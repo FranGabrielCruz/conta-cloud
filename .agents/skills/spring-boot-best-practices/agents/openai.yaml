@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spring Boot Best Practices"
+  short_description: "Genera proyectos Spring Boot por capas con Initializr"
+  default_prompt: "Usa $spring-boot-best-practices para crear una API Spring Boot básica desde Spring Initializr."
