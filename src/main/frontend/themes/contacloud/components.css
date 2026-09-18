@@ -1,0 +1,17 @@
+vaadin-app-layout::part(drawer) { background: var(--cc-sidebar); }
+vaadin-app-layout::part(navbar) { background: var(--cc-surface); }
+vaadin-side-nav-item[current] { --vaadin-side-nav-item-background: var(--lumo-primary-color-10pct); font-weight: 700; }
+vaadin-context-menu-overlay::part(overlay),
+vaadin-dialog-overlay::part(overlay),
+vaadin-confirm-dialog-overlay::part(overlay) { background: var(--cc-surface); border: 1px solid var(--cc-border); }
+
+/* Evita que el primer elemento parezca seleccionado al abrir el menú con el mouse. */
+vaadin-context-menu-item {
+  --vaadin-focus-ring-color: transparent;
+  --lumo-primary-color-50pct: transparent;
+}
+
+vaadin-context-menu-item[focus-ring] {
+  box-shadow: none !important;
+  outline: none !important;
+}
