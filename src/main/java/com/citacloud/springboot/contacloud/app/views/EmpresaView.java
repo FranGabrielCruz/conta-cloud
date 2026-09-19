@@ -2,9 +2,9 @@ package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.dto.EmpresaDto;
 import com.citacloud.springboot.contacloud.app.services.EmpresaService;
-import com.vaadin.flow.component.html.H1;
+import com.citacloud.springboot.contacloud.app.views.components.AppDetailSection;
+import com.citacloud.springboot.contacloud.app.views.components.AppPageHeader;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.*;
 import jakarta.annotation.security.PermitAll;
 
@@ -12,9 +12,17 @@ import jakarta.annotation.security.PermitAll;
 public class EmpresaView extends VerticalLayout {
     public EmpresaView(EmpresaService service) {
         EmpresaDto empresa = service.obtenerActual();
-        var codigo = new TextField("Codigo", empresa.codigo(), ""); codigo.setReadOnly(true);
-        var nombre = new TextField("Nombre", empresa.nombre(), ""); nombre.setReadOnly(true);
-        var fiscal = new TextField("Identificacion fiscal", empresa.identificacionFiscal(), ""); fiscal.setReadOnly(true);
-        setMaxWidth("800px"); add(new H1("Datos de empresa"), codigo, nombre, fiscal);
+        addClassName("cc-page");
+        setPadding(false);
+        setSpacing(false);
+        setWidthFull();
+        var details = new AppDetailSection("Información general")
+            .field("Nombre", empresa.nombre())
+            .field("Identificación fiscal", empresa.identificacionFiscal())
+            .field("País", empresa.paisCodigo())
+            .field("Zona horaria", empresa.zonaHoraria())
+            .field("Código", empresa.codigo())
+            .field("Estado", empresa.activo() ? "Activa" : "Inactiva");
+        add(new AppPageHeader("Datos de empresa", "Información general de la empresa activa."), details);
     }
 }

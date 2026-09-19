@@ -1,9 +1,9 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
+import com.citacloud.springboot.contacloud.app.views.components.AppPageHeader;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -20,8 +20,8 @@ public class ConfiguracionView extends VerticalLayout {
         addClassName("cc-page");
         setPadding(false);
         setSpacing(false);
-        add(new H1("Configuración"),
-            new Paragraph("Configura los datos generales, sucursales y monedas utilizadas por la empresa."));
+        add(new AppPageHeader("Configuración",
+            "Configura los datos generales, sucursales y monedas utilizadas por la empresa."));
 
         var tarjetas = new Div();
         tarjetas.addClassName("cc-settings-grid");

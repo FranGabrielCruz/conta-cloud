@@ -161,8 +161,6 @@ public class MainLayout extends AppLayout {
         var derecha = new Span("Versión " + version + " · Soporte · Privacidad");
         var footer = new Footer(izquierda, derecha);
         footer.addClassName("cc-footer");
-        footer.getStyle().set("display", "flex").set("justify-content", "space-between")
-            .set("flex-wrap", "wrap");
         return footer;
     }
 

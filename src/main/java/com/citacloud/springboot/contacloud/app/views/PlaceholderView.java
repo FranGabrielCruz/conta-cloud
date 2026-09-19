@@ -1,8 +1,7 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
-import com.vaadin.flow.component.html.H1;
-import com.vaadin.flow.component.html.Paragraph;
+import com.citacloud.springboot.contacloud.app.views.components.AppPageHeader;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
@@ -69,8 +68,8 @@ public class PlaceholderView extends VerticalLayout implements BeforeEnterObserv
             return;
         }
         removeAll();
-        add(new H1(modulo.titulo()),
-            new Paragraph("La base segura de este módulo está preparada para continuar con su flujo CRUD."));
+        add(new AppPageHeader(modulo.titulo(),
+            "La base segura de este módulo está preparada para continuar con su flujo CRUD."));
     }
 
     private record Modulo(String titulo, String permiso) {}

@@ -12,6 +12,7 @@ public class MenuService {
         grupos.add(new GrupoMenu("INICIO", List.of(new OpcionMenu("Dashboard", "dashboard", "HOME"))));
 
         List<OpcionMenu> administracion = new ArrayList<>();
+        agregarSi(permisos, administracion, "EMPRESA_VER", "Empresa", "empresa", "OFFICE");
         if (permisos.contains("ROLE_PLATFORM_SUPERADMIN")) administracion.add(new OpcionMenu("Empresas", "empresas", "OFFICE"));
         agregarSi(permisos, administracion, "USUARIO_VER", "Usuarios", "usuarios", "USERS");
         agregarSi(permisos, administracion, "ROL_VER", "Roles y permisos", "roles", "USER_STAR");

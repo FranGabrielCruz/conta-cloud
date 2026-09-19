@@ -30,7 +30,18 @@ class MenuServiceTest {
             .toList();
 
         assertThat(opciones).contains("Dashboard", "Usuarios", "Impuestos")
-            .doesNotContain("Roles y permisos", "Empresas", "Tenants");
+            .doesNotContain("Empresa", "Roles y permisos", "Empresas", "Tenants");
+    }
+
+    @Test
+    void empresaApareceEnAdministracionSoloConPermisoYEnlazaEmpresaActual() {
+        autenticar(Set.of("EMPRESA_VER"));
+
+        var administracion = service.obtener().stream()
+            .filter(grupo -> grupo.titulo().equals("ADMINISTRACIÓN"))
+            .findFirst().orElseThrow();
+        assertThat(administracion.opciones()).containsExactly(
+            new MenuService.OpcionMenu("Empresa", "empresa", "OFFICE"));
     }
 
     @Test

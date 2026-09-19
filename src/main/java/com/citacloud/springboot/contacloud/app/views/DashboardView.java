@@ -1,10 +1,10 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.services.DashboardService;
+import com.citacloud.springboot.contacloud.app.views.components.AppPageHeader;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
@@ -34,8 +34,8 @@ public class DashboardView extends VerticalLayout {
         setWidthFull();
 
         var resumen = service.obtener();
-        add(new H1("Hola, " + resumen.empresa()),
-            new Paragraph("Este es el resumen administrativo y de configuración de tu empresa."));
+        add(new AppPageHeader("Hola, " + resumen.empresa(),
+            "Este es el resumen administrativo y de configuración de tu empresa."));
 
         var metricas = new Div(
             metrica("Usuarios", resumen.metricas().usuarios()),
