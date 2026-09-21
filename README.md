@@ -18,6 +18,18 @@ Defina como minimo:
 $env:DB_PASSWORD="su-password-local"
 ```
 
+Los logos se guardan como archivos locales, fuera de PostgreSQL. En desarrollo se usa
+`./data/contacloud` (ignorado por Git). Para producción configure
+`APP_STORAGE_LOCAL_BASE_PATH=/data/contacloud` y monte esa ruta en un volumen persistente
+del contenedor; no dependa de su capa efímera. La base solo guarda `logo_object_key`,
+con la forma `tenants/{tenantId}/companies/{empresaId}/logos/logo-{uuid}.{ext}`.
+El `tenantId` es una identidad estable y distinta del `empresaId`, preparada para
+una futura organización con varias empresas por tenant.
+
+Una copia de seguridad y su restauración deben incluir **PostgreSQL y el directorio
+completo de archivos**, conservando las rutas relativas de los logos. El repositorio
+no contiene Docker Compose; al añadirlo, monte el volumen en la misma ruta configurada.
+
 Para crear el primer tenant y administrador en una instalacion vacia, ejecute una sola vez con estas variables. No se guardan en el repositorio y el bootstrap no modifica una empresa ya existente.
 
 ```powershell
@@ -46,4 +58,11 @@ Abra `http://localhost:8080` e ingrese Empresa, Usuario y Contraseña.
 
 ## Alcance actual
 
-Incluye el esquema completo de datos de la Fase 1, login multitenant, permisos base, dashboard, datos de empresa, generacion segura de secuencias, manejo uniforme de errores y pruebas unitarias de aislamiento. Los CRUD visuales restantes se incorporan progresivamente sobre esta base, sin adelantar modulos de facturacion, ventas, compras o inventario.
+Incluye el esquema de datos de la Fase 1, login multitenant, permisos base, dashboard,
+configuración operativa de la empresa, sucursales, catálogo y monedas habilitadas,
+moneda base, logo local, generación segura de secuencias, manejo uniforme de errores
+y pruebas de aislamiento. La configuración está disponible desde el menú de usuario en
+`/configuracion` y nunca recibe el tenant o la empresa desde el navegador.
+
+Los módulos de facturación, ventas, compras e inventario permanecen fuera del alcance
+de esta etapa.

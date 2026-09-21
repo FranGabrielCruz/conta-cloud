@@ -67,6 +67,7 @@ public class AppPagination extends Div {
     }
 
     public PageRequest currentRequest() { return new PageRequest(page, pageSize.getValue()); }
+    public void reset() { page = 0; refresh(); }
 
     private void refresh() {
         long first = total == 0 ? 0 : (long) page * pageSize.getValue() + 1;

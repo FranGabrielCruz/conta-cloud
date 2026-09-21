@@ -29,6 +29,12 @@ public class BootstrapConfig implements ApplicationRunner {
         if (existe != null && existe > 0) return;
         UUID empresaId = UUID.randomUUID(), rolId = UUID.randomUUID(), usuarioId = UUID.randomUUID();
         jdbc.update("INSERT INTO empresas(id,codigo,nombre) VALUES (?,?,?)", empresaId, empresaCodigo.trim().toUpperCase(), empresaNombre.trim());
+        jdbc.update("INSERT INTO datos_empresa(empresa_id,nombre_comercial,razon_social) VALUES (?,?,?)",
+            empresaId, empresaNombre.trim(), empresaNombre.trim());
+        jdbc.update("INSERT INTO sucursales(empresa_id,codigo,nombre,principal,activo) VALUES (?,?,?,?,TRUE)",
+            empresaId, "PRINCIPAL", "Sucursal Principal", true);
+        jdbc.update("INSERT INTO monedas(empresa_id,codigo_iso,nombre,simbolo,decimales,moneda_base,activo) " +
+            "VALUES (?,?,?,?,2,TRUE,TRUE)", empresaId, "DOP", "Peso dominicano", "RD$");
         jdbc.update("INSERT INTO roles(id,empresa_id,codigo,nombre) VALUES (?,?,?,?)", rolId, empresaId, "ADMINISTRADOR", "Administrador");
         jdbc.update("INSERT INTO rol_permisos(empresa_id,rol_id,permiso_id) SELECT ?,?,id FROM permisos", empresaId, rolId);
         jdbc.update("INSERT INTO usuarios(id,empresa_id,usuario,nombre,password_hash) VALUES (?,?,?,?,?)",

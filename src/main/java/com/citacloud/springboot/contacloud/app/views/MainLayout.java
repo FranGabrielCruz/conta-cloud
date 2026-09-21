@@ -1,7 +1,9 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.services.ContextoUsuarioService;
+import com.citacloud.springboot.contacloud.app.services.CompanyConfigurationService;
 import com.citacloud.springboot.contacloud.app.services.MenuService;
+import com.citacloud.springboot.contacloud.app.views.components.CompanyLogoAvatar;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
@@ -31,13 +33,21 @@ import java.time.Year;
 public class MainLayout extends AppLayout {
 
     private final Div contentHost = new Div();
+    private final CompanyConfigurationService companyConfiguration;
+    private final ContextoUsuarioService contextoUsuario;
+    private CompanyLogoAvatar menuAvatar;
+    private Span companyBadge;
+    private Span menuCompanyName;
     private HasElement currentContent;
 
     public MainLayout(ContextoUsuarioService contextoUsuario, MenuService menuService,
+                      CompanyConfigurationService companyConfiguration,
                       AuthenticationContext authenticationContext,
                       @Value("${contacloud.version}") String version,
                       @Value("${contacloud.session.warning-after}") Duration warningAfter,
                       @Value("${contacloud.session.expire-after}") Duration expireAfter) {
+        this.companyConfiguration = companyConfiguration;
+        this.contextoUsuario = contextoUsuario;
         var contexto = contextoUsuario.obtener();
         addToNavbar(crearHeader(contexto, authenticationContext));
         addToDrawer(crearDrawer(menuService));
@@ -62,16 +72,16 @@ public class MainLayout extends AppLayout {
         marca.add(new Span("C") {{ addClassName("cc-brand-mark"); }},
             new Span("ContaCloud") {{ addClassName("cc-brand-name"); }});
 
-        var empresa = new Span(contexto.empresa());
-        empresa.addClassName("cc-context-badge");
-        empresa.getElement().setAttribute("title", "Empresa activa: " + contexto.empresaCodigo());
+        companyBadge = new Span(contexto.empresa());
+        companyBadge.addClassName("cc-context-badge");
+        companyBadge.getElement().setAttribute("title", "Empresa activa: " + contexto.empresaCodigo());
 
         var usuario = new Button(contexto.usuario(), VaadinIcon.USER.create());
         usuario.addClassName("cc-user-button");
         usuario.getElement().setAttribute("aria-label", "Abrir menú de usuario");
         crearMenuUsuario(usuario, contexto, authenticationContext);
 
-        var header = new HorizontalLayout(new DrawerToggle(), marca, empresa, usuario);
+        var header = new HorizontalLayout(new DrawerToggle(), marca, companyBadge, usuario);
         header.addClassName("cc-header");
         header.setWidthFull();
         header.setPadding(false);
@@ -86,14 +96,15 @@ public class MainLayout extends AppLayout {
         var menu = new ContextMenu(target);
         menu.setOpenOnClick(true);
 
-        var avatar = new Span(contexto.inicialEmpresa());
-        avatar.addClassName("cc-avatar");
-        var datos = new VerticalLayout(new Span(contexto.usuario()) {{ addClassName("cc-user-name"); }},
-            new Span(contexto.empresa()) {{ addClassName("cc-user-company"); }});
+        menuAvatar = new CompanyLogoAvatar(contexto.inicialEmpresa(), false);
+        menuAvatar.refresh(companyConfiguration.currentLogoAvailable());
+        menuCompanyName = new Span(contexto.empresa());
+        menuCompanyName.addClassName("cc-user-company");
+        var datos = new VerticalLayout(new Span(contexto.usuario()) {{ addClassName("cc-user-name"); }}, menuCompanyName);
         datos.addClassName("cc-user-info");
         datos.setPadding(false);
         datos.setSpacing(false);
-        var perfil = new HorizontalLayout(avatar, datos);
+        var perfil = new HorizontalLayout(menuAvatar, datos);
         perfil.addClassName("cc-user-profile");
         perfil.setAlignItems(HorizontalLayout.Alignment.CENTER);
         menu.addComponent(perfil);
@@ -170,6 +181,19 @@ public class MainLayout extends AppLayout {
             localStorage.setItem('contacloud.theme', theme);
             document.documentElement.setAttribute('theme', theme);
             """, oscuro);
+    }
+
+    public void refreshCompanyLogo() {
+        menuAvatar.refresh(companyConfiguration.currentLogoAvailable());
+    }
+
+    public void refreshCompanyContext() {
+        var contexto = contextoUsuario.obtener();
+        companyBadge.setText(contexto.empresa());
+        companyBadge.getElement().setAttribute("title", "Empresa activa: " + contexto.empresaCodigo());
+        menuCompanyName.setText(contexto.empresa());
+        menuAvatar.setInitial(contexto.inicialEmpresa());
+        refreshCompanyLogo();
     }
 
     @Override

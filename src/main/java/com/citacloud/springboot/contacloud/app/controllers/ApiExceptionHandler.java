@@ -1,6 +1,7 @@
 package com.citacloud.springboot.contacloud.app.controllers;
 
 import com.citacloud.springboot.contacloud.app.services.RecursoNoEncontradoException;
+import com.citacloud.springboot.contacloud.app.services.ReglaNegocioException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,6 +22,8 @@ public class ApiExceptionHandler {
     ResponseEntity<?> integridad(DataIntegrityViolationException ex) {
         log.warn("Conflicto de integridad", ex); return respuesta(HttpStatus.CONFLICT, "No fue posible guardar: existe un valor duplicado o relacionado");
     }
+    @ExceptionHandler(ReglaNegocioException.class)
+    ResponseEntity<?> regla(ReglaNegocioException ex) { return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage()); }
     private ResponseEntity<?> respuesta(HttpStatus status, String mensaje) {
         return ResponseEntity.status(status).body(Map.of("fecha", Instant.now(), "estado", status.value(), "mensaje", mensaje));
     }

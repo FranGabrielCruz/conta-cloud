@@ -4,7 +4,7 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 
 public enum ActionType {
     NEW("Nuevo registro", VaadinIcon.PLUS, "new"),
-    SAVE("Guardar", null, "save"),
+    SAVE("Guardar", VaadinIcon.DISC, "save"),
     EDIT("Editar", VaadinIcon.PENCIL, "edit"),
     VIEW("Ver", VaadinIcon.EYE, "view"),
     CANCEL("Cancelar", VaadinIcon.CLOSE, "neutral"),

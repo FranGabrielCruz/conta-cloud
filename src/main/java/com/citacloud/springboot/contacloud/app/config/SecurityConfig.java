@@ -22,7 +22,9 @@ public class SecurityConfig {
     }
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, TenantAuthenticationProvider provider) throws Exception {
         http.authenticationProvider(provider);
-        http.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/health", "/favicon.svg").permitAll());
+        http.authorizeHttpRequests(auth -> auth
+            .requestMatchers("/actuator/health", "/favicon.svg").permitAll()
+            .requestMatchers("/api/company/logo").authenticated());
         http.with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer.loginView(LoginView.class));
         return http.build();
     }

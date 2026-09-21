@@ -14,10 +14,20 @@ public class Sucursal {
     @Column(nullable = false) private boolean principal;
     @Column(nullable = false) private boolean activo = true;
     protected Sucursal() {}
+    public Sucursal(UUID empresaId, String codigo, String nombre) {
+        this.empresaId = empresaId; this.codigo = codigo; this.nombre = nombre;
+    }
     public UUID getId() { return id; }
     public UUID getEmpresaId() { return empresaId; }
     public String getCodigo() { return codigo; }
     public String getNombre() { return nombre; }
+    public void setNombre(String value) { nombre = value; }
+    public String getDireccion() { return direccion; }
+    public void setDireccion(String value) { direccion = value; }
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String value) { telefono = value; }
     public boolean isPrincipal() { return principal; }
+    public void setPrincipal(boolean value) { principal = value; }
     public boolean isActivo() { return activo; }
+    public void setActivo(boolean value) { activo = value; }
 }

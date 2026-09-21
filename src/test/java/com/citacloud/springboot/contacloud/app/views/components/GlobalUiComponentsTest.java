@@ -1,6 +1,8 @@
 package com.citacloud.springboot.contacloud.app.views.components;
 
 import org.junit.jupiter.api.Test;
+import com.vaadin.flow.component.html.Image;
+import com.vaadin.flow.component.html.Span;
 
 import java.util.ArrayList;
 
@@ -23,6 +25,16 @@ class GlobalUiComponentsTest {
         assertTrue(guardar.hasClassName("cc-action-save"));
         assertEquals("Guardar", guardar.getElement().getAttribute("aria-label"));
         assertNotNull(guardar.getIcon());
+        assertTrue(guardar.getIcon().hasClassName("cc-action-icon"));
+        assertEquals("vaadin-icon", guardar.getIcon().getElement().getTag());
+    }
+
+    @Test
+    void tablaEstandarAutoajustaAlturaSinAlterarPaginacionBackend() {
+        var grid = new AppGrid<String>(String.class);
+        assertTrue(grid.isAllRowsVisible());
+        assertTrue(grid.hasClassName("cc-auto-grid"));
+        assertEquals("100%", grid.getWidth());
     }
 
     @Test
@@ -42,5 +54,21 @@ class GlobalUiComponentsTest {
             .field("RNC", null);
         assertEquals(2, section.getChildren().filter(child -> child.hasClassName("cc-detail-grid"))
             .findFirst().orElseThrow().getChildren().count());
+    }
+
+    @Test
+    void logoUsaFallbackYLaMismaUrlProtegidaEnAmbosTamanos() {
+        var menuAvatar = new CompanyLogoAvatar("C", false);
+        menuAvatar.refresh(false);
+        assertTrue(menuAvatar.hasClassName("cc-company-avatar"));
+        assertFalse(menuAvatar.hasClassName("cc-company-avatar-large"));
+        assertEquals("C", menuAvatar.getChildren().map(Span.class::cast).findFirst().orElseThrow().getText());
+
+        var preview = new CompanyLogoAvatar("C", true);
+        preview.refresh(true);
+        assertTrue(preview.hasClassName("cc-company-avatar-large"));
+        var image = preview.getChildren().filter(Image.class::isInstance).map(Image.class::cast)
+            .findFirst().orElseThrow();
+        assertTrue(image.getSrc().startsWith("/api/company/logo?v="));
     }
 }
