@@ -6,6 +6,14 @@ import java.util.*;
 
 @Service
 public class MenuService {
+    private static final Set<String> PERMISOS_CONFIGURACION_USUARIO = Set.of(
+        "EMPRESA_VER", "empresa.ver", "SUCURSAL_VER", "sucursales.ver", "MONEDA_VER", "monedas.ver");
+
+    public boolean mostrarConfiguracionUsuario() {
+        Set<String> permisos = TenantContext.principalActual().permisos();
+        return permisos.stream().anyMatch(PERMISOS_CONFIGURACION_USUARIO::contains);
+    }
+
     public List<GrupoMenu> obtener() {
         Set<String> permisos = TenantContext.principalActual().permisos();
         List<GrupoMenu> grupos = new ArrayList<>();
@@ -14,8 +22,8 @@ public class MenuService {
         List<OpcionMenu> administracion = new ArrayList<>();
         agregarSi(permisos, administracion, "EMPRESA_VER", "Empresa", "empresa", "OFFICE");
         if (permisos.contains("ROLE_PLATFORM_SUPERADMIN")) administracion.add(new OpcionMenu("Empresas", "empresas", "OFFICE"));
-        agregarSi(permisos, administracion, "USUARIO_VER", "Usuarios", "usuarios", "USERS");
-        agregarSi(permisos, administracion, "ROL_VER", "Roles y permisos", "roles", "USER_STAR");
+        agregarSi(permisos, administracion, "USUARIO_VER", "usuarios.ver", "Usuarios", "usuarios", "USERS");
+        agregarSi(permisos, administracion, "ROL_VER", "roles.ver", "Roles y permisos", "roles", "USER_STAR");
         if (!administracion.isEmpty()) grupos.add(new GrupoMenu("ADMINISTRACIÓN", List.copyOf(administracion)));
 
         List<OpcionMenu> configuracion = new ArrayList<>();
@@ -39,6 +47,9 @@ public class MenuService {
     }
     private void agregarSi(Set<String> permisos, List<OpcionMenu> opciones, String permiso, String titulo, String ruta, String icono) {
         if (permisos.contains(permiso)) opciones.add(new OpcionMenu(titulo, ruta, icono));
+    }
+    private void agregarSi(Set<String> permisos, List<OpcionMenu> opciones, String permiso, String alterno, String titulo, String ruta, String icono) {
+        if (permisos.contains(permiso) || permisos.contains(alterno)) opciones.add(new OpcionMenu(titulo, ruta, icono));
     }
     public record GrupoMenu(String titulo, List<OpcionMenu> opciones) {}
     public record OpcionMenu(String titulo, String ruta, String icono) {}

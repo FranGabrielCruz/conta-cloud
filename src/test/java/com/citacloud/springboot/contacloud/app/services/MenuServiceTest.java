@@ -55,6 +55,25 @@ class MenuServiceTest {
         });
     }
 
+    @Test
+    void rolSinPermisosNoMuestraOpcionesNiSeccionesVacias() {
+        autenticar(Set.of());
+
+        assertThat(service.obtener()).containsExactly(
+            new MenuService.GrupoMenu("INICIO", java.util.List.of(
+                new MenuService.OpcionMenu("Dashboard", "dashboard", "HOME"))));
+        assertThat(service.mostrarConfiguracionUsuario()).isFalse();
+    }
+
+    @Test
+    void configuracionDelUsuarioSoloApareceConUnaOpcionPermitida() {
+        autenticar(Set.of("SUCURSAL_VER"));
+        assertThat(service.mostrarConfiguracionUsuario()).isTrue();
+
+        autenticar(Set.of("ROL_VER"));
+        assertThat(service.mostrarConfiguracionUsuario()).isFalse();
+    }
+
     private void autenticar(Set<String> permisos) {
         var principal = new TenantPrincipal(UUID.randomUUID(), UUID.randomUUID(), "EMPRESA01",
             "Administrador", "admin", "hash", true, permisos);

@@ -6,12 +6,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import java.util.List;
+import java.util.Collection;
 import java.util.UUID;
 public interface SucursalRepository extends JpaRepository<Sucursal, UUID> {
     Page<Sucursal> findAllByEmpresaId(UUID empresaId, Pageable pageable);
     Optional<Sucursal> findByIdAndEmpresaId(UUID id, UUID empresaId);
     long countByEmpresaIdAndActivoTrue(UUID empresaId);
     boolean existsByEmpresaIdAndPrincipalTrue(UUID empresaId);
+    List<Sucursal> findAllByEmpresaIdAndActivoTrueOrderByNombre(UUID empresaId);
+    List<Sucursal> findAllByIdInAndEmpresaId(Collection<UUID> ids, UUID empresaId);
     @Query("""
         select s from Sucursal s where s.empresaId=:empresaId
           and (:buscar='' or lower(s.nombre) like lower(concat('%',:buscar,'%'))

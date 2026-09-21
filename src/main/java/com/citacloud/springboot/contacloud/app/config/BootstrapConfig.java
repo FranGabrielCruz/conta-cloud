@@ -27,19 +27,21 @@ public class BootstrapConfig implements ApplicationRunner {
         if (empresaCodigo.isBlank() || empresaNombre.isBlank() || usuario.isBlank() || password.isBlank()) return;
         Integer existe = jdbc.queryForObject("SELECT COUNT(*) FROM empresas WHERE UPPER(codigo)=UPPER(?)", Integer.class, empresaCodigo);
         if (existe != null && existe > 0) return;
-        UUID empresaId = UUID.randomUUID(), rolId = UUID.randomUUID(), usuarioId = UUID.randomUUID();
-        jdbc.update("INSERT INTO empresas(id,codigo,nombre) VALUES (?,?,?)", empresaId, empresaCodigo.trim().toUpperCase(), empresaNombre.trim());
+        UUID empresaId = UUID.randomUUID(), tenantId = UUID.randomUUID(), rolId = UUID.randomUUID(), usuarioId = UUID.randomUUID();
+        jdbc.update("INSERT INTO empresas(id,tenant_id,codigo,nombre) VALUES (?,?,?,?)", empresaId, tenantId, empresaCodigo.trim().toUpperCase(), empresaNombre.trim());
         jdbc.update("INSERT INTO datos_empresa(empresa_id,nombre_comercial,razon_social) VALUES (?,?,?)",
             empresaId, empresaNombre.trim(), empresaNombre.trim());
         jdbc.update("INSERT INTO sucursales(empresa_id,codigo,nombre,principal,activo) VALUES (?,?,?,?,TRUE)",
             empresaId, "PRINCIPAL", "Sucursal Principal", true);
         jdbc.update("INSERT INTO monedas(empresa_id,codigo_iso,nombre,simbolo,decimales,moneda_base,activo) " +
             "VALUES (?,?,?,?,2,TRUE,TRUE)", empresaId, "DOP", "Peso dominicano", "RD$");
-        jdbc.update("INSERT INTO roles(id,empresa_id,codigo,nombre) VALUES (?,?,?,?)", rolId, empresaId, "ADMINISTRADOR", "Administrador");
+        jdbc.update("INSERT INTO roles(id,empresa_id,codigo,nombre,protegido) VALUES (?,?,?,?,TRUE)", rolId, empresaId, "ADMINISTRADOR", "Administrador");
         jdbc.update("INSERT INTO rol_permisos(empresa_id,rol_id,permiso_id) SELECT ?,?,id FROM permisos", empresaId, rolId);
-        jdbc.update("INSERT INTO usuarios(id,empresa_id,usuario,nombre,password_hash) VALUES (?,?,?,?,?)",
-            usuarioId, empresaId, usuario.trim(), usuario.trim(), encoder.encode(password));
+        jdbc.update("INSERT INTO usuarios(id,tenant_id,empresa_id,usuario,nombre,apellido,password_hash) VALUES (?,?,?,?,?,?,?)",
+            usuarioId, tenantId, empresaId, usuario.trim().toLowerCase(), usuario.trim(), "", encoder.encode(password));
         jdbc.update("INSERT INTO usuario_roles(empresa_id,usuario_id,rol_id) VALUES (?,?,?)", empresaId, usuarioId, rolId);
+        jdbc.update("INSERT INTO usuario_empresa(usuario_id,empresa_id,rol_id,activo,acceso_todas_sucursales) VALUES (?,?,?,TRUE,TRUE)",
+            usuarioId, empresaId, rolId);
         log.info("Tenant inicial creado: {}", empresaCodigo.trim().toUpperCase());
     }
 }

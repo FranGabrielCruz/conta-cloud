@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public final class TenantContext {
     private TenantContext() {}
+    public static UUID requerirTenantId() { return principalActual().tenantId(); }
     public static UUID requerirEmpresaId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof TenantPrincipal principal)) {

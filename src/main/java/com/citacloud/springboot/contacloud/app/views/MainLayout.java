@@ -49,7 +49,7 @@ public class MainLayout extends AppLayout {
         this.companyConfiguration = companyConfiguration;
         this.contextoUsuario = contextoUsuario;
         var contexto = contextoUsuario.obtener();
-        addToNavbar(crearHeader(contexto, authenticationContext));
+        addToNavbar(crearHeader(contexto, authenticationContext, menuService));
         addToDrawer(crearDrawer(menuService));
 
         contentHost.addClassName("cc-content");
@@ -65,7 +65,8 @@ public class MainLayout extends AppLayout {
     }
 
     private Component crearHeader(ContextoUsuarioService.Contexto contexto,
-                                   AuthenticationContext authenticationContext) {
+                                   AuthenticationContext authenticationContext,
+                                   MenuService menuService) {
         var marca = new RouterLink();
         marca.setRoute(DashboardView.class);
         marca.addClassName("cc-brand");
@@ -79,7 +80,7 @@ public class MainLayout extends AppLayout {
         var usuario = new Button(contexto.usuario(), VaadinIcon.USER.create());
         usuario.addClassName("cc-user-button");
         usuario.getElement().setAttribute("aria-label", "Abrir menú de usuario");
-        crearMenuUsuario(usuario, contexto, authenticationContext);
+        crearMenuUsuario(usuario, contexto, authenticationContext, menuService);
 
         var header = new HorizontalLayout(new DrawerToggle(), marca, companyBadge, usuario);
         header.addClassName("cc-header");
@@ -92,7 +93,8 @@ public class MainLayout extends AppLayout {
     }
 
     private void crearMenuUsuario(Button target, ContextoUsuarioService.Contexto contexto,
-                                  AuthenticationContext authenticationContext) {
+                                  AuthenticationContext authenticationContext,
+                                  MenuService menuService) {
         var menu = new ContextMenu(target);
         menu.setOpenOnClick(true);
 
@@ -110,8 +112,10 @@ public class MainLayout extends AppLayout {
         menu.addComponent(perfil);
         menu.addSeparator();
 
-        menu.addItem(filaMenu(VaadinIcon.COG.create(), "Configuración"),
-            event -> UI.getCurrent().navigate("configuracion"));
+        if (menuService.mostrarConfiguracionUsuario()) {
+            menu.addItem(filaMenu(VaadinIcon.COG.create(), "Configuración"),
+                event -> UI.getCurrent().navigate("configuracion"));
+        }
 
         var temaOscuro = new Checkbox();
         temaOscuro.setAriaLabel("Modo oscuro");

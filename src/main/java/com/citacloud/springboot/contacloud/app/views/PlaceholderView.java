@@ -14,8 +14,6 @@ import jakarta.annotation.security.PermitAll;
 import java.util.Map;
 
 @Route(value = "modulo", layout = MainLayout.class)
-@RouteAlias(value = "usuarios", layout = MainLayout.class)
-@RouteAlias(value = "roles", layout = MainLayout.class)
 @RouteAlias(value = "sucursales", layout = MainLayout.class)
 @RouteAlias(value = "monedas", layout = MainLayout.class)
 @RouteAlias(value = "tasas-cambio", layout = MainLayout.class)
@@ -35,8 +33,6 @@ import java.util.Map;
 public class PlaceholderView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final Map<String, Modulo> MODULOS = Map.ofEntries(
-        Map.entry("usuarios", new Modulo("Usuarios", "USUARIO_VER")),
-        Map.entry("roles", new Modulo("Roles y permisos", "ROL_VER")),
         Map.entry("sucursales", new Modulo("Sucursales", "SUCURSAL_VER")),
         Map.entry("monedas", new Modulo("Monedas", "MONEDA_VER")),
         Map.entry("tasas-cambio", new Modulo("Tasas de cambio", "TASA_CAMBIO_VER")),
