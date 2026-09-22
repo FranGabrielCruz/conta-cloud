@@ -28,7 +28,7 @@ public class CompanyCurrencyService {
         this.repository=repository; this.catalog=catalog; this.empresas=empresas; this.mapper=mapper; this.auditoria=auditoria;
     }
 
-    @Transactional(readOnly = true) @PreAuthorize("hasAuthority('MONEDA_VER')")
+    @Transactional(readOnly = true) @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_VER')")
     public Page<MonedaDto> search(String query, Boolean active, Pageable pageable) {
         if (!java.util.Set.of(10,25,50,100).contains(pageable.getPageSize()) || pageable.getPageNumber() < 0)
             throw new ReglaNegocioException("Paginación no válida.");
@@ -39,15 +39,15 @@ public class CompanyCurrencyService {
             : repository.buscarPorEstado(empresaId, search, active, pageable);
         return result.map(mapper::toDto);
     }
-    @Transactional(readOnly = true) @PreAuthorize("hasAnyAuthority('MONEDA_VER','EMPRESA_VER')")
+    @Transactional(readOnly = true) @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAnyAuthority('MONEDA_VER','EMPRESA_VER')")
     public List<MonedaDto> activeCurrencies() {
         return repository.findAllByEmpresaIdAndActivoTrueOrderByCodigoIso(TenantContext.requerirEmpresaId())
             .stream().map(mapper::toDto).toList();
     }
-    @Transactional(readOnly = true) @PreAuthorize("hasAuthority('MONEDA_VER')")
+    @Transactional(readOnly = true) @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_VER')")
     public MonedaDto get(UUID id) { return mapper.toDto(findCurrent(id)); }
 
-    @Transactional @PreAuthorize("hasAuthority('MONEDA_CREAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_CREAR')")
     public MonedaDto addFromCatalog(String code) {
         UUID empresaId = TenantContext.requerirEmpresaId();
         String normalized = code == null ? "" : code.trim().toUpperCase();
@@ -61,7 +61,7 @@ public class CompanyCurrencyService {
         return mapper.toDto(currency);
     }
 
-    @Transactional @PreAuthorize("hasAuthority('MONEDA_CREAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_CREAR')")
     public MonedaDto create(NuevaMonedaDto dto) {
         validateNew(dto);
         UUID empresaId = TenantContext.requerirEmpresaId();
@@ -74,7 +74,7 @@ public class CompanyCurrencyService {
         return mapper.toDto(currency);
     }
 
-    @Transactional @PreAuthorize("hasAuthority('MONEDA_EDITAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_EDITAR')")
     public MonedaDto update(UUID id, MonedaDto dto) {
         var currency = findCurrent(id);
         if (!currency.getCodigoIso().equalsIgnoreCase(dto.codigoIso()))
@@ -88,7 +88,7 @@ public class CompanyCurrencyService {
         return mapper.toDto(currency);
     }
 
-    @Transactional @PreAuthorize("hasAuthority('MONEDA_DESACTIVAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('MONEDAS') and hasAuthority('MONEDA_DESACTIVAR')")
     public void disable(UUID id) {
         empresas.findWithLockById(TenantContext.requerirEmpresaId())
             .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));

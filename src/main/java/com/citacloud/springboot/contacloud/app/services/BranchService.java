@@ -20,7 +20,7 @@ public class BranchService {
         this.repository = repository; this.mapper = mapper; this.auditoria = auditoria;
     }
 
-    @Transactional(readOnly = true) @PreAuthorize("hasAuthority('SUCURSAL_VER')")
+    @Transactional(readOnly = true) @PreAuthorize("@moduleAuthorization.enabled('SUCURSALES') and hasAuthority('SUCURSAL_VER')")
     public Page<SucursalDto> search(String query, Boolean active, Pageable pageable) {
         validatePage(pageable);
         UUID empresaId = TenantContext.requerirEmpresaId();
@@ -31,10 +31,10 @@ public class BranchService {
         return result.map(mapper::toDto);
     }
 
-    @Transactional(readOnly = true) @PreAuthorize("hasAuthority('SUCURSAL_VER')")
+    @Transactional(readOnly = true) @PreAuthorize("@moduleAuthorization.enabled('SUCURSALES') and hasAuthority('SUCURSAL_VER')")
     public SucursalDto get(UUID id) { return mapper.toDto(findCurrent(id)); }
 
-    @Transactional @PreAuthorize("hasAuthority('SUCURSAL_CREAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('SUCURSALES') and hasAuthority('SUCURSAL_CREAR')")
     public SucursalDto create(SucursalDto dto) {
         validate(dto);
         UUID empresaId = TenantContext.requerirEmpresaId();
@@ -45,7 +45,7 @@ public class BranchService {
         return mapper.toDto(branch);
     }
 
-    @Transactional @PreAuthorize("hasAuthority('SUCURSAL_EDITAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('SUCURSALES') and hasAuthority('SUCURSAL_EDITAR')")
     public SucursalDto update(UUID id, SucursalDto dto) {
         validate(dto);
         var branch = findCurrent(id); mapper.update(branch, normalized(dto)); repository.save(branch);
@@ -53,7 +53,7 @@ public class BranchService {
         return mapper.toDto(branch);
     }
 
-    @Transactional @PreAuthorize("hasAuthority('SUCURSAL_DESACTIVAR')")
+    @Transactional @PreAuthorize("@moduleAuthorization.enabled('SUCURSALES') and hasAuthority('SUCURSAL_DESACTIVAR')")
     public void disable(UUID id) {
         var branch = findCurrent(id);
         if (branch.isPrincipal()) throw new ReglaNegocioException("No puedes desactivar la sucursal principal.");

@@ -4,6 +4,7 @@ import com.citacloud.springboot.contacloud.app.dto.*;
 import com.citacloud.springboot.contacloud.app.mappers.*;
 import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
+import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,6 +29,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest(properties = {"spring.flyway.enabled=false", "spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import({CompanyConfigurationService.class, CompanyCurrencyService.class, CurrencyCatalogService.class,
@@ -127,5 +130,12 @@ class ConfigurationPersistenceIntegrationTest {
     }
 
     @TestConfiguration @EnableMethodSecurity
-    static class TestConfig { @Bean AuditoriaService auditoriaService() { return mock(AuditoriaService.class); } }
+    static class TestConfig {
+        @Bean AuditoriaService auditoriaService() { return mock(AuditoriaService.class); }
+        @Bean ModuleAuthorization moduleAuthorization() {
+            EmpresaModuloService modules = mock(EmpresaModuloService.class);
+            when(modules.habilitado(anyString())).thenReturn(true);
+            return new ModuleAuthorization(modules);
+        }
+    }
 }

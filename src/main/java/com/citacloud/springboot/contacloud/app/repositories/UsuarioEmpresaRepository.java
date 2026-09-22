@@ -8,7 +8,16 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa,UUID> {
-    Optional<UsuarioEmpresa> findByEmpresaIdAndUsuarioUsuarioIgnoreCaseAndActivoTrueAndUsuarioActivoTrue(UUID empresaId,String usuario);
+    @Query("""
+      select distinct ue from UsuarioEmpresa ue
+      join fetch ue.usuario u
+      join fetch ue.rol r
+      left join fetch r.permisos
+      where ue.empresaId=:empresaId and lower(u.usuario)=lower(:usuario)
+        and ue.activo=true and u.activo=true
+      """)
+    Optional<UsuarioEmpresa> findForAuthentication(@Param("empresaId") UUID empresaId,
+                                                    @Param("usuario") String usuario);
     Optional<UsuarioEmpresa> findByIdAndEmpresaId(UUID id,UUID empresaId);
     Optional<UsuarioEmpresa> findByUsuarioIdAndEmpresaId(UUID usuarioId,UUID empresaId);
     boolean existsByUsuarioIdAndEmpresaId(UUID usuarioId,UUID empresaId);

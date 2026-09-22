@@ -23,11 +23,8 @@ import java.util.Map;
 @RouteAlias(value = "condiciones-pago", layout = MainLayout.class)
 @RouteAlias(value = "periodos-fiscales", layout = MainLayout.class)
 @RouteAlias(value = "configuracion-contable", layout = MainLayout.class)
-@RouteAlias(value = "empresas", layout = MainLayout.class)
-@RouteAlias(value = "plataforma/tenants", layout = MainLayout.class)
-@RouteAlias(value = "plataforma/bases-datos", layout = MainLayout.class)
-@RouteAlias(value = "plataforma/asignaciones", layout = MainLayout.class)
-@RouteAlias(value = "plataforma/migraciones", layout = MainLayout.class)
+@RouteAlias(value = "bases-datos", layout = MainLayout.class)
+@RouteAlias(value = "migraciones", layout = MainLayout.class)
 @PageTitle("Módulo | ContaCloud")
 @PermitAll
 public class PlaceholderView extends VerticalLayout implements BeforeEnterObserver {
@@ -42,11 +39,8 @@ public class PlaceholderView extends VerticalLayout implements BeforeEnterObserv
         Map.entry("condiciones-pago", new Modulo("Condiciones de pago", "CONDICION_PAGO_VER")),
         Map.entry("periodos-fiscales", new Modulo("Períodos fiscales", "PERIODO_VER")),
         Map.entry("configuracion-contable", new Modulo("Configuración contable", "CONFIGURACION_CONTABLE_VER")),
-        Map.entry("empresas", new Modulo("Empresas", "ROLE_PLATFORM_SUPERADMIN")),
-        Map.entry("plataforma/tenants", new Modulo("Tenants", "ROLE_PLATFORM_SUPERADMIN")),
-        Map.entry("plataforma/bases-datos", new Modulo("Bases de datos", "ROLE_PLATFORM_SUPERADMIN")),
-        Map.entry("plataforma/asignaciones", new Modulo("Asignaciones", "ROLE_PLATFORM_SUPERADMIN")),
-        Map.entry("plataforma/migraciones", new Modulo("Migraciones", "ROLE_PLATFORM_SUPERADMIN")));
+        Map.entry("bases-datos", new Modulo("Bases de datos", "bases_datos.ver")),
+        Map.entry("migraciones", new Modulo("Migraciones", "migraciones.ver")));
 
     public PlaceholderView() {
         addClassName("cc-page");

@@ -32,6 +32,7 @@ public class Empresa {
 
     protected Empresa() {}
     public Empresa(String codigo, String nombre) { this.codigo = codigo; this.nombre = nombre; }
+    public Empresa(UUID tenantId,String codigo,String nombre){this.tenantId=tenantId;this.codigo=codigo;this.nombre=nombre;}
     @PreUpdate void antesDeActualizar() { actualizadoEn = Instant.now(); }
     public UUID getId() { return id; }
     public UUID getTenantId() { return tenantId; }

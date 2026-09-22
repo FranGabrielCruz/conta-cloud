@@ -8,10 +8,12 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(name="contacloud.multidatabase.enabled",havingValue="false",matchIfMissing=true)
 public class BootstrapConfig implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(BootstrapConfig.class);
     private final JdbcTemplate jdbc;

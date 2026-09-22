@@ -39,6 +39,25 @@ $env:BOOTSTRAP_USUARIO="admin"
 $env:BOOTSTRAP_PASSWORD="una-clave-segura"
 ```
 
+### Modo multi-base
+
+El modo local de una sola base continúa siendo el predeterminado. Para activar el
+enrutamiento multi-base, cree previamente `contacloud_directory` y al menos una base
+operacional migrada, registre su `database_node` y `tenant_directory`, y configure:
+
+```powershell
+$env:MULTIDATABASE_ENABLED="true"
+$env:DIRECTORY_DB_URL="jdbc:postgresql://localhost:5432/contacloud_directory"
+$env:DIRECTORY_DB_USERNAME="postgres"
+$env:DIRECTORY_DB_PASSWORD="una-clave-segura"
+$env:MULTIDATABASE_BOOTSTRAP_TENANT_ID="uuid-de-un-tenant-operacional"
+```
+
+Las credenciales de cada nodo se resuelven mediante `secret_reference`. Por ejemplo,
+si el nodo contiene `secret_reference=DB001`, defina `DB001_USERNAME`,
+`DB001_PASSWORD` y opcionalmente `DB001_JDBC_URL`. Ninguna contraseña ni URL sensible
+se almacena en `database_node` o se envía a la interfaz.
+
 ## Ejecucion
 
 ```powershell

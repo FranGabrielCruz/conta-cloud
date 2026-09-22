@@ -28,6 +28,7 @@ public class Rol {
     public String getDescripcion() { return descripcion; }
     public void setDescripcion(String value) { descripcion = value; }
     public boolean isProtegido() { return protegido; }
+    public void setProtegido(boolean value) { protegido = value; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean value) { activo = value; }
     public Set<Permiso> getPermisos() { return permisos; }

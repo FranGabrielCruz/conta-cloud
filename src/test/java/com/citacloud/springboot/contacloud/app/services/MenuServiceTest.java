@@ -2,6 +2,7 @@ package com.citacloud.springboot.contacloud.app.services;
 
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -10,10 +11,21 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class MenuServiceTest {
 
-    private final MenuService service = new MenuService();
+    private final EmpresaModuloService modules = mock(EmpresaModuloService.class);
+    private final MenuService service = new MenuService(modules);
+
+    @BeforeEach
+    void habilitarModulosImplementados() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of(
+            "EMPRESA", "USUARIOS", "ROLES", "SUCURSALES", "MONEDAS",
+            "TASAS_CAMBIO", "IMPUESTOS", "COMPROBANTES_FISCALES", "SECUENCIAS",
+            "CONDICIONES_PAGO", "PERIODOS_FISCALES", "CONFIGURACION_CONTABLE"));
+    }
 
     @AfterEach
     void limpiarContexto() {
@@ -34,25 +46,55 @@ class MenuServiceTest {
     }
 
     @Test
-    void empresaApareceEnAdministracionSoloConPermisoYEnlazaEmpresaActual() {
+    void datosDeEmpresaNoSeDuplicanEnElMenuAdministrativo() {
         autenticar(Set.of("EMPRESA_VER"));
+
+        assertThat(service.obtener().stream()
+            .flatMap(grupo -> grupo.opciones().stream())
+            .map(MenuService.OpcionMenu::titulo))
+            .containsExactly("Dashboard");
+    }
+
+    @Test
+    void empresasPermaneceEnAdministracionConSuPermiso() {
+        autenticar(Set.of("empresas.ver"));
 
         var administracion = service.obtener().stream()
             .filter(grupo -> grupo.titulo().equals("ADMINISTRACIÓN"))
             .findFirst().orElseThrow();
         assertThat(administracion.opciones()).containsExactly(
-            new MenuService.OpcionMenu("Empresa", "empresa", "OFFICE"));
+            new MenuService.OpcionMenu("Empresas", "empresas", "OFFICE"));
     }
 
     @Test
-    void plataformaSoloExisteParaSuperadministrador() {
-        autenticar(Set.of("ROLE_PLATFORM_SUPERADMIN"));
+    void infraestructuraSeControlaConPermisosNormales() {
+        autenticar(Set.of("bases_datos.ver", "migraciones.ver"));
 
         assertThat(service.obtener()).anySatisfy(grupo -> {
-            assertThat(grupo.titulo()).isEqualTo("PLATAFORMA");
+            assertThat(grupo.titulo()).isEqualTo("INFRAESTRUCTURA");
             assertThat(grupo.opciones()).extracting(MenuService.OpcionMenu::titulo)
-                .containsExactly("Tenants", "Bases de datos", "Asignaciones", "Migraciones");
+                .containsExactly("Bases de datos", "Migraciones");
         });
+    }
+
+    @Test
+    void unRolEspecialNoSustituyeLosPermisosGranulares() {
+        autenticar(Set.of("ROLE_GLOBAL_SPECIAL"));
+
+        assertThat(service.obtener()).containsExactly(
+            new MenuService.GrupoMenu("INICIO", java.util.List.of(
+                new MenuService.OpcionMenu("Dashboard", "dashboard", "HOME"))));
+    }
+
+    @Test
+    void ocultaOpcionAunqueExistaPermisoCuandoModuloEstaDeshabilitado() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of("EMPRESA"));
+        autenticar(Set.of("USUARIO_VER", "IMPUESTO_VER"));
+
+        assertThat(service.obtener().stream()
+            .flatMap(grupo -> grupo.opciones().stream())
+            .map(MenuService.OpcionMenu::titulo))
+            .containsExactly("Dashboard");
     }
 
     @Test

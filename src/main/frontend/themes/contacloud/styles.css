@@ -189,6 +189,7 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-permission-group h3 { grid-column: 1 / -1; }
 .cc-permission-group h3, .cc-permission-summary h3 { margin: 0 0 6px; font-size: var(--lumo-font-size-m); }
 .cc-permission-summary { margin-top: var(--lumo-space-m); }
+.cc-company-module-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 20px; width: 100%; }
 .cc-dialog-span-2 { grid-column: 1 / -1; }
 .cc-metric { min-width: 190px; flex: 1 1 190px; }
 .cc-metric-label { color: var(--cc-muted); font-size: .88rem; }
@@ -246,7 +247,7 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-config-span-2 { grid-column: auto; }
   .cc-config-toolbar { align-items: stretch; }
   .cc-config-toolbar > * { width: 100% !important; }
-  .cc-dialog-form, .cc-permission-matrix, .cc-permission-group { grid-template-columns: 1fr; }
+  .cc-dialog-form, .cc-permission-matrix, .cc-permission-group, .cc-company-module-grid { grid-template-columns: 1fr; }
   .cc-permission-group h3 { grid-column: auto; }
   .cc-dialog-span-2 { grid-column: auto; }
 }
