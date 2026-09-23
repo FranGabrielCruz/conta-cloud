@@ -57,6 +57,7 @@ public class JdbcDirectoryGateway implements DirectoryGateway {
         insert into company_directory(empresa_id,tenant_id,codigo,nombre,activo) values (?,?,?,?,true)
         on conflict(empresa_id) do update set codigo=excluded.codigo,nombre=excluded.nombre,activo=true,updated_at=current_timestamp
         """,empresaId,tenantId,codigo,nombre);}
+    @Override public void setCompanyActive(UUID empresaId,boolean active){jdbc.update("update company_directory set activo=?,updated_at=current_timestamp where empresa_id=?",active,empresaId);}
     private void increment(UUID id){int changed=jdbc.update("""
         update database_node set current_tenants=current_tenants+1,version=version+1,updated_at=current_timestamp
         where id=? and status='ACTIVA' and healthy=true and current_tenants<max_tenants

@@ -57,15 +57,16 @@ public class UsuariosView extends VerticalLayout implements BeforeEnterObserver 
         var page=service.buscar(buscar.getValue(),activo,r.page(),r.size());grid.setItems(page.getContent());paginacion.setTotal(page.getTotalElements());}
     private void editar(UsuarioDto actual){
         var dialog=new Dialog();dialog.setHeaderTitle(actual==null?"Nuevo usuario":"Editar usuario");dialog.setWidth("min(920px, 96vw)");
-        var usuario=new TextField("Usuario");var nombre=new TextField("Nombre");var apellido=new TextField("Apellido");var correo=new EmailField("Correo");var telefono=new TextField("Teléfono");
+        var usuario=new TextField("Usuario");var nombre=new TextField("Nombre");var apellido=new TextField("Apellido");var correo=new EmailField("Correo");var telefono=new TextField("Teléfono");InputFieldSupport.aplicarFormatoTelefono(telefono);
         var rol=new ComboBox<OpcionSeguridadDto>("Rol");rol.setItems(service.rolesDisponibles());rol.setItemLabelGenerator(OpcionSeguridadDto::nombre);
         var sucursal=new MultiSelectComboBox<OpcionSeguridadDto>("Sucursales");var opciones=new ArrayList<OpcionSeguridadDto>();opciones.add(TODAS);opciones.addAll(service.sucursalesDisponibles());sucursal.setItems(opciones);sucursal.setItemLabelGenerator(OpcionSeguridadDto::nombre);
         sucursal.addValueChangeListener(e->{if(ajustandoSucursales)return;if(e.getValue().contains(TODAS)&&e.getValue().size()>1){ajustandoSucursales=true;sucursal.setValue(Set.of(TODAS));ajustandoSucursales=false;}});
         var clave=new PasswordField(actual==null?"Contraseña":"Nueva contraseña (opcional)");var confirmar=new PasswordField("Confirmar contraseña");var activo=new Checkbox("Activo",true);
-        if(actual!=null){usuario.setValue(valor(actual.usuario()));nombre.setValue(valor(actual.nombre()));apellido.setValue(valor(actual.apellido()));correo.setValue(valor(actual.correo()));telefono.setValue(valor(actual.telefono()));activo.setValue(actual.activo());
+        if(actual==null){InputFieldSupport.desactivarAutocompletado(usuario,"nuevo-usuario");InputFieldSupport.desactivarAutocompletado(sucursal,"nuevo-usuario-sucursales");InputFieldSupport.desactivarAutocompletado(telefono,"nuevo-usuario-telefono");InputFieldSupport.nuevaContrasena(clave,"nuevo-usuario-clave");InputFieldSupport.nuevaContrasena(confirmar,"nuevo-usuario-confirmar-clave");}
+        if(actual!=null){usuario.setValue(valor(actual.usuario()));nombre.setValue(valor(actual.nombre()));apellido.setValue(valor(actual.apellido()));correo.setValue(valor(actual.correo()));telefono.setValue(InputFieldSupport.formatearTelefono(valor(actual.telefono())));activo.setValue(actual.activo());
             rol.getListDataView().getItems().filter(x->Objects.equals(x.id(),actual.rolId())).findFirst().ifPresent(rol::setValue);
             if(actual.todasSucursales())sucursal.setValue(Set.of(TODAS));else{sucursal.setValue(opciones.stream().filter(x->actual.sucursalIds().contains(x.id())).collect(java.util.stream.Collectors.toSet()));}}
-        else{sucursal.setValue(Set.of(TODAS));activo.setValue(true);}
+        else{sucursal.clear();clave.clear();confirmar.clear();activo.setValue(true);}
         var form=new Div(usuario,nombre,apellido,correo,telefono,rol,sucursal,clave,confirmar,activo);form.addClassName("cc-dialog-form");dialog.add(form);
         var guardar=new AppActionButton(ActionType.SAVE,ButtonSize.MAIN,"Guardar",e->{try{Set<OpcionSeguridadDto> sel=sucursal.getValue();boolean todas=sel.contains(TODAS);Set<UUID> ids=sel.stream().map(OpcionSeguridadDto::id).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
             UsuarioInputDto input=new UsuarioInputDto(usuario.getValue(),nombre.getValue(),apellido.getValue(),correo.getValue(),telefono.getValue(),rol.getValue()==null?null:rol.getValue().id(),todas,ids,activo.getValue());

@@ -26,7 +26,7 @@ class UsuarioEmpresaAuthenticationRepositoryTest {
         jdbc.update("insert into usuarios(id,tenant_id,empresa_id,usuario,nombre,apellido,password_hash,activo) values (?,?,?,?,?,?,?,true)",usuarioId,tenantId,empresaId,"admin","Administrador","","hash");
         jdbc.update("insert into roles(id,empresa_id,codigo,nombre,protegido,activo) values (?,?,?,?,true,true)",rolId,empresaId,"ADMINISTRADOR","Administrador");
         jdbc.update("insert into permisos(id,codigo,nombre,modulo) values (?,?,?,?)",permisoId,"EMPRESA_VER","Ver empresa","CORE");
-        jdbc.update("insert into rol_permisos(rol_id,permiso_id) values (?,?)",rolId,permisoId);
+        jdbc.update("insert into rol_permisos(tenant_id,empresa_id,rol_id,permiso_id) values (?,?,?,?)",tenantId,empresaId,rolId,permisoId);
         jdbc.update("insert into usuario_empresa(id,usuario_id,empresa_id,rol_id,activo,acceso_todas_sucursales,creado_en,actualizado_en) values (?,?,?,?,true,true,current_timestamp,current_timestamp)",accesoId,usuarioId,empresaId,rolId);
         entityManager.clear();
 
@@ -35,5 +35,25 @@ class UsuarioEmpresaAuthenticationRepositoryTest {
         entityManager.clear();
 
         assertThat(acceso.getRol().getPermisos()).extracting("codigo").containsExactly("EMPRESA_VER");
+    }
+
+    @Test
+    void autenticaEnOtraEmpresaMedianteUsuarioEmpresaSinTablaLegada() {
+        UUID tenantId=UUID.randomUUID(),empresaOrigen=UUID.randomUUID(),empresaDestino=UUID.randomUUID();
+        UUID usuarioId=UUID.randomUUID(),rolId=UUID.randomUUID(),permisoId=UUID.randomUUID(),accesoId=UUID.randomUUID();
+        jdbc.update("insert into empresas(id,tenant_id,codigo,nombre,zona_horaria,activo,creado_en,actualizado_en) values (?,?,?,?,?,true,current_timestamp,current_timestamp)",empresaOrigen,tenantId,"ORIGEN","Empresa origen","America/Santo_Domingo");
+        jdbc.update("insert into empresas(id,tenant_id,codigo,nombre,zona_horaria,activo,creado_en,actualizado_en) values (?,?,?,?,?,true,current_timestamp,current_timestamp)",empresaDestino,tenantId,"DESTINO","Empresa destino","America/Santo_Domingo");
+        jdbc.update("insert into usuarios(id,tenant_id,empresa_id,usuario,nombre,apellido,password_hash,activo) values (?,?,?,?,?,?,?,true)",usuarioId,tenantId,empresaOrigen,"admin.multiple","Administrador","","hash");
+        jdbc.update("insert into roles(id,empresa_id,codigo,nombre,protegido,activo) values (?,?,?,?,true,true)",rolId,empresaDestino,"ADMINISTRADOR","Administrador");
+        jdbc.update("insert into permisos(id,codigo,nombre,modulo) values (?,?,?,?)",permisoId,"EMPRESA_EDITAR","Editar empresa","CORE");
+        jdbc.update("insert into rol_permisos(tenant_id,empresa_id,rol_id,permiso_id) values (?,?,?,?)",tenantId,empresaDestino,rolId,permisoId);
+        jdbc.update("insert into usuario_empresa(id,usuario_id,empresa_id,rol_id,activo,acceso_todas_sucursales,creado_en,actualizado_en) values (?,?,?,?,true,true,current_timestamp,current_timestamp)",accesoId,usuarioId,empresaDestino,rolId);
+        entityManager.clear();
+
+        var acceso=repository.findForAuthentication(empresaDestino,"ADMIN.MULTIPLE").orElseThrow();
+
+        assertThat(acceso.getUsuario().getEmpresaId()).isEqualTo(empresaOrigen);
+        assertThat(acceso.getEmpresaId()).isEqualTo(empresaDestino);
+        assertThat(acceso.getRol().getPermisos()).extracting("codigo").containsExactly("EMPRESA_EDITAR");
     }
 }

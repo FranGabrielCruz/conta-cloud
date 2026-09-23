@@ -13,4 +13,5 @@ public interface DirectoryGateway {
     void createProvisioningTenant(UUID tenantId, UUID nodeId, DatabaseNodeType hostingType, String idempotencyKey);
     void markTenantStatus(UUID tenantId, TenantStatus status);
     void registerCompany(UUID empresaId, UUID tenantId, String codigo, String nombre);
+    void setCompanyActive(UUID empresaId, boolean active);
 }

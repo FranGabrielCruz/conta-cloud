@@ -15,6 +15,16 @@ public interface EmpresaRepository extends JpaRepository<Empresa, UUID> {
     Optional<Empresa> findByIdAndTenantId(UUID id,UUID tenantId);
     boolean existsByCodigoIgnoreCase(String codigo);
     @Query("""
+      select e from Empresa e
+      where (:buscar='' or lower(e.nombre) like lower(concat('%',:buscar,'%')) or lower(e.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(e.identificacionFiscal,'')) like lower(concat('%',:buscar,'%')))
+      """)
+    Page<Empresa> buscarTodas(@Param("buscar")String buscar,Pageable pageable);
+    @Query("""
+      select e from Empresa e where e.activo=:activo
+      and (:buscar='' or lower(e.nombre) like lower(concat('%',:buscar,'%')) or lower(e.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(e.identificacionFiscal,'')) like lower(concat('%',:buscar,'%')))
+      """)
+    Page<Empresa> buscarTodasPorEstado(@Param("buscar")String buscar,@Param("activo")boolean activo,Pageable pageable);
+    @Query("""
       select e from Empresa e, UsuarioEmpresa ue where ue.empresaId=e.id and ue.usuario.id=:usuarioId
       and ue.activo=true and e.tenantId=:tenantId
       and (:buscar='' or lower(e.nombre) like lower(concat('%',:buscar,'%')) or lower(e.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(e.identificacionFiscal,'')) like lower(concat('%',:buscar,'%')))

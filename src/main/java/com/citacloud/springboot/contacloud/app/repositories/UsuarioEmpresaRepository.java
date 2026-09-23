@@ -20,6 +20,8 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa,U
                                                     @Param("usuario") String usuario);
     Optional<UsuarioEmpresa> findByIdAndEmpresaId(UUID id,UUID empresaId);
     Optional<UsuarioEmpresa> findByUsuarioIdAndEmpresaId(UUID usuarioId,UUID empresaId);
+    @Query("select ue from UsuarioEmpresa ue join fetch ue.usuario u where ue.empresaId=:empresaId order by u.usuario")
+    List<UsuarioEmpresa> findAllForPasswordReset(@Param("empresaId") UUID empresaId);
     boolean existsByUsuarioIdAndEmpresaId(UUID usuarioId,UUID empresaId);
     long countByEmpresaIdAndRolIdAndActivoTrue(UUID empresaId,UUID rolId);
     long countByUsuarioIdAndActivoTrue(UUID usuarioId);

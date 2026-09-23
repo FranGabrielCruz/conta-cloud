@@ -34,5 +34,5 @@ public class MultiDatabaseConfiguration {
     }
     @Bean DatabaseAllocationService databaseAllocationService(DirectoryGateway gateway,@Value("${contacloud.schema.required-version:}")String version){return new DatabaseAllocationService(gateway,version);}
     @Bean OperationalFlywayService operationalFlywayService(DataSourceRegistry registry){return new OperationalFlywayService(registry);}
-    @Bean TenantProvisioningService tenantProvisioningService(DirectoryGateway gateway,DatabaseAllocationService allocation,DataSourceRegistry registry,TenantDatabaseResolver resolver,com.citacloud.springboot.contacloud.app.repositories.UsuarioRepository usuarios){return new TenantProvisioningService(gateway,allocation,registry,resolver,usuarios);}
+    @Bean TenantProvisioningService tenantProvisioningService(DirectoryGateway gateway,DatabaseAllocationService allocation,DataSourceRegistry registry,TenantDatabaseResolver resolver,org.springframework.security.crypto.password.PasswordEncoder passwordEncoder){return new TenantProvisioningService(gateway,allocation,registry,resolver,passwordEncoder);}
 }

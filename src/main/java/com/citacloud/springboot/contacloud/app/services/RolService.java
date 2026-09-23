@@ -7,7 +7,6 @@ import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +19,11 @@ public class RolService {
     private static final Set<Integer> TAMANOS = Set.of(10, 25, 50, 100);
     private final RolRepository roles; private final PermisoRepository permisos;
     private final UsuarioEmpresaRepository accesos; private final RolMapper mapper;
-    private final JdbcTemplate jdbc; private final EntityManager entityManager; private final AuditoriaService auditoria;
+    private final RolPermisoRepository rolPermisos; private final EntityManager entityManager; private final AuditoriaService auditoria;
     public RolService(RolRepository roles, PermisoRepository permisos, UsuarioEmpresaRepository accesos,
-                      RolMapper mapper, JdbcTemplate jdbc, EntityManager entityManager, AuditoriaService auditoria) {
+                      RolMapper mapper, RolPermisoRepository rolPermisos, EntityManager entityManager, AuditoriaService auditoria) {
         this.roles=roles; this.permisos=permisos; this.accesos=accesos; this.mapper=mapper;
-        this.jdbc=jdbc; this.entityManager=entityManager; this.auditoria=auditoria;
+        this.rolPermisos=rolPermisos; this.entityManager=entityManager; this.auditoria=auditoria;
     }
 
     @Transactional(readOnly=true)
@@ -87,7 +86,7 @@ public class RolService {
         boolean existe=id==null?roles.existsByEmpresaIdAndNombreIgnoreCase(TenantContext.requerirEmpresaId(),n):roles.existsByEmpresaIdAndNombreIgnoreCaseAndIdNot(TenantContext.requerirEmpresaId(),n,id);
         if(existe)throw new ReglaNegocioException("Ya existe un rol con ese nombre en la empresa."); return n; }
     private Set<UUID> validarPermisos(Set<UUID> ids){ Set<UUID> seguros=ids==null?Set.of():Set.copyOf(ids); if(permisos.findAllByIdIn(seguros).size()!=seguros.size())throw new ReglaNegocioException("La selección contiene permisos no válidos."); return seguros; }
-    private void reemplazarPermisos(UUID empresaId,UUID rolId,Set<UUID> ids){ jdbc.update("delete from rol_permisos where rol_id=?",rolId); for(UUID id:ids)jdbc.update("insert into rol_permisos(empresa_id,rol_id,permiso_id) values (?,?,?)",empresaId,rolId,id); }
+    private void reemplazarPermisos(UUID empresaId,UUID rolId,Set<UUID> ids){rolPermisos.deleteAllByRolId(rolId);UUID tenantId=TenantContext.requerirTenantId();rolPermisos.saveAll(ids.stream().map(id->new RolPermiso(tenantId,empresaId,rolId,id)).toList());}
     private static String limpiar(String s){return s==null?"":s.trim();}
     private static String limitar(String s,int max){String v=limpiar(s);if(v.length()>max)throw new ReglaNegocioException("La descripción excede "+max+" caracteres.");return v.isEmpty()?null:v;}
 }

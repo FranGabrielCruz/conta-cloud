@@ -12,8 +12,13 @@ public class AuditoriaService {
 
     public void registrar(String accion, String entidad, UUID registroId, String detalleJson) {
         var principal = TenantContext.principalActual();
+        registrarPara(principal.empresaId(), principal.usuarioId(), accion, entidad, registroId, detalleJson);
+    }
+
+    public void registrarPara(UUID empresaId, UUID usuarioId, String accion, String entidad,
+                              UUID registroId, String detalleJson) {
         jdbc.update("INSERT INTO auditoria(empresa_id,usuario_id,accion,entidad,registro_id,detalle) " +
-                "VALUES (?,?,?,?,?,CAST(? AS jsonb))", principal.empresaId(), principal.usuarioId(), accion,
+                "VALUES (?,?,?,?,?,CAST(? AS jsonb))", empresaId, usuarioId, accion,
             entidad, registroId, detalleJson == null ? "{}" : detalleJson);
     }
 }
