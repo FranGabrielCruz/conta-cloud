@@ -25,6 +25,7 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa,U
     boolean existsByUsuarioIdAndEmpresaId(UUID usuarioId,UUID empresaId);
     long countByEmpresaIdAndRolIdAndActivoTrue(UUID empresaId,UUID rolId);
     long countByUsuarioIdAndActivoTrue(UUID usuarioId);
+    long countByEmpresaIdAndActivoTrue(UUID empresaId);
     @Query("""
       select ue from UsuarioEmpresa ue where ue.empresaId=:empresaId
         and (:buscar='' or lower(ue.usuario.usuario) like lower(concat('%',:buscar,'%'))

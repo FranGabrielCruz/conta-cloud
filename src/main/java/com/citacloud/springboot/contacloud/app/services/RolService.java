@@ -20,10 +20,12 @@ public class RolService {
     private final RolRepository roles; private final PermisoRepository permisos;
     private final UsuarioEmpresaRepository accesos; private final RolMapper mapper;
     private final RolPermisoRepository rolPermisos; private final EntityManager entityManager; private final AuditoriaService auditoria;
+    private final EmpresaModuloService modulos;
     public RolService(RolRepository roles, PermisoRepository permisos, UsuarioEmpresaRepository accesos,
-                      RolMapper mapper, RolPermisoRepository rolPermisos, EntityManager entityManager, AuditoriaService auditoria) {
+                      RolMapper mapper, RolPermisoRepository rolPermisos, EntityManager entityManager,
+                      AuditoriaService auditoria, EmpresaModuloService modulos) {
         this.roles=roles; this.permisos=permisos; this.accesos=accesos; this.mapper=mapper;
-        this.rolPermisos=rolPermisos; this.entityManager=entityManager; this.auditoria=auditoria;
+        this.rolPermisos=rolPermisos; this.entityManager=entityManager; this.auditoria=auditoria; this.modulos=modulos;
     }
 
     @Transactional(readOnly=true)
@@ -45,7 +47,7 @@ public class RolService {
 
     @Transactional(readOnly=true)
     @PreAuthorize("hasAnyAuthority('ROL_VER','roles.ver','ROL_CREAR','roles.crear','ROL_EDITAR','roles.editar')")
-    public List<PermisoDto> catalogoPermisos() { return permisos.findAllByOrderByModuloAscRecursoAscCodigoAsc().stream().map(mapper::toDto).toList(); }
+    public List<PermisoDto> catalogoPermisos() { return permisosDisponibles().stream().map(mapper::toDto).toList(); }
 
     @Transactional
     @PreAuthorize("hasAnyAuthority('ROL_CREAR','roles.crear')")
@@ -85,7 +87,9 @@ public class RolService {
         if(n.isEmpty()||n.length()>100)throw new ReglaNegocioException("El nombre del rol es obligatorio y no debe exceder 100 caracteres.");
         boolean existe=id==null?roles.existsByEmpresaIdAndNombreIgnoreCase(TenantContext.requerirEmpresaId(),n):roles.existsByEmpresaIdAndNombreIgnoreCaseAndIdNot(TenantContext.requerirEmpresaId(),n,id);
         if(existe)throw new ReglaNegocioException("Ya existe un rol con ese nombre en la empresa."); return n; }
-    private Set<UUID> validarPermisos(Set<UUID> ids){ Set<UUID> seguros=ids==null?Set.of():Set.copyOf(ids); if(permisos.findAllByIdIn(seguros).size()!=seguros.size())throw new ReglaNegocioException("La selección contiene permisos no válidos."); return seguros; }
+    private Set<UUID> validarPermisos(Set<UUID> ids){Set<UUID> seguros=ids==null?Set.of():Set.copyOf(ids);List<Permiso> seleccionados=permisos.findAllByIdIn(seguros);Set<String> habilitados=modulos.habilitadosActuales();if(seleccionados.size()!=seguros.size()||seleccionados.stream().anyMatch(p->!disponible(p,habilitados)))throw new ReglaNegocioException("La selección contiene permisos de módulos no habilitados para la empresa.");return seguros;}
+    private List<Permiso> permisosDisponibles(){Set<String> habilitados=modulos.habilitadosActuales();return permisos.findAllByOrderByModuloAscRecursoAscCodigoAsc().stream().filter(p->disponible(p,habilitados)).toList();}
+    private static boolean disponible(Permiso permiso,Set<String> habilitados){return PermisoTenantPolicy.disponibleParaTenant(permiso.getModulo(),permiso.getRecurso())&&PermisoModuloPolicy.moduloRequerido(permiso.getCodigo(),permiso.getRecurso()).filter(habilitados::contains).isPresent();}
     private void reemplazarPermisos(UUID empresaId,UUID rolId,Set<UUID> ids){rolPermisos.deleteAllByRolId(rolId);UUID tenantId=TenantContext.requerirTenantId();rolPermisos.saveAll(ids.stream().map(id->new RolPermiso(tenantId,empresaId,rolId,id)).toList());}
     private static String limpiar(String s){return s==null?"":s.trim();}
     private static String limitar(String s,int max){String v=limpiar(s);if(v.length()>max)throw new ReglaNegocioException("La descripción excede "+max+" caracteres.");return v.isEmpty()?null:v;}

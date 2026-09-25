@@ -86,7 +86,7 @@ class EmpresaAdministracionTenantLocalTest {
             passwordEncoder);
         var result = service.crearTenantLocal(
             new NuevaEmpresaDto("CLIENTE01", "Cliente Nuevo", "Cliente Nuevo SRL", "101850585",
-                "8095550101", "cliente@example.com", "Santo Domingo", Set.of()),
+                "8095550101", "cliente@example.com", "Santo Domingo", true, 5, Set.of()),
             new UsuarioInicialDto("cliente.admin", "Ana", "Pérez", "ana@example.com", "8095550102"),
             "ClaveSegura1", "ClaveSegura1");
 
@@ -95,6 +95,11 @@ class EmpresaAdministracionTenantLocalTest {
         assertThat(result.databaseNodeCode()).isEqualTo("conta_cloud");
         verify(usuarios, times(1)).saveAndFlush(any(Usuario.class));
         verify(accesos, times(1)).save(any(UsuarioEmpresa.class));
+
+        ArgumentCaptor<Empresa> empresaCaptor = ArgumentCaptor.forClass(Empresa.class);
+        verify(empresas).saveAndFlush(empresaCaptor.capture());
+        assertThat(empresaCaptor.getValue().isLimiteUsuariosHabilitado()).isTrue();
+        assertThat(empresaCaptor.getValue().getLimiteUsuarios()).isEqualTo(5);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<RolPermiso>> captor = ArgumentCaptor.forClass(List.class);

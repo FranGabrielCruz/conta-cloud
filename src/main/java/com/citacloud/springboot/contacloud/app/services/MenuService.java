@@ -14,7 +14,8 @@ public class MenuService {
 
     public boolean mostrarConfiguracionUsuario() {
         Set<String> permisos = TenantContext.principalActual().permisos();
-        return permisos.stream().anyMatch(PERMISOS_CONFIGURACION_USUARIO::contains);
+        return modules.habilitadosActuales().contains("CONFIGURACION")
+            && permisos.stream().anyMatch(PERMISOS_CONFIGURACION_USUARIO::contains);
     }
 
     public List<GrupoMenu> obtener() {
@@ -24,14 +25,14 @@ public class MenuService {
         grupos.add(new GrupoMenu("INICIO", List.of(new OpcionMenu("Dashboard", "dashboard", "HOME"))));
 
         List<OpcionMenu> administracion = new ArrayList<>();
-        agregarSiModulo(permisos,habilitados, administracion, "empresas.ver", null,"EMPRESA", "Empresas", "empresas", "OFFICE");
+        agregarSi(permisos, administracion, "empresas.ver", "Empresas", "empresas", "OFFICE");
         agregarSiModulo(permisos,habilitados, administracion, "USUARIO_VER", "usuarios.ver", "USUARIOS", "Usuarios", "usuarios", "USERS");
         agregarSiModulo(permisos,habilitados, administracion, "ROL_VER", "roles.ver", "ROLES", "Roles y permisos", "roles", "USER_STAR");
         if (!administracion.isEmpty()) grupos.add(new GrupoMenu("ADMINISTRACIÓN", List.copyOf(administracion)));
 
         List<OpcionMenu> configuracion = new ArrayList<>();
-        agregarSiModulo(permisos,habilitados,configuracion,"SUCURSAL_VER",null,"SUCURSALES","Sucursales","configuracion","OFFICE");
-        agregarSiModulo(permisos,habilitados,configuracion,"MONEDA_VER",null,"MONEDAS","Monedas","configuracion","COIN_PILES");
+        if(habilitados.contains("CONFIGURACION")&&permisos.stream().anyMatch(PERMISOS_CONFIGURACION_USUARIO::contains))
+            configuracion.add(new OpcionMenu("Configuración","configuracion","COG"));
         agregarSiModulo(permisos,habilitados,configuracion,"TASA_CAMBIO_VER",null,"TASAS_CAMBIO","Tasas de cambio","tasas-cambio","EXCHANGE");
         agregarSiModulo(permisos,habilitados,configuracion,"IMPUESTO_VER",null,"IMPUESTOS","Impuestos","impuestos","CALC");
         agregarSiModulo(permisos,habilitados,configuracion,"COMPROBANTE_VER",null,"COMPROBANTES_FISCALES","Comprobantes fiscales","comprobantes-fiscales","FILE_TEXT_O");

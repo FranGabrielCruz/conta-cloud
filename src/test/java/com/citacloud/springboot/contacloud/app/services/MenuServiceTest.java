@@ -22,7 +22,7 @@ class MenuServiceTest {
     @BeforeEach
     void habilitarModulosImplementados() {
         when(modules.habilitadosActuales()).thenReturn(Set.of(
-            "EMPRESA", "USUARIOS", "ROLES", "SUCURSALES", "MONEDAS",
+            "CONFIGURACION", "USUARIOS", "ROLES",
             "TASAS_CAMBIO", "IMPUESTOS", "COMPROBANTES_FISCALES", "SECUENCIAS",
             "CONDICIONES_PAGO", "PERIODOS_FISCALES", "CONFIGURACION_CONTABLE"));
     }
@@ -46,13 +46,13 @@ class MenuServiceTest {
     }
 
     @Test
-    void datosDeEmpresaNoSeDuplicanEnElMenuAdministrativo() {
+    void datosDeEmpresaAparecenDentroDeConfiguracion() {
         autenticar(Set.of("EMPRESA_VER"));
 
         assertThat(service.obtener().stream()
             .flatMap(grupo -> grupo.opciones().stream())
             .map(MenuService.OpcionMenu::titulo))
-            .containsExactly("Dashboard");
+            .containsExactly("Dashboard", "Configuración");
     }
 
     @Test
@@ -114,6 +114,16 @@ class MenuServiceTest {
 
         autenticar(Set.of("ROL_VER"));
         assertThat(service.mostrarConfiguracionUsuario()).isFalse();
+    }
+
+    @Test
+    void empresaSucursalesYMonedasGeneranUnaSolaOpcionConfiguracion() {
+        autenticar(Set.of("EMPRESA_VER", "SUCURSAL_VER", "MONEDA_VER"));
+
+        assertThat(service.obtener().stream()
+            .flatMap(grupo -> grupo.opciones().stream())
+            .map(MenuService.OpcionMenu::titulo))
+            .containsExactly("Dashboard", "Configuración");
     }
 
     private void autenticar(Set<String> permisos) {

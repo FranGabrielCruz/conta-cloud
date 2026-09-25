@@ -91,6 +91,7 @@ public class UsuarioService {
         UUID empresaId = TenantContext.requerirEmpresaId();
         UUID tenantId = TenantContext.requerirTenantId();
         DatosValidados datos = validar(input, clave, confirmarClave, true, null);
+        if (input.activo()) validarCupoDisponible(empresaId);
         Optional<Usuario> identidadExistente = usuarios.findByTenantIdAndUsuarioIgnoreCase(tenantId, datos.usuario());
         Usuario usuario;
         if (identidadExistente.isPresent()) {
@@ -125,6 +126,7 @@ public class UsuarioService {
         DatosValidados datos = validar(input, clave, confirmarClave, false, usuario.getId());
         boolean desactivaAdmin = esAdministrador(acceso.getRol()) && (!input.activo() || !esAdministrador(datos.rol()));
         if (desactivaAdmin) validarNoEsUltimoAdministrador(acceso);
+        if (!acceso.isActivo() && input.activo()) validarCupoDisponible(acceso.getEmpresaId());
         usuario.setUsuario(datos.usuario()); usuario.setNombre(datos.nombre()); usuario.setApellido(datos.apellido());
         usuario.setCorreo(datos.correo()); usuario.setTelefono(datos.telefono());
         if (!limpiar(clave).isEmpty()) {
@@ -194,6 +196,19 @@ public class UsuarioService {
         empresas.findWithLockById(acceso.getEmpresaId()).orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada."));
         if (accesos.countByEmpresaIdAndRolIdAndActivoTrue(acceso.getEmpresaId(), acceso.getRol().getId()) <= 1)
             throw new ReglaNegocioException("No es posible desactivar o cambiar el rol del último administrador activo.");
+    }
+
+    private void validarCupoDisponible(UUID empresaId) {
+        Empresa empresa = empresas.findWithLockById(empresaId)
+            .filter(e -> e.getTenantId().equals(TenantContext.requerirTenantId()))
+            .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada."));
+        if (!empresa.isLimiteUsuariosHabilitado()) return;
+        Integer limite = empresa.getLimiteUsuarios();
+        if (limite == null || limite < 1)
+            throw new ReglaNegocioException("La configuración del límite de usuarios no es válida.");
+        long activos = accesos.countByEmpresaIdAndActivoTrue(empresaId);
+        if (activos >= limite)
+            throw new ReglaNegocioException("La empresa alcanzó el límite de " + limite + " usuarios activos.");
     }
 
     private UsuarioEmpresa accesoSeguro(UUID id) {

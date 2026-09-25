@@ -1,6 +1,7 @@
 package com.citacloud.springboot.contacloud.app.models;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +26,11 @@ public class Empresa {
     private String zonaHoraria = "America/Santo_Domingo";
     @Column(nullable = false)
     private boolean activo = true;
+    @Column(name = "limite_usuarios_habilitado", nullable = false)
+    @ColumnDefault("false")
+    private boolean limiteUsuariosHabilitado;
+    @Column(name = "limite_usuarios")
+    private Integer limiteUsuarios;
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private Instant creadoEn;
     @Column(name = "actualizado_en", nullable = false)
@@ -50,4 +56,8 @@ public class Empresa {
     public void setZonaHoraria(String valor) { zonaHoraria = valor; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public boolean isLimiteUsuariosHabilitado() { return limiteUsuariosHabilitado; }
+    public void setLimiteUsuariosHabilitado(boolean valor) { limiteUsuariosHabilitado = valor; }
+    public Integer getLimiteUsuarios() { return limiteUsuarios; }
+    public void setLimiteUsuarios(Integer valor) { limiteUsuarios = valor; }
 }

@@ -53,8 +53,8 @@ public class TenantProvisioningService {
     }
     private static void createOperational(JdbcTemplate jdbc,UUID tenantId,UUID empresaId,UUID rolId,
             UUID usuarioId,UUID accesoId,String code,ProvisionTenantRequest request,UsuarioInicialDto initial,String passwordHash){
-        NuevaEmpresaDto e=request.empresa();
-        jdbc.update("insert into empresas(id,tenant_id,codigo,nombre,identificacion_fiscal,activo) values (?,?,?,?,?,false)",empresaId,tenantId,code,e.nombreComercial().trim(),CompanyConfigurationService.normalizeRnc(e.identificacionFiscal()));
+        NuevaEmpresaDto e=request.empresa();Integer limiteUsuarios=LimiteUsuariosValidator.normalizar(e.limiteUsuariosHabilitado(),e.limiteUsuarios());
+        jdbc.update("insert into empresas(id,tenant_id,codigo,nombre,identificacion_fiscal,activo,limite_usuarios_habilitado,limite_usuarios) values (?,?,?,?,?,false,?,?)",empresaId,tenantId,code,e.nombreComercial().trim(),CompanyConfigurationService.normalizeRnc(e.identificacionFiscal()),e.limiteUsuariosHabilitado(),limiteUsuarios);
         jdbc.update("insert into datos_empresa(empresa_id,nombre_comercial,razon_social,direccion,telefono,correo) values (?,?,?,?,?,?)",empresaId,e.nombreComercial().trim(),blank(e.razonSocial()),blank(e.direccion()),CompanyConfigurationService.normalizePhone(e.telefono()),CompanyConfigurationService.normalizeEmail(e.correo()));
         jdbc.update("insert into sucursales(empresa_id,codigo,nombre,principal,activo) values (?,?,?,true,true)",empresaId,"PRINCIPAL","Sucursal Principal");
         jdbc.update("insert into monedas(empresa_id,codigo_iso,nombre,simbolo,decimales,moneda_base,activo) values (?,?,?,?,2,true,true)",empresaId,"DOP","Peso dominicano","RD$");
