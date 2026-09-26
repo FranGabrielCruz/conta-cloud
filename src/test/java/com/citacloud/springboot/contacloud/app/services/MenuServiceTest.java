@@ -46,13 +46,14 @@ class MenuServiceTest {
     }
 
     @Test
-    void datosDeEmpresaAparecenDentroDeConfiguracion() {
+    void configuracionSoloApareceEnElMenuDelUsuario() {
         autenticar(Set.of("EMPRESA_VER"));
 
         assertThat(service.obtener().stream()
             .flatMap(grupo -> grupo.opciones().stream())
             .map(MenuService.OpcionMenu::titulo))
-            .containsExactly("Dashboard", "Configuración");
+            .containsExactly("Dashboard");
+        assertThat(service.mostrarConfiguracionUsuario()).isTrue();
     }
 
     @Test
@@ -117,13 +118,14 @@ class MenuServiceTest {
     }
 
     @Test
-    void empresaSucursalesYMonedasGeneranUnaSolaOpcionConfiguracion() {
+    void empresaSucursalesYMonedasNoDuplicanConfiguracionEnElDrawer() {
         autenticar(Set.of("EMPRESA_VER", "SUCURSAL_VER", "MONEDA_VER"));
 
         assertThat(service.obtener().stream()
             .flatMap(grupo -> grupo.opciones().stream())
             .map(MenuService.OpcionMenu::titulo))
-            .containsExactly("Dashboard", "Configuración");
+            .containsExactly("Dashboard");
+        assertThat(service.mostrarConfiguracionUsuario()).isTrue();
     }
 
     private void autenticar(Set<String> permisos) {

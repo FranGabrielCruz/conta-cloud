@@ -31,8 +31,6 @@ public class MenuService {
         if (!administracion.isEmpty()) grupos.add(new GrupoMenu("ADMINISTRACIÓN", List.copyOf(administracion)));
 
         List<OpcionMenu> configuracion = new ArrayList<>();
-        if(habilitados.contains("CONFIGURACION")&&permisos.stream().anyMatch(PERMISOS_CONFIGURACION_USUARIO::contains))
-            configuracion.add(new OpcionMenu("Configuración","configuracion","COG"));
         agregarSiModulo(permisos,habilitados,configuracion,"TASA_CAMBIO_VER",null,"TASAS_CAMBIO","Tasas de cambio","tasas-cambio","EXCHANGE");
         agregarSiModulo(permisos,habilitados,configuracion,"IMPUESTO_VER",null,"IMPUESTOS","Impuestos","impuestos","CALC");
         agregarSiModulo(permisos,habilitados,configuracion,"COMPROBANTE_VER",null,"COMPROBANTES_FISCALES","Comprobantes fiscales","comprobantes-fiscales","FILE_TEXT_O");
