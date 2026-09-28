@@ -41,8 +41,8 @@ public class MenuService {
         if (!configuracion.isEmpty()) grupos.add(new GrupoMenu("CONFIGURACIÓN", List.copyOf(configuracion)));
 
         List<OpcionMenu> infraestructura=new ArrayList<>();
-        agregarSi(permisos,infraestructura,"bases_datos.ver","Bases de datos","bases-datos","DATABASE");
-        agregarSi(permisos,infraestructura,"migraciones.ver","Migraciones","migraciones","REFRESH");
+        if(permisos.contains("bases_datos.ver")||permisos.contains("migraciones.ver"))
+            infraestructura.add(new OpcionMenu("Bases de datos","bases-datos","DATABASE"));
         if(!infraestructura.isEmpty())grupos.add(new GrupoMenu("INFRAESTRUCTURA",List.copyOf(infraestructura)));
         return List.copyOf(grupos);
     }

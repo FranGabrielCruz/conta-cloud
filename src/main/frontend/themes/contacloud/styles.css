@@ -182,6 +182,16 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-config-save { justify-content: flex-end; width: 100%; margin-top: 12px; }
 .cc-config-toolbar { gap: 12px; margin: 12px 0; flex-wrap: wrap; }
 .cc-config-toolbar > vaadin-text-field { min-width: 240px; }
+.cc-infrastructure-tabs { width: 100%; margin-top: 8px; border-bottom: 1px solid var(--cc-border); padding: 0; }
+.cc-infrastructure-tabs vaadin-tab { border-radius: 0; padding: 12px 18px; }
+.cc-infrastructure-tabs vaadin-tab[selected] { background: transparent; color: var(--lumo-primary-text-color); border-bottom: 3px solid var(--lumo-primary-color); }
+.cc-tab-content { width: 100%; padding-top: 22px; box-sizing: border-box; }
+.cc-section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--cc-spacing-md); width: 100%; }
+.cc-section-header h2 { margin: 0; font-size: 1.25rem; }
+.cc-section-header p { margin: 6px 0 18px; color: var(--cc-muted); }
+.cc-migration-stages { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--cc-border); }
+.cc-migration-stages h3 { font-size: .82rem; letter-spacing: .06em; }
+.cc-migration-stages p { margin: 8px 0; }
 .cc-grid-actions { gap: 4px; }
 .cc-dialog-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; width: 100%; }
 .cc-permission-matrix { display: grid; grid-template-columns: 1fr; gap: 12px; max-height: 42vh; overflow: auto; }

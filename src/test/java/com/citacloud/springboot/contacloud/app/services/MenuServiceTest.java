@@ -74,7 +74,18 @@ class MenuServiceTest {
         assertThat(service.obtener()).anySatisfy(grupo -> {
             assertThat(grupo.titulo()).isEqualTo("INFRAESTRUCTURA");
             assertThat(grupo.opciones()).extracting(MenuService.OpcionMenu::titulo)
-                .containsExactly("Bases de datos", "Migraciones");
+                .containsExactly("Bases de datos");
+        });
+    }
+
+    @Test
+    void permisoDeMigracionesAbreLaPantallaUnificadaDeBases() {
+        autenticar(Set.of("migraciones.ver"));
+
+        assertThat(service.obtener()).anySatisfy(grupo -> {
+            assertThat(grupo.titulo()).isEqualTo("INFRAESTRUCTURA");
+            assertThat(grupo.opciones()).containsExactly(
+                new MenuService.OpcionMenu("Bases de datos", "bases-datos", "DATABASE"));
         });
     }
 

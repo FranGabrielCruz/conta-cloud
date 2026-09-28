@@ -21,7 +21,7 @@ public class MultiDatabaseConfiguration {
         @Value("${contacloud.directory.password}") String password){
         HikariConfig c=new HikariConfig();c.setPoolName("contacloud-directory");c.setJdbcUrl(url);c.setUsername(username);c.setPassword(password);c.setMaximumPoolSize(5);return new HikariDataSource(c);
     }
-    @Bean DirectoryGateway directoryGateway(@Qualifier("directoryDataSource") DataSource ds){Flyway.configure().dataSource(ds).locations("classpath:db/directory-migration").table("flyway_directory_history").baselineOnMigrate(true).load().migrate();var manager=new DataSourceTransactionManager(ds);return new JdbcDirectoryGateway(new JdbcTemplate(ds),new TransactionTemplate(manager));}
+    @Bean DirectoryGateway directoryGateway(@Qualifier("directoryDataSource") DataSource ds){Flyway.configure().dataSource(ds).locations("classpath:db/directory-migration").sqlMigrationPrefix("D").table("flyway_directory_history").baselineOnMigrate(true).load().migrate();var manager=new DataSourceTransactionManager(ds);return new JdbcDirectoryGateway(new JdbcTemplate(ds),new TransactionTemplate(manager));}
     @Bean TenantRoutingCache tenantRoutingCache(@Value("${contacloud.routing.cache-ttl:PT1M}") Duration ttl){return new TenantRoutingCache(ttl);}
     @Bean TenantDatabaseResolver tenantDatabaseResolver(DirectoryGateway gateway,TenantRoutingCache cache){return new TenantDatabaseResolver(gateway,cache);}
     @Bean DatabaseSecretResolver databaseSecretResolver(){return new EnvironmentDatabaseSecretResolver();}
