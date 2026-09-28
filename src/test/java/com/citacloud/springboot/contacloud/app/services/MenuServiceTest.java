@@ -41,7 +41,7 @@ class MenuServiceTest {
             .map(MenuService.OpcionMenu::titulo)
             .toList();
 
-        assertThat(opciones).contains("Dashboard", "Usuarios", "Impuestos")
+        assertThat(opciones).contains("Dashboard", "Usuarios", "Configuración fiscal")
             .doesNotContain("Empresa", "Roles y permisos", "Empresas", "Tenants");
     }
 

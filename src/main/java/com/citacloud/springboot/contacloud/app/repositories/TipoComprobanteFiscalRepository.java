@@ -1,0 +1,6 @@
+package com.citacloud.springboot.contacloud.app.repositories;
+import com.citacloud.springboot.contacloud.app.models.TipoComprobanteFiscal;import org.springframework.data.domain.*;import org.springframework.data.jpa.repository.*;import org.springframework.data.repository.query.Param;import java.util.*;
+public interface TipoComprobanteFiscalRepository extends JpaRepository<TipoComprobanteFiscal,UUID>{
+ Optional<TipoComprobanteFiscal> findByIdAndTenantIdAndEmpresaId(UUID id,UUID t,UUID e); boolean existsByTenantIdAndEmpresaIdAndCodigoIgnoreCase(UUID t,UUID e,String c); boolean existsByTenantIdAndEmpresaIdAndCodigoIgnoreCaseAndIdNot(UUID t,UUID e,String c,UUID id); List<TipoComprobanteFiscal> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByCodigo(UUID t,UUID e); List<TipoComprobanteFiscal> findAllByIdInAndTenantIdAndEmpresaId(Collection<UUID> ids,UUID t,UUID e);
+ @Query("select c from TipoComprobanteFiscal c where c.tenantId=:t and c.empresaId=:e and (:a is null or c.activo=:a) and (:q='' or lower(c.codigo) like lower(concat('%',:q,'%')) or lower(c.nombre) like lower(concat('%',:q,'%')) or lower(coalesce(c.descripcion,'')) like lower(concat('%',:q,'%'))) order by c.codigo") Page<TipoComprobanteFiscal> buscar(@Param("t")UUID t,@Param("e")UUID e,@Param("q")String q,@Param("a")Boolean a,Pageable p);
+}

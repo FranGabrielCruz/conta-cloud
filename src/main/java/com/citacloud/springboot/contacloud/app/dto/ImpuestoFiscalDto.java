@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto; import java.math.BigDecimal;import java.util.UUID; public record ImpuestoFiscalDto(UUID id,String nombre,BigDecimal tasa,String tipo,String descripcion,boolean activo){}

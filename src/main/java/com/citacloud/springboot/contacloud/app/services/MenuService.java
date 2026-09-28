@@ -32,9 +32,10 @@ public class MenuService {
 
         List<OpcionMenu> configuracion = new ArrayList<>();
         agregarSiModulo(permisos,habilitados,configuracion,"TASA_CAMBIO_VER",null,"TASAS_CAMBIO","Tasas de cambio","tasas-cambio","EXCHANGE");
-        agregarSiModulo(permisos,habilitados,configuracion,"IMPUESTO_VER",null,"IMPUESTOS","Impuestos","impuestos","CALC");
-        agregarSiModulo(permisos,habilitados,configuracion,"COMPROBANTE_VER",null,"COMPROBANTES_FISCALES","Comprobantes fiscales","comprobantes-fiscales","FILE_TEXT_O");
-        agregarSiModulo(permisos,habilitados,configuracion,"SECUENCIA_VER",null,"SECUENCIAS","Secuencias","secuencias","SORT_NUMERIC_ASC");
+        boolean fiscal=(habilitados.contains("IMPUESTOS")&&(permisos.contains("impuestos.ver")||permisos.contains("IMPUESTO_VER")))
+            ||(habilitados.contains("COMPROBANTES_FISCALES")&&(permisos.contains("comprobantes_fiscales.ver")||permisos.contains("COMPROBANTE_VER")))
+            ||(habilitados.contains("SECUENCIAS")&&(permisos.contains("secuencias.ver")||permisos.contains("SECUENCIA_VER")));
+        if(fiscal)configuracion.add(new OpcionMenu("Configuración fiscal","configuracion-fiscal","FILE_TEXT_O"));
         agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER",null,"CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
         agregarSiModulo(permisos,habilitados,configuracion,"PERIODO_VER",null,"PERIODOS_FISCALES","Períodos fiscales","periodos-fiscales","CALENDAR");
         agregarSiModulo(permisos,habilitados,configuracion,"CONFIGURACION_CONTABLE_VER",null,"CONFIGURACION_CONTABLE","Configuración contable","configuracion-contable","BOOK_DOLLAR");

@@ -17,9 +17,6 @@ import java.util.Map;
 @RouteAlias(value = "sucursales", layout = MainLayout.class)
 @RouteAlias(value = "monedas", layout = MainLayout.class)
 @RouteAlias(value = "tasas-cambio", layout = MainLayout.class)
-@RouteAlias(value = "impuestos", layout = MainLayout.class)
-@RouteAlias(value = "comprobantes-fiscales", layout = MainLayout.class)
-@RouteAlias(value = "secuencias", layout = MainLayout.class)
 @RouteAlias(value = "condiciones-pago", layout = MainLayout.class)
 @RouteAlias(value = "periodos-fiscales", layout = MainLayout.class)
 @RouteAlias(value = "configuracion-contable", layout = MainLayout.class)
@@ -31,9 +28,6 @@ public class PlaceholderView extends VerticalLayout implements BeforeEnterObserv
         Map.entry("sucursales", new Modulo("Sucursales", "SUCURSAL_VER")),
         Map.entry("monedas", new Modulo("Monedas", "MONEDA_VER")),
         Map.entry("tasas-cambio", new Modulo("Tasas de cambio", "TASA_CAMBIO_VER")),
-        Map.entry("impuestos", new Modulo("Impuestos", "IMPUESTO_VER")),
-        Map.entry("comprobantes-fiscales", new Modulo("Comprobantes fiscales", "COMPROBANTE_VER")),
-        Map.entry("secuencias", new Modulo("Secuencias", "SECUENCIA_VER")),
         Map.entry("condiciones-pago", new Modulo("Condiciones de pago", "CONDICION_PAGO_VER")),
         Map.entry("periodos-fiscales", new Modulo("Períodos fiscales", "PERIODO_VER")),
         Map.entry("configuracion-contable", new Modulo("Configuración contable", "CONFIGURACION_CONTABLE_VER")));
