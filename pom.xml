@@ -63,6 +63,14 @@
 			<groupId>com.vaadin</groupId>
 			<artifactId>vaadin-dev</artifactId>
 			<optional>true</optional>
+			<exclusions>
+				<!-- ContaCloud no utiliza Vaadin Copilot. Excluirlo evita que su canal
+				     WebSocket intente reutilizar sesiones eliminadas tras un reinicio. -->
+				<exclusion>
+					<groupId>com.vaadin</groupId>
+					<artifactId>copilot</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>com.vaadin</groupId>

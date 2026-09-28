@@ -139,6 +139,17 @@ class MenuServiceTest {
         assertThat(service.mostrarConfiguracionUsuario()).isTrue();
     }
 
+    @Test
+    void periodosSeIntegraEnConfiguracionContableSinOpcionDuplicada() {
+        autenticar(Set.of("periodos_fiscales.ver", "configuracion_contable.ver"));
+
+        assertThat(service.obtener().stream()
+            .flatMap(grupo -> grupo.opciones().stream())
+            .map(MenuService.OpcionMenu::titulo))
+            .contains("Configuración contable")
+            .doesNotContain("Períodos fiscales");
+    }
+
     private void autenticar(Set<String> permisos) {
         var principal = new TenantPrincipal(UUID.randomUUID(), UUID.randomUUID(), "EMPRESA01",
             "Administrador", "admin", "hash", true, permisos);

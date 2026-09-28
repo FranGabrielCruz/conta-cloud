@@ -18,8 +18,6 @@ import java.util.Map;
 @RouteAlias(value = "monedas", layout = MainLayout.class)
 @RouteAlias(value = "tasas-cambio", layout = MainLayout.class)
 @RouteAlias(value = "condiciones-pago", layout = MainLayout.class)
-@RouteAlias(value = "periodos-fiscales", layout = MainLayout.class)
-@RouteAlias(value = "configuracion-contable", layout = MainLayout.class)
 @PageTitle("Módulo | ContaCloud")
 @PermitAll
 public class PlaceholderView extends VerticalLayout implements BeforeEnterObserver {
@@ -28,9 +26,7 @@ public class PlaceholderView extends VerticalLayout implements BeforeEnterObserv
         Map.entry("sucursales", new Modulo("Sucursales", "SUCURSAL_VER")),
         Map.entry("monedas", new Modulo("Monedas", "MONEDA_VER")),
         Map.entry("tasas-cambio", new Modulo("Tasas de cambio", "TASA_CAMBIO_VER")),
-        Map.entry("condiciones-pago", new Modulo("Condiciones de pago", "CONDICION_PAGO_VER")),
-        Map.entry("periodos-fiscales", new Modulo("Períodos fiscales", "PERIODO_VER")),
-        Map.entry("configuracion-contable", new Modulo("Configuración contable", "CONFIGURACION_CONTABLE_VER")));
+        Map.entry("condiciones-pago", new Modulo("Condiciones de pago", "CONDICION_PAGO_VER")));
 
     public PlaceholderView() {
         addClassName("cc-page");

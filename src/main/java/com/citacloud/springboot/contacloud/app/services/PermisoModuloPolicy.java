@@ -20,7 +20,7 @@ public final class PermisoModuloPolicy {
             case "comprobante", "comprobantes", "comprobantes_fiscales" -> "COMPROBANTES_FISCALES";
             case "secuencia", "secuencias" -> "SECUENCIAS";
             case "condicion_pago", "condiciones_pago" -> "CONDICIONES_PAGO";
-            case "periodo", "periodos", "periodos_fiscales" -> "PERIODOS_FISCALES";
+            case "periodo", "periodos", "periodos_fiscales" -> "CONFIGURACION_CONTABLE";
             case "configuracion_contable" -> "CONFIGURACION_CONTABLE";
             default -> null;
         });

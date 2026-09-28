@@ -37,8 +37,13 @@ public class MenuService {
             ||(habilitados.contains("SECUENCIAS")&&(permisos.contains("secuencias.ver")||permisos.contains("SECUENCIA_VER")));
         if(fiscal)configuracion.add(new OpcionMenu("Configuración fiscal","configuracion-fiscal","FILE_TEXT_O"));
         agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER",null,"CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
-        agregarSiModulo(permisos,habilitados,configuracion,"PERIODO_VER",null,"PERIODOS_FISCALES","Períodos fiscales","periodos-fiscales","CALENDAR");
-        agregarSiModulo(permisos,habilitados,configuracion,"CONFIGURACION_CONTABLE_VER",null,"CONFIGURACION_CONTABLE","Configuración contable","configuracion-contable","BOOK_DOLLAR");
+        boolean contabilidad = habilitados.contains("CONFIGURACION_CONTABLE")
+            && (permisos.contains("configuracion_contable.ver")
+                || permisos.contains("CONFIGURACION_CONTABLE_VER")
+                || permisos.contains("periodos_fiscales.ver")
+                || permisos.contains("PERIODO_VER"));
+        if (contabilidad) configuracion.add(new OpcionMenu(
+            "Configuración contable", "configuracion-contable", "BOOK_DOLLAR"));
         if (!configuracion.isEmpty()) grupos.add(new GrupoMenu("CONFIGURACIÓN", List.copyOf(configuracion)));
 
         List<OpcionMenu> infraestructura=new ArrayList<>();

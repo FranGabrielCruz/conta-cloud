@@ -83,8 +83,9 @@ public class DashboardService {
         agregarAcceso(permisos, accesos, "USUARIO_CREAR", "Nuevo usuario", "usuarios", "USER_PLUS");
         agregarAcceso(permisos, accesos, "TASA_CAMBIO_CREAR", "Nueva tasa de cambio", "tasas-cambio", "EXCHANGE");
         agregarAcceso(permisos, accesos, "IMPUESTO_CREAR", "Nuevo impuesto", "impuestos", "CALC");
-        agregarAcceso(permisos, accesos, "CONFIGURACION_CONTABLE_EDITAR", "Configuración contable",
-            "configuracion-contable", "COG");
+        if (permisos.contains("configuracion_contable.editar") || permisos.contains("CONFIGURACION_CONTABLE_EDITAR")) {
+            accesos.add(new AccesoRapido("Configuración contable", "configuracion-contable", "COG"));
+        }
         return List.copyOf(accesos);
     }
 

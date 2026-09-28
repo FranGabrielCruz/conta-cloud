@@ -9,7 +9,6 @@ window.Vaadin.featureFlags.tailwindCss = false;
 window.Vaadin.featureFlags.fullstackSignals = false;
 window.Vaadin.featureFlags.layoutComponentImprovements = false;
 window.Vaadin.featureFlags.defaultAutoResponsiveFormLayout = false;
-window.Vaadin.featureFlags.copilotExperimentalFeatures = false;
 window.Vaadin.featureFlags.aiComponents = false;
 window.Vaadin.featureFlags.breadcrumbsComponent = false;
 window.Vaadin.featureFlags.accessibleDisabledMenuItems = false;

@@ -12,7 +12,9 @@ public enum ActionType {
     BACK("Volver", VaadinIcon.ARROW_LEFT, "neutral"),
     DELETE("Eliminar", VaadinIcon.TRASH, "danger"),
     ACTIVATE("Activar", VaadinIcon.POWER_OFF, "success"),
-    DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger");
+    DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),
+    CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
+    REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
 
     private final String defaultLabel;
     private final VaadinIcon icon;

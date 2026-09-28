@@ -186,6 +186,10 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-infrastructure-tabs vaadin-tab { border-radius: 0; padding: 12px 18px; }
 .cc-infrastructure-tabs vaadin-tab[selected] { background: transparent; color: var(--lumo-primary-text-color); border-bottom: 3px solid var(--lumo-primary-color); }
 .cc-tab-content { width: 100%; padding-top: 22px; box-sizing: border-box; }
+.cc-accounting-section { width: 100%; padding: 20px; margin-bottom: 16px; box-sizing: border-box; border: 1px solid var(--cc-border); border-radius: var(--lumo-border-radius-l); background: var(--lumo-base-color); }
+.cc-accounting-section h3 { margin: 0 0 4px; font-size: var(--lumo-font-size-m); }
+.cc-accounting-section p { margin: 0 0 16px; color: var(--lumo-secondary-text-color); }
+.cc-accounting-section-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; width: 100%; }
 .cc-section-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--cc-spacing-md); width: 100%; }
 .cc-section-header h2 { margin: 0; font-size: 1.25rem; }
 .cc-section-header p { margin: 6px 0 18px; color: var(--cc-muted); }
@@ -258,7 +262,7 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-config-span-2 { grid-column: auto; }
   .cc-config-toolbar { align-items: stretch; }
   .cc-config-toolbar > * { width: 100% !important; }
-  .cc-dialog-form, .cc-permission-matrix, .cc-permission-group, .cc-company-module-grid { grid-template-columns: 1fr; }
+  .cc-dialog-form, .cc-permission-matrix, .cc-permission-group, .cc-company-module-grid, .cc-accounting-section-grid { grid-template-columns: 1fr; }
   .cc-permission-group h3, .cc-permission-group h4 { grid-column: auto; }
   .cc-dialog-span-2 { grid-column: auto; }
 }
