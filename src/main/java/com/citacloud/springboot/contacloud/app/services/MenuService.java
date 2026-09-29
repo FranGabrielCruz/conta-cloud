@@ -31,7 +31,7 @@ public class MenuService {
         if (!administracion.isEmpty()) grupos.add(new GrupoMenu("ADMINISTRACIÓN", List.copyOf(administracion)));
 
         List<OpcionMenu> configuracion = new ArrayList<>();
-        agregarSiModulo(permisos,habilitados,configuracion,"TASA_CAMBIO_VER",null,"TASAS_CAMBIO","Tasas de cambio","tasas-cambio","EXCHANGE");
+        agregarSiModulo(permisos,habilitados,configuracion,"TASA_CAMBIO_VER","tasas_cambio.ver","TASAS_CAMBIO","Tasas de cambio","tasas-cambio","EXCHANGE");
         boolean fiscal=(habilitados.contains("IMPUESTOS")&&(permisos.contains("impuestos.ver")||permisos.contains("IMPUESTO_VER")))
             ||(habilitados.contains("COMPROBANTES_FISCALES")&&(permisos.contains("comprobantes_fiscales.ver")||permisos.contains("COMPROBANTE_VER")))
             ||(habilitados.contains("SECUENCIAS")&&(permisos.contains("secuencias.ver")||permisos.contains("SECUENCIA_VER")));

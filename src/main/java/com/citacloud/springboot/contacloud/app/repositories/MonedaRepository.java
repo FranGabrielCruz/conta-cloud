@@ -14,6 +14,7 @@ public interface MonedaRepository extends JpaRepository<Moneda, UUID> {
     Optional<Moneda> findByIdAndEmpresaId(UUID id, UUID empresaId);
     Optional<Moneda> findByEmpresaIdAndCodigoIsoIgnoreCase(UUID empresaId, String codigoIso);
     List<Moneda> findAllByEmpresaIdAndActivoTrueOrderByCodigoIso(UUID empresaId);
+    List<Moneda> findAllByEmpresaIdOrderByCodigoIso(UUID empresaId);
     boolean existsByEmpresaIdAndCodigoIsoIgnoreCase(UUID empresaId, String codigoIso);
     long countByEmpresaId(UUID empresaId);
     @Modifying(clearAutomatically = true, flushAutomatically = true)

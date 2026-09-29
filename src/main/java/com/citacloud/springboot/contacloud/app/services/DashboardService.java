@@ -81,7 +81,9 @@ public class DashboardService {
         List<AccesoRapido> accesos = new ArrayList<>();
         agregarAcceso(permisos, accesos, "SUCURSAL_CREAR", "Nueva sucursal", "sucursales", "BUILDING");
         agregarAcceso(permisos, accesos, "USUARIO_CREAR", "Nuevo usuario", "usuarios", "USER_PLUS");
-        agregarAcceso(permisos, accesos, "TASA_CAMBIO_CREAR", "Nueva tasa de cambio", "tasas-cambio", "EXCHANGE");
+        if (permisos.contains("TASA_CAMBIO_CREAR") || permisos.contains("tasas_cambio.crear")) {
+            accesos.add(new AccesoRapido("Nueva tasa de cambio", "tasas-cambio", "EXCHANGE"));
+        }
         agregarAcceso(permisos, accesos, "IMPUESTO_CREAR", "Nuevo impuesto", "impuestos", "CALC");
         if (permisos.contains("configuracion_contable.editar") || permisos.contains("CONFIGURACION_CONTABLE_EDITAR")) {
             accesos.add(new AccesoRapido("Configuración contable", "configuracion-contable", "COG"));
