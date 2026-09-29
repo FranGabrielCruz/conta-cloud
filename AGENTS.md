@@ -1941,3 +1941,16 @@ Toda nueva funcionalidad debe fortalecer esta arquitectura y no comprometer:
 - Mantenibilidad
 - Trazabilidad
 - Experiencia de usuario
+
+---
+
+# Regla de la empresa DEMO
+
+La empresa con código `DEMO` es la empresa creada por defecto para validación funcional.
+
+Cada nueva opción, permiso o módulo implementado debe quedar disponible para el rol
+`ADMINISTRADOR` de la empresa `DEMO` mediante roles, permisos y entitlements normales.
+
+Aplicar esta configuración mediante una nueva migración Flyway cuando corresponda. No
+implementar excepciones por nombre de usuario, bypasses de seguridad ni permisos directos
+hardcodeados en la interfaz.

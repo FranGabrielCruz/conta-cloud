@@ -156,7 +156,10 @@ public class MainLayout extends AppLayout {
             titulo.addClassName("cc-nav-label");
             var navegacion = new SideNav();
             for (var opcion : grupo.opciones()) {
-                navegacion.addItem(new SideNavItem(opcion.titulo(), opcion.ruta(), icono(opcion.icono())));
+                var item = new SideNavItem(opcion.titulo(), opcion.ruta(), icono(opcion.icono()));
+                item.setMatchNested(true);
+                item.setTooltipText(opcion.titulo());
+                navegacion.addItem(item);
             }
             drawer.add(titulo, navegacion);
         }

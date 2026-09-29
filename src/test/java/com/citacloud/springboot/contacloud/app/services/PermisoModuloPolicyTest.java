@@ -31,4 +31,13 @@ class PermisoModuloPolicyTest {
         assertThat(PermisoModuloPolicy.moduloRequerido("bases_datos.ver", "bases_datos"))
             .isEmpty();
     }
+
+    @Test
+    void relacionaLosRecursosDeFaseDosConSusEntitlements() {
+        assertThat(PermisoModuloPolicy.moduloRequerido("clientes.ver", "clientes")).contains("VENTAS");
+        assertThat(PermisoModuloPolicy.moduloRequerido("ordenes_compra.ver", "ordenes_compra"))
+            .contains("COMPRAS");
+        assertThat(PermisoModuloPolicy.moduloRequerido("conciliacion_bancaria.ver", "conciliacion_bancaria"))
+            .contains("CAJA_BANCOS");
+    }
 }

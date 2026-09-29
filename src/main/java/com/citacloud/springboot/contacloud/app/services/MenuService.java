@@ -24,6 +24,14 @@ public class MenuService {
         List<GrupoMenu> grupos = new ArrayList<>();
         grupos.add(new GrupoMenu("INICIO", List.of(new OpcionMenu("Dashboard", "dashboard", "HOME"))));
 
+        for (PhaseTwoNavigation.Section section : PhaseTwoNavigation.SECTIONS) {
+            List<OpcionMenu> options = section.items().stream()
+                .filter(item -> habilitados.contains(item.module()) && permisos.contains(item.permission()))
+                .map(item -> new OpcionMenu(item.title(), item.route(), item.icon()))
+                .toList();
+            if (!options.isEmpty()) grupos.add(new GrupoMenu(section.title(), options));
+        }
+
         List<OpcionMenu> administracion = new ArrayList<>();
         agregarSi(permisos, administracion, "empresas.ver", "Empresas", "empresas", "OFFICE");
         agregarSiModulo(permisos,habilitados, administracion, "USUARIO_VER", "usuarios.ver", "USUARIOS", "Usuarios", "usuarios", "USERS");

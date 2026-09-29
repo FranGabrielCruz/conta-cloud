@@ -150,6 +150,59 @@ class MenuServiceTest {
             .doesNotContain("Períodos fiscales");
     }
 
+    @Test
+    void construyeLasTresSeccionesDeFaseDosEnElOrdenDefinido() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of("VENTAS", "COMPRAS", "CAJA_BANCOS"));
+        autenticar(Set.of(
+            "clientes.ver", "cotizaciones.ver", "facturas.ver", "notas_credito.ver",
+            "notas_debito.ver", "recibos.ver", "cuentas_cobrar.ver",
+            "proveedores.ver", "ordenes_compra.ver", "facturas_proveedores.ver",
+            "notas_credito_proveedores.ver", "pagos_proveedores.ver", "cuentas_pagar.ver",
+            "cajas.ver", "cuentas_bancarias.ver", "ingresos.ver", "egresos.ver",
+            "transferencias.ver", "conciliacion_bancaria.ver"));
+
+        var grupos = service.obtener();
+
+        assertThat(grupos).extracting(MenuService.GrupoMenu::titulo)
+            .containsExactly("INICIO", "VENTAS", "COMPRAS", "CAJA Y BANCOS");
+        assertThat(grupos.get(1).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Clientes", "Cotizaciones", "Facturas", "Notas de crédito",
+                "Notas de débito", "Recibos", "Cuentas por cobrar");
+        assertThat(grupos.get(2).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Proveedores", "Órdenes de compra", "Facturas de proveedores",
+                "Notas de crédito", "Pagos", "Cuentas por pagar");
+        assertThat(grupos.get(3).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Cajas", "Cuentas bancarias", "Ingresos", "Egresos",
+                "Transferencias", "Conciliación bancaria");
+    }
+
+    @Test
+    void filtraFaseDosPorPermisoYOcultaSeccionesVacias() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of("VENTAS", "COMPRAS", "CAJA_BANCOS"));
+        autenticar(Set.of("clientes.ver", "facturas.ver", "cuentas_cobrar.ver", "cajas.ver", "ingresos.ver"));
+
+        var grupos = service.obtener();
+
+        assertThat(grupos).extracting(MenuService.GrupoMenu::titulo)
+            .containsExactly("INICIO", "VENTAS", "CAJA Y BANCOS");
+        assertThat(grupos.get(1).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Clientes", "Facturas", "Cuentas por cobrar");
+        assertThat(grupos.get(2).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Cajas", "Ingresos");
+    }
+
+    @Test
+    void recalculaFaseDosConLosModulosDeLaEmpresaActual() {
+        autenticar(Set.of("clientes.ver", "proveedores.ver", "cajas.ver"));
+        when(modules.habilitadosActuales()).thenReturn(Set.of("VENTAS", "COMPRAS"));
+        assertThat(service.obtener()).extracting(MenuService.GrupoMenu::titulo)
+            .contains("VENTAS", "COMPRAS").doesNotContain("CAJA Y BANCOS");
+
+        when(modules.habilitadosActuales()).thenReturn(Set.of("VENTAS", "CAJA_BANCOS"));
+        assertThat(service.obtener()).extracting(MenuService.GrupoMenu::titulo)
+            .contains("VENTAS", "CAJA Y BANCOS").doesNotContain("COMPRAS");
+    }
+
     private void autenticar(Set<String> permisos) {
         var principal = new TenantPrincipal(UUID.randomUUID(), UUID.randomUUID(), "EMPRESA01",
             "Administrador", "admin", "hash", true, permisos);
