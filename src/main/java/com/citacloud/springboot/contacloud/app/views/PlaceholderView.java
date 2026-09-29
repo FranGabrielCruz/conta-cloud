@@ -16,15 +16,13 @@ import java.util.Map;
 @Route(value = "modulo", layout = MainLayout.class)
 @RouteAlias(value = "sucursales", layout = MainLayout.class)
 @RouteAlias(value = "monedas", layout = MainLayout.class)
-@RouteAlias(value = "condiciones-pago", layout = MainLayout.class)
 @PageTitle("Módulo | ContaCloud")
 @PermitAll
 public class PlaceholderView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final Map<String, Modulo> MODULOS = Map.ofEntries(
         Map.entry("sucursales", new Modulo("Sucursales", "SUCURSAL_VER")),
-        Map.entry("monedas", new Modulo("Monedas", "MONEDA_VER")),
-        Map.entry("condiciones-pago", new Modulo("Condiciones de pago", "CONDICION_PAGO_VER")));
+        Map.entry("monedas", new Modulo("Monedas", "MONEDA_VER")));
 
     public PlaceholderView() {
         addClassName("cc-page");

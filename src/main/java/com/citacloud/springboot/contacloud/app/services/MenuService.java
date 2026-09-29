@@ -36,7 +36,7 @@ public class MenuService {
             ||(habilitados.contains("COMPROBANTES_FISCALES")&&(permisos.contains("comprobantes_fiscales.ver")||permisos.contains("COMPROBANTE_VER")))
             ||(habilitados.contains("SECUENCIAS")&&(permisos.contains("secuencias.ver")||permisos.contains("SECUENCIA_VER")));
         if(fiscal)configuracion.add(new OpcionMenu("Configuración fiscal","configuracion-fiscal","FILE_TEXT_O"));
-        agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER",null,"CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
+        agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER","condiciones_pago.ver","CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
         boolean contabilidad = habilitados.contains("CONFIGURACION_CONTABLE")
             && (permisos.contains("configuracion_contable.ver")
                 || permisos.contains("CONFIGURACION_CONTABLE_VER")
