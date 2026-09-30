@@ -13,6 +13,7 @@ public enum ActionType {
     DELETE("Eliminar", VaadinIcon.TRASH, "danger"),
     ACTIVATE("Activar", VaadinIcon.POWER_OFF, "success"),
     DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),
+    VOID("Anular", VaadinIcon.BAN, "danger"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
     REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
 

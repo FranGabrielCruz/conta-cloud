@@ -23,6 +23,10 @@ public interface BankAccountRepository extends JpaRepository<CuentaBancaria, UUI
     @EntityGraph(attributePaths = "moneda")
     Optional<CuentaBancaria> findByIdAndTenantIdAndEmpresaId(UUID id, UUID tenantId, UUID empresaId);
 
+    @EntityGraph(attributePaths = "moneda")
+    List<CuentaBancaria> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByBancoNombreAscNombreCuentaAsc(
+        UUID tenantId, UUID empresaId);
+
     boolean existsByTenantIdAndEmpresaIdAndNumeroCuentaFingerprint(
         UUID tenantId, UUID empresaId, String fingerprint);
 

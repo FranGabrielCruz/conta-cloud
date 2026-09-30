@@ -5,7 +5,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cajas")
+@Table(name = "cajas", uniqueConstraints=@UniqueConstraint(columnNames={"tenant_id","empresa_id","id"}))
 public class Caja {
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

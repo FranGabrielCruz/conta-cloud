@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface CashRegisterRepository extends JpaRepository<Caja, UUID> {
@@ -26,6 +27,10 @@ public interface CashRegisterRepository extends JpaRepository<Caja, UUID> {
 
     @EntityGraph(attributePaths = {"sucursal", "moneda"})
     Optional<Caja> findByIdAndTenantIdAndEmpresaId(UUID id, UUID tenantId, UUID empresaId);
+
+    @EntityGraph(attributePaths = {"sucursal", "moneda"})
+    List<Caja> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(
+        UUID tenantId, UUID empresaId);
 
     boolean existsByTenantIdAndEmpresaIdAndSucursalIdAndNombreIgnoreCase(
         UUID tenantId, UUID empresaId, UUID sucursalId, String nombre);
