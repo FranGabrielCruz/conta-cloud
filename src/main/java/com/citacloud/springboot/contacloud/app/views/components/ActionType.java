@@ -14,6 +14,9 @@ public enum ActionType {
     ACTIVATE("Activar", VaadinIcon.POWER_OFF, "success"),
     DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),
     VOID("Anular", VaadinIcon.BAN, "danger"),
+    MATCH("Conciliar", VaadinIcon.CONNECT, "success"),
+    UNMATCH("Desconciliar", VaadinIcon.UNLINK, "danger"),
+    FINALIZE("Finalizar", VaadinIcon.LOCK, "danger"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
     REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
 

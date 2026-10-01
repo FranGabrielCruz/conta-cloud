@@ -25,7 +25,6 @@ import jakarta.annotation.security.PermitAll;
 @RouteAlias(value = "notas-credito-proveedores", layout = MainLayout.class)
 @RouteAlias(value = "pagos-proveedores", layout = MainLayout.class)
 @RouteAlias(value = "cuentas-por-pagar", layout = MainLayout.class)
-@RouteAlias(value = "conciliacion-bancaria", layout = MainLayout.class)
 @PageTitle("Fase 2 | ContaCloud")
 @PermitAll
 public class PhaseTwoPlaceholderView extends VerticalLayout implements BeforeEnterObserver {

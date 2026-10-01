@@ -4,6 +4,7 @@ import com.citacloud.springboot.contacloud.app.models.CuentaBancaria;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import java.util.*;
 
 public interface BankAccountRepository extends JpaRepository<CuentaBancaria, UUID> {
@@ -32,4 +33,9 @@ public interface BankAccountRepository extends JpaRepository<CuentaBancaria, UUI
 
     boolean existsByTenantIdAndEmpresaIdAndNumeroCuentaFingerprintAndIdNot(
         UUID tenantId, UUID empresaId, String fingerprint, UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from CuentaBancaria c where c.id=:id and c.tenantId=:tenantId and c.empresaId=:empresaId")
+    Optional<CuentaBancaria> bloquearParaConciliacion(@Param("id") UUID id,
+        @Param("tenantId") UUID tenantId,@Param("empresaId") UUID empresaId);
 }

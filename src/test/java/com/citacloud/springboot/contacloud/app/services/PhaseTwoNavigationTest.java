@@ -6,6 +6,7 @@ import com.citacloud.springboot.contacloud.app.views.CuentasBancariasView;
 import com.citacloud.springboot.contacloud.app.views.IngresosView;
 import com.citacloud.springboot.contacloud.app.views.EgresosView;
 import com.citacloud.springboot.contacloud.app.views.TransferenciasView;
+import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,8 @@ class PhaseTwoNavigationTest {
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),
                 IngresosView.class.getAnnotation(Route.class).value(),
                 EgresosView.class.getAnnotation(Route.class).value(),
-                TransferenciasView.class.getAnnotation(Route.class).value())).toList();
+                TransferenciasView.class.getAnnotation(Route.class).value(),
+                ConciliacionBancariaView.class.getAnnotation(Route.class).value())).toList();
 
         assertThat(registered).doesNotHaveDuplicates();
         assertThat(registered).containsExactlyInAnyOrderElementsOf(

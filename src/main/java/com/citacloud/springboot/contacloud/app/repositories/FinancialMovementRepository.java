@@ -50,4 +50,20 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
       """)
     List<MovimientoFinanciero> buscarTransferenciaParaAnular(@Param("tenantId")UUID tenantId,
         @Param("empresaId")UUID empresaId,@Param("transferenciaId")UUID transferenciaId);
+
+    @Query("""
+      select m from MovimientoFinanciero m where m.tenantId=:tenantId and m.empresaId=:empresaId
+        and m.tipoCuenta=com.citacloud.springboot.contacloud.app.models.TipoCuentaDinero.BANK_ACCOUNT
+        and m.cuentaBancariaId=:cuentaId and m.monedaId=:monedaId
+        and m.estado=com.citacloud.springboot.contacloud.app.models.EstadoMovimientoFinanciero.REGISTERED
+        and m.fecha<=:hasta
+        and not exists(select a.id from AsociacionConciliacionBancaria a where a.movimientoFinancieroId=m.id)
+      """)
+    Page<MovimientoFinanciero> candidatosConciliacion(@Param("tenantId")UUID tenantId,
+        @Param("empresaId")UUID empresaId,@Param("cuentaId")UUID cuentaId,
+        @Param("monedaId")UUID monedaId,@Param("hasta")LocalDate hasta,Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<MovimientoFinanciero> findByIdAndTenantIdAndEmpresaIdAndTipoCuentaAndCuentaBancariaId(
+        UUID id,UUID tenantId,UUID empresaId,TipoCuentaDinero tipoCuenta,UUID cuentaBancariaId);
 }
