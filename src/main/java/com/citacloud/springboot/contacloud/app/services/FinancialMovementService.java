@@ -17,14 +17,13 @@ import java.util.*;
 public class FinancialMovementService {
     private static final Set<Integer> PAGE_SIZES=Set.of(10,25,50,100);
     private final FinancialMovementRepository repository;
-    private final CashRegisterRepository cajas;
-    private final BankAccountRepository cuentas;
+    private final CuentaDineroResolver cuentaResolver;
     private final MovimientoFinancieroMapper mapper;
     private final AuditoriaService auditoria;
 
-    public FinancialMovementService(FinancialMovementRepository repository,CashRegisterRepository cajas,
-            BankAccountRepository cuentas,MovimientoFinancieroMapper mapper,AuditoriaService auditoria) {
-        this.repository=repository; this.cajas=cajas; this.cuentas=cuentas; this.mapper=mapper; this.auditoria=auditoria;
+    public FinancialMovementService(FinancialMovementRepository repository,CuentaDineroResolver cuentaResolver,
+            MovimientoFinancieroMapper mapper,AuditoriaService auditoria) {
+        this.repository=repository;this.cuentaResolver=cuentaResolver;this.mapper=mapper;this.auditoria=auditoria;
     }
 
     @Transactional(readOnly=true)
@@ -88,26 +87,15 @@ public class FinancialMovementService {
     }
 
     private MovimientoCatalogosDto catalogos() {
-        var p=TenantContext.principalActual(); UUID empresaId=EmpresaContext.requerirEmpresaId();
-        List<CuentaDineroOpcionDto> opciones=new ArrayList<>();
-        cajas.findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(p.tenantId(),empresaId).stream()
-            .filter(c->EmpresaContext.permiteSucursal(c.getSucursalId()))
-            .map(c->new CuentaDineroOpcionDto(c.getId(),TipoCuentaDinero.CASH_REGISTER,
-                "Caja · "+c.getNombre()+" · "+c.getSucursal().getNombre(),c.getMonedaId(),c.getMoneda().getCodigoIso()))
-            .forEach(opciones::add);
-        cuentas.findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByBancoNombreAscNombreCuentaAsc(p.tenantId(),empresaId)
-            .stream().map(c->new CuentaDineroOpcionDto(c.getId(),TipoCuentaDinero.BANK_ACCOUNT,
-                "Cuenta bancaria · "+c.getBancoNombre()+" · "+c.getNombreCuenta(),c.getMonedaId(),
-                c.getMoneda().getCodigoIso())).forEach(opciones::add);
-        return new MovimientoCatalogosDto(List.copyOf(opciones));
+        return new MovimientoCatalogosDto(cuentaResolver.opciones());
     }
 
     private MovimientoFinancieroDto crear(TipoMovimientoFinanciero tipo,MovimientoFinancieroInput input) {
         Validado v=validar(input); var p=TenantContext.principalActual(); UUID empresaId=EmpresaContext.requerirEmpresaId();
-        CuentaResuelta cuenta=resolverCuenta(v.tipoCuenta,v.cuentaId,p.tenantId(),empresaId);
+        CuentaDineroResolver.CuentaResuelta cuenta=cuentaResolver.resolver(v.tipoCuenta,v.cuentaId);
         MovimientoFinanciero entity=new MovimientoFinanciero(p.tenantId(),empresaId,tipo,v.fecha,v.tipoCuenta,
-            v.cuentaId,cuenta.monedaId,v.monto,v.concepto,v.referencia,v.descripcion,p.usuarioId());
-        entity.asignarRelacionesCuenta(cuenta.caja,cuenta.cuentaBancaria,cuenta.moneda);
+            v.cuentaId,cuenta.monedaId(),v.monto,v.concepto,v.referencia,v.descripcion,p.usuarioId());
+        entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
         repository.saveAndFlush(entity);
         auditoria.registrar(evento(tipo,"CREATED"),"MovimientoFinanciero",entity.getId(),detalle(entity));
         return mapper.toDto(seguro(entity.getId(),tipo));
@@ -119,13 +107,13 @@ public class FinancialMovementService {
             throw new ReglaNegocioException("No se puede editar un movimiento anulado.");
         if(entity.getTipoOrigen()!=TipoOrigenMovimiento.MANUAL)
             throw new ReglaNegocioException("Este movimiento fue generado automáticamente y no puede editarse manualmente.");
-        Validado v=validar(input); CuentaResuelta cuenta=resolverCuenta(v.tipoCuenta,v.cuentaId,
-            entity.getTenantId(),entity.getEmpresaId()); String anterior=detalle(entity);
+        Validado v=validar(input); CuentaDineroResolver.CuentaResuelta cuenta=cuentaResolver.resolver(v.tipoCuenta,v.cuentaId);
+        String anterior=detalle(entity);
         if(entity.getMonto().compareTo(v.monto)!=0)
             throw new ReglaNegocioException("El monto de un movimiento registrado no puede modificarse.");
-        entity.actualizar(v.fecha,v.tipoCuenta,v.cuentaId,cuenta.monedaId,v.monto,v.concepto,v.referencia,
+        entity.actualizar(v.fecha,v.tipoCuenta,v.cuentaId,cuenta.monedaId(),v.monto,v.concepto,v.referencia,
             v.descripcion,TenantContext.principalActual().usuarioId());
-        entity.asignarRelacionesCuenta(cuenta.caja,cuenta.cuentaBancaria,cuenta.moneda);
+        entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
         repository.saveAndFlush(entity);
         auditoria.registrar(evento(tipo,"UPDATED"),"MovimientoFinanciero",entity.getId(),
             "{\"anterior\":"+anterior+",\"nuevo\":"+detalle(entity)+"}");
@@ -164,17 +152,25 @@ public class FinancialMovementService {
         return m;
     }
 
-    private CuentaResuelta resolverCuenta(TipoCuentaDinero tipo,UUID id,UUID tenantId,UUID empresaId) {
-        if(tipo==TipoCuentaDinero.CASH_REGISTER) {
-            Caja c=cajas.findByIdAndTenantIdAndEmpresaId(id,tenantId,empresaId).filter(Caja::isActivo)
-                .orElseThrow(()->new ReglaNegocioException("La caja seleccionada no es válida o está inactiva."));
-            if(!EmpresaContext.permiteSucursal(c.getSucursalId()))
-                throw new ReglaNegocioException("La caja seleccionada no está autorizada para el usuario.");
-            return new CuentaResuelta(c.getMonedaId(),c,null,c.getMoneda());
-        }
-        CuentaBancaria c=cuentas.findByIdAndTenantIdAndEmpresaId(id,tenantId,empresaId).filter(CuentaBancaria::isActivo)
-            .orElseThrow(()->new ReglaNegocioException("La cuenta bancaria seleccionada no es válida o está inactiva."));
-        return new CuentaResuelta(c.getMonedaId(),null,c,c.getMoneda());
+    MovimientoFinanciero registrarTransferencia(UUID transferenciaId,TipoMovimientoFinanciero direccion,
+            LocalDate fecha,CuentaDineroResolver.CuentaResuelta cuenta,BigDecimal monto,String referencia,String descripcion){
+        var p=TenantContext.principalActual();UUID empresaId=EmpresaContext.requerirEmpresaId();
+        String concepto=direccion==TipoMovimientoFinanciero.EXPENSE?"Transferencia enviada":"Transferencia recibida";
+        MovimientoFinanciero entity=MovimientoFinanciero.transferencia(p.tenantId(),empresaId,direccion,fecha,
+            cuenta.tipo(),cuenta.id(),cuenta.monedaId(),monto,concepto,referencia,descripcion,transferenciaId,p.usuarioId());
+        entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
+        return repository.saveAndFlush(entity);
+    }
+
+    void anularTransferencia(UUID transferenciaId,String motivo){
+        var p=TenantContext.principalActual();UUID empresaId=EmpresaContext.requerirEmpresaId();
+        List<MovimientoFinanciero> movimientos=repository.buscarTransferenciaParaAnular(p.tenantId(),empresaId,transferenciaId);
+        if(movimientos.size()!=2||movimientos.stream().map(MovimientoFinanciero::getTipoMovimiento).distinct().count()!=2)
+            throw new ReglaNegocioException("Los movimientos de la transferencia no están completos.");
+        if(movimientos.stream().anyMatch(m->m.getEstado()!=EstadoMovimientoFinanciero.REGISTERED))
+            throw new ReglaNegocioException("Los movimientos de la transferencia ya fueron anulados.");
+        movimientos.forEach(m->m.anular(motivo,p.usuarioId()));
+        repository.saveAll(movimientos);repository.flush();
     }
 
     private static Validado validar(MovimientoFinancieroInput input) {
@@ -210,7 +206,6 @@ public class FinancialMovementService {
     private static String escapar(String s){return s.replace("\\","\\\\").replace("\"","\\\"");}
     private static String limpiar(String s){return s==null?"":s.trim();}
     private static String limpiarNulo(String s){String v=limpiar(s);return v.isEmpty()?null:v;}
-    private record CuentaResuelta(UUID monedaId,Caja caja,CuentaBancaria cuentaBancaria,Moneda moneda){}
     private record Validado(LocalDate fecha,TipoCuentaDinero tipoCuenta,UUID cuentaId,String concepto,
                             BigDecimal monto,String referencia,String descripcion){}
 }

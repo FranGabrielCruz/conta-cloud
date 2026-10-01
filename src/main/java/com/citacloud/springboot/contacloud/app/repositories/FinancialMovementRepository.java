@@ -11,6 +11,7 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
     @Query("""
       select m from MovimientoFinanciero m
       where m.tenantId=:tenantId and m.empresaId=:empresaId and m.tipoMovimiento=:tipo
+        and m.tipoOrigen=com.citacloud.springboot.contacloud.app.models.TipoOrigenMovimiento.MANUAL
         and (:buscar='' or lower(m.concepto) like lower(concat('%',:buscar,'%'))
           or lower(coalesce(m.referencia,'')) like lower(concat('%',:buscar,'%'))
           or lower(coalesce(m.descripcion,'')) like lower(concat('%',:buscar,'%')))
@@ -40,4 +41,13 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
     Optional<MovimientoFinanciero> buscarParaActualizar(@Param("id") UUID id,
         @Param("tenantId") UUID tenantId,@Param("empresaId") UUID empresaId,
         @Param("tipo") TipoMovimientoFinanciero tipo);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+      select m from MovimientoFinanciero m where m.tenantId=:tenantId and m.empresaId=:empresaId
+        and m.tipoOrigen=com.citacloud.springboot.contacloud.app.models.TipoOrigenMovimiento.TRANSFER
+        and m.origenId=:transferenciaId
+      """)
+    List<MovimientoFinanciero> buscarTransferenciaParaAnular(@Param("tenantId")UUID tenantId,
+        @Param("empresaId")UUID empresaId,@Param("transferenciaId")UUID transferenciaId);
 }

@@ -60,10 +60,23 @@ public class MovimientoFinanciero {
     public MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion, UUID usuarioId) {
+        this(tenantId,empresaId,tipo,fecha,tipoCuenta,cuentaId,monedaId,monto,concepto,referencia,
+            descripcion,TipoOrigenMovimiento.MANUAL,null,usuarioId);
+    }
+    public static MovimientoFinanciero transferencia(UUID tenantId,UUID empresaId,TipoMovimientoFinanciero tipo,
+            LocalDate fecha,TipoCuentaDinero tipoCuenta,UUID cuentaId,UUID monedaId,BigDecimal monto,
+            String concepto,String referencia,String descripcion,UUID transferenciaId,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,tipo,fecha,tipoCuenta,cuentaId,monedaId,monto,
+            concepto,referencia,descripcion,TipoOrigenMovimiento.TRANSFER,transferenciaId,usuarioId);
+    }
+    private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
+            LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
+            BigDecimal monto, String concepto, String referencia, String descripcion,
+            TipoOrigenMovimiento tipoOrigen,UUID origenId,UUID usuarioId) {
         this.tenantId=tenantId; this.empresaId=empresaId; this.tipoMovimiento=tipo; this.fecha=fecha;
         this.tipoCuenta=tipoCuenta; asignarCuenta(tipoCuenta,cuentaId); this.monedaId=monedaId;
         this.monto=monto; this.concepto=concepto; this.referencia=referencia; this.descripcion=descripcion;
-        this.estado=EstadoMovimientoFinanciero.REGISTERED; this.tipoOrigen=TipoOrigenMovimiento.MANUAL;
+        this.estado=EstadoMovimientoFinanciero.REGISTERED; this.tipoOrigen=tipoOrigen;this.origenId=origenId;
         this.creadoPor=usuarioId; this.actualizadoPor=usuarioId; this.actualizadoEn=OffsetDateTime.now();
     }
     @PreUpdate void actualizarMarcaTiempo(){ actualizadoEn=OffsetDateTime.now(); }

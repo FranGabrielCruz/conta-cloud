@@ -22,7 +22,8 @@ class FinancialMovementServiceTest {
     private final CashRegisterRepository cajas=mock(CashRegisterRepository.class);
     private final BankAccountRepository cuentas=mock(BankAccountRepository.class);
     private final AuditoriaService auditoria=mock(AuditoriaService.class);
-    private final FinancialMovementService service=new FinancialMovementService(repository,cajas,cuentas,
+    private final CuentaDineroResolver cuentaResolver=new CuentaDineroResolver(cajas,cuentas);
+    private final FinancialMovementService service=new FinancialMovementService(repository,cuentaResolver,
         new MovimientoFinancieroMapper(),auditoria);
     private final UUID tenantId=UUID.randomUUID(),empresaId=UUID.randomUUID(),usuarioId=UUID.randomUUID();
     private final UUID sucursalId=UUID.randomUUID(),cajaId=UUID.randomUUID(),monedaId=UUID.randomUUID();
