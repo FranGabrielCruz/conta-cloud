@@ -5,6 +5,8 @@ import com.citacloud.springboot.contacloud.app.models.CuentaBancaria;
 import com.citacloud.springboot.contacloud.app.services.BankAccountNumberService;
 import org.springframework.stereotype.Component;
 import java.util.UUID;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Component
 public class CuentaBancariaMapper {
@@ -17,6 +19,14 @@ public class CuentaBancariaMapper {
             entity.getTipoCuenta(), entity.getMonedaId(), entity.getMoneda().getCodigoIso(),
             entity.getMoneda().getNombre(), numbers.mask(entity.getNumeroCuentaUltimos4()),
             entity.getDescripcion(), entity.isActivo());
+    }
+
+    public CuentaBancariaDto toDto(CuentaBancaria entity,BigDecimal saldoApertura,
+            LocalDate fechaSaldoApertura,BigDecimal saldoActual) {
+        return new CuentaBancariaDto(entity.getId(),entity.getBancoNombre(),entity.getNombreCuenta(),
+            entity.getTipoCuenta(),entity.getMonedaId(),entity.getMoneda().getCodigoIso(),entity.getMoneda().getNombre(),
+            numbers.mask(entity.getNumeroCuentaUltimos4()),entity.getDescripcion(),entity.isActivo(),
+            saldoApertura,fechaSaldoApertura,saldoActual);
     }
 
     public CuentaBancariaEdicionDto toEditDto(CuentaBancaria entity) {

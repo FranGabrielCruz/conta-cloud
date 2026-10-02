@@ -111,21 +111,29 @@ abstract class FinancialMovementsView extends VerticalLayout implements BeforeEn
         ComboBox<CuentaDineroOpcionDto> account=new ComboBox<>("Cuenta");account.setRequired(true);account.setItems(cats.cuentas());account.setItemLabelGenerator(this::etiquetaCuenta);
         TextField moneda=new TextField("Moneda");moneda.setReadOnly(true);
         TextField concepto=new TextField("Concepto");concepto.setRequired(true);concepto.setMaxLength(180);
+        Select<MedioPagoMovimiento> medioPago=new Select<>();medioPago.setLabel("Medio de pago");
+        medioPago.setItems(MedioPagoMovimiento.values());medioPago.setItemLabelGenerator(MedioPagoMovimiento::getEtiqueta);
+        medioPago.setRequiredIndicatorVisible(true);
         BigDecimalField monto=new BigDecimalField("Monto");monto.setRequiredIndicatorVisible(true);
         if(actual!=null){monto.setReadOnly(true);monto.setHelperText("El monto no puede modificarse.");}
         TextField referencia=new TextField("Referencia");referencia.setMaxLength(100);
         TextArea descripcion=new TextArea("Descripción");descripcion.setMaxLength(1000);descripcion.addClassName("cc-dialog-span-2");
-        account.addValueChangeListener(e->moneda.setValue(e.getValue()==null?"":e.getValue().monedaCodigo()));
+        account.addValueChangeListener(e->{moneda.setValue(e.getValue()==null?"":e.getValue().monedaCodigo());
+            boolean caja=e.getValue()!=null&&e.getValue().tipo()==TipoCuentaDinero.CASH_REGISTER;
+            medioPago.setVisible(caja);if(!caja)medioPago.setValue(MedioPagoMovimiento.BANK_TRANSFER);
+            else if(medioPago.getValue()==MedioPagoMovimiento.BANK_TRANSFER)medioPago.setValue(MedioPagoMovimiento.CASH);});
         if(actual==null)fecha.setValue(java.time.LocalDate.now());else{
             fecha.setValue(actual.fecha());cats.cuentas().stream().filter(x->x.id().equals(actual.cuentaId())&&x.tipo()==actual.tipoCuenta()).findFirst().ifPresent(account::setValue);
-            concepto.setValue(actual.concepto());monto.setValue(actual.monto());referencia.setValue(nvl(actual.referencia()));descripcion.setValue(nvl(actual.descripcion()));moneda.setValue(actual.monedaCodigo());}
+            concepto.setValue(actual.concepto());monto.setValue(actual.monto());referencia.setValue(nvl(actual.referencia()));descripcion.setValue(nvl(actual.descripcion()));moneda.setValue(actual.monedaCodigo());
+            medioPago.setValue(actual.medioPago());medioPago.setVisible(actual.tipoCuenta()==TipoCuentaDinero.CASH_REGISTER);}
         EstadoFormulario change=new EstadoFormulario();
         fecha.addValueChangeListener(e->change.marcar(e.isFromClient()));account.addValueChangeListener(e->change.marcar(e.isFromClient()));
         concepto.addValueChangeListener(e->change.marcar(e.isFromClient()));monto.addValueChangeListener(e->change.marcar(e.isFromClient()));
         referencia.addValueChangeListener(e->change.marcar(e.isFromClient()));descripcion.addValueChangeListener(e->change.marcar(e.isFromClient()));
-        d.add(form(fecha,account,moneda,concepto,monto,referencia,descripcion));
+        medioPago.addValueChangeListener(e->change.marcar(e.isFromClient()));
+        d.add(form(fecha,account,moneda,concepto,monto,medioPago,referencia,descripcion));
         AppActionButton guardar=new AppActionButton(ActionType.SAVE,ButtonSize.MAIN,"Guardar",null);
-        guardar.addClickListener(e->{CuentaDineroOpcionDto a=account.getValue();MovimientoFinancieroInput input=new MovimientoFinancieroInput(fecha.getValue(),a==null?null:a.tipo(),a==null?null:a.id(),concepto.getValue(),monto.getValue(),referencia.getValue(),descripcion.getValue());
+        guardar.addClickListener(e->{CuentaDineroOpcionDto a=account.getValue();MovimientoFinancieroInput input=new MovimientoFinancieroInput(fecha.getValue(),a==null?null:a.tipo(),a==null?null:a.id(),concepto.getValue(),monto.getValue(),referencia.getValue(),descripcion.getValue(),medioPago.getValue());
             guardar(d,guardar,change,actual,input);});d.getFooter().add(guardar);
         if(actual!=null&&actual.anulable()&&puede(recurso+".anular"))d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular",e->anular(actual.id(),d)));
         d.getFooter().add(new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->cerrar(d,change)));
@@ -140,6 +148,7 @@ abstract class FinancialMovementsView extends VerticalLayout implements BeforeEn
     private void detalle(UUID id){try{MovimientoFinancieroDto i=obtener(id);Dialog d=dialog(singularMayus());AppDetailSection section=new AppDetailSection("Información")
         .field("Fecha",DATE.format(i.fecha())).field("Concepto",i.concepto()).field("Cuenta",i.cuentaNombre())
         .field("Moneda",i.monedaCodigo()).field("Monto",String.format(Locale.US,"%,.2f",i.monto()))
+        .field("Medio de pago",i.medioPago()==null?"—":i.medioPago().getEtiqueta())
         .field("Estado",estado(i.estado())).field("Referencia",texto(i.referencia())).field("Descripción",texto(i.descripcion()));
         if(i.estado()==EstadoMovimientoFinanciero.VOIDED)section.field("Anulado el",i.anuladoEn()==null?"—":i.anuladoEn().toLocalDateTime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
             .field("Anulado por",texto(i.anuladoPorNombre())).field("Motivo de anulación",texto(i.motivoAnulacion()));

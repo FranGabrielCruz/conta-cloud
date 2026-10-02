@@ -20,10 +20,12 @@ public class FinancialMovementService {
     private final CuentaDineroResolver cuentaResolver;
     private final MovimientoFinancieroMapper mapper;
     private final AuditoriaService auditoria;
+    private final CashRegisterSessionService sesionesCaja;
 
     public FinancialMovementService(FinancialMovementRepository repository,CuentaDineroResolver cuentaResolver,
-            MovimientoFinancieroMapper mapper,AuditoriaService auditoria) {
+            MovimientoFinancieroMapper mapper,AuditoriaService auditoria,CashRegisterSessionService sesionesCaja) {
         this.repository=repository;this.cuentaResolver=cuentaResolver;this.mapper=mapper;this.auditoria=auditoria;
+        this.sesionesCaja=sesionesCaja;
     }
 
     @Transactional(readOnly=true)
@@ -93,8 +95,10 @@ public class FinancialMovementService {
     private MovimientoFinancieroDto crear(TipoMovimientoFinanciero tipo,MovimientoFinancieroInput input) {
         Validado v=validar(input); var p=TenantContext.principalActual(); UUID empresaId=EmpresaContext.requerirEmpresaId();
         CuentaDineroResolver.CuentaResuelta cuenta=cuentaResolver.resolver(v.tipoCuenta,v.cuentaId);
+        OperacionCaja operacion=operacion(v.tipoCuenta,v.cuentaId,v.medioPago);
         MovimientoFinanciero entity=new MovimientoFinanciero(p.tenantId(),empresaId,tipo,v.fecha,v.tipoCuenta,
-            v.cuentaId,cuenta.monedaId(),v.monto,v.concepto,v.referencia,v.descripcion,p.usuarioId());
+            v.cuentaId,cuenta.monedaId(),v.monto,v.concepto,v.referencia,v.descripcion,
+            operacion.medioPago,operacion.sesionId,p.usuarioId());
         entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
         repository.saveAndFlush(entity);
         auditoria.registrar(evento(tipo,"CREATED"),"MovimientoFinanciero",entity.getId(),detalle(entity));
@@ -107,12 +111,14 @@ public class FinancialMovementService {
             throw new ReglaNegocioException("No se puede editar un movimiento anulado.");
         if(entity.getTipoOrigen()!=TipoOrigenMovimiento.MANUAL)
             throw new ReglaNegocioException("Este movimiento fue generado automáticamente y no puede editarse manualmente.");
+        sesionesCaja.validarMovimientoModificable(entity.getSesionCajaId());
         Validado v=validar(input); CuentaDineroResolver.CuentaResuelta cuenta=cuentaResolver.resolver(v.tipoCuenta,v.cuentaId);
+        OperacionCaja operacion=operacion(v.tipoCuenta,v.cuentaId,v.medioPago);
         String anterior=detalle(entity);
         if(entity.getMonto().compareTo(v.monto)!=0)
             throw new ReglaNegocioException("El monto de un movimiento registrado no puede modificarse.");
         entity.actualizar(v.fecha,v.tipoCuenta,v.cuentaId,cuenta.monedaId(),v.monto,v.concepto,v.referencia,
-            v.descripcion,TenantContext.principalActual().usuarioId());
+            v.descripcion,operacion.medioPago,operacion.sesionId,TenantContext.principalActual().usuarioId());
         entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
         repository.saveAndFlush(entity);
         auditoria.registrar(evento(tipo,"UPDATED"),"MovimientoFinanciero",entity.getId(),
@@ -124,6 +130,7 @@ public class FinancialMovementService {
         MovimientoFinanciero entity=seguroParaActualizar(id,tipo);
         if(entity.getEstado()==EstadoMovimientoFinanciero.VOIDED)
             throw new ReglaNegocioException("El movimiento ya está anulado.");
+        sesionesCaja.validarMovimientoModificable(entity.getSesionCajaId());
         String limpio=limpiarNulo(motivo);
         if(limpio==null) throw new ReglaNegocioException("El motivo de anulación es obligatorio.");
         if(limpio.length()>500) throw new ReglaNegocioException("El motivo de anulación excede 500 caracteres.");
@@ -158,6 +165,8 @@ public class FinancialMovementService {
         String concepto=direccion==TipoMovimientoFinanciero.EXPENSE?"Transferencia enviada":"Transferencia recibida";
         MovimientoFinanciero entity=MovimientoFinanciero.transferencia(p.tenantId(),empresaId,direccion,fecha,
             cuenta.tipo(),cuenta.id(),cuenta.monedaId(),monto,concepto,referencia,descripcion,transferenciaId,p.usuarioId());
+        if(cuenta.tipo()==TipoCuentaDinero.CASH_REGISTER)
+            entity.asignarOperacionCaja(sesionesCaja.requerirSesionAbierta(cuenta.id()),MedioPagoMovimiento.CASH);
         entity.asignarRelacionesCuenta(cuenta.caja(),cuenta.cuentaBancaria(),cuenta.moneda());
         return repository.saveAndFlush(entity);
     }
@@ -169,6 +178,7 @@ public class FinancialMovementService {
             throw new ReglaNegocioException("Los movimientos de la transferencia no están completos.");
         if(movimientos.stream().anyMatch(m->m.getEstado()!=EstadoMovimientoFinanciero.REGISTERED))
             throw new ReglaNegocioException("Los movimientos de la transferencia ya fueron anulados.");
+        movimientos.forEach(m->sesionesCaja.validarMovimientoModificable(m.getSesionCajaId()));
         movimientos.forEach(m->m.anular(motivo,p.usuarioId()));
         repository.saveAll(movimientos);repository.flush();
     }
@@ -187,7 +197,23 @@ public class FinancialMovementService {
         String referencia=limpiarNulo(input.referencia()),descripcion=limpiarNulo(input.descripcion());
         if(referencia!=null&&referencia.length()>100) throw new ReglaNegocioException("La referencia excede 100 caracteres.");
         if(descripcion!=null&&descripcion.length()>1000) throw new ReglaNegocioException("La descripción excede 1000 caracteres.");
-        return new Validado(input.fecha(),input.tipoCuenta(),input.cuentaId(),concepto,monto,referencia,descripcion);
+        return new Validado(input.fecha(),input.tipoCuenta(),input.cuentaId(),concepto,monto,referencia,descripcion,input.medioPago());
+    }
+
+    void registrarSaldoApertura(CuentaBancaria cuenta,LocalDate fecha,BigDecimal saldo){
+        if(saldo==null||saldo.signum()==0)return;
+        var p=TenantContext.principalActual();TipoMovimientoFinanciero tipo=saldo.signum()>0
+            ?TipoMovimientoFinanciero.INCOME:TipoMovimientoFinanciero.EXPENSE;
+        MovimientoFinanciero m=MovimientoFinanciero.saldoApertura(p.tenantId(),EmpresaContext.requerirEmpresaId(),
+            tipo,fecha,cuenta.getId(),cuenta.getMonedaId(),saldo.abs(),p.usuarioId());
+        m.asignarRelacionesCuenta(null,cuenta,cuenta.getMoneda());repository.saveAndFlush(m);
+        auditoria.registrar("BANK_ACCOUNT_OPENING_BALANCE_CREATED","MovimientoFinanciero",m.getId(),detalle(m));
+    }
+
+    private OperacionCaja operacion(TipoCuentaDinero tipo,UUID cuentaId,MedioPagoMovimiento medio){
+        if(tipo==TipoCuentaDinero.BANK_ACCOUNT)return new OperacionCaja(MedioPagoMovimiento.BANK_TRANSFER,null);
+        if(medio==null)throw new ReglaNegocioException("El medio de pago es obligatorio para movimientos de caja.");
+        return new OperacionCaja(medio,sesionesCaja.requerirSesionAbierta(cuentaId));
     }
     private static Sort orden(String campo,boolean asc) {
         String propiedad=switch(campo==null?"fecha":campo){case "concepto"->"concepto";case "cuenta"->"tipoCuenta";
@@ -207,5 +233,6 @@ public class FinancialMovementService {
     private static String limpiar(String s){return s==null?"":s.trim();}
     private static String limpiarNulo(String s){String v=limpiar(s);return v.isEmpty()?null:v;}
     private record Validado(LocalDate fecha,TipoCuentaDinero tipoCuenta,UUID cuentaId,String concepto,
-                            BigDecimal monto,String referencia,String descripcion){}
+                            BigDecimal monto,String referencia,String descripcion,MedioPagoMovimiento medioPago){}
+    private record OperacionCaja(MedioPagoMovimiento medioPago,UUID sesionId){}
 }

@@ -46,6 +46,8 @@ public final class PhaseTwoNavigation {
         new Section("CAJA Y BANCOS", List.of(
             item("Cajas", "cajas", "CASH", CAJA_BANCOS, "cajas.ver",
                 "Administra las cajas utilizadas por la empresa."),
+            item("Operaciones de caja", "operaciones-caja", "CALC_BOOK", CAJA_BANCOS, "operaciones_caja.ver",
+                "Abre, opera, cierra y consulta los turnos de caja."),
             item("Cuentas bancarias", "cuentas-bancarias", "CREDIT_CARD", CAJA_BANCOS,
                 "cuentas_bancarias.ver", "Administra las cuentas bancarias de la empresa."),
             item("Ingresos", "ingresos", "MONEY_DEPOSIT", CAJA_BANCOS, "ingresos.ver",

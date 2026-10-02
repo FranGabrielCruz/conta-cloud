@@ -10,6 +10,7 @@ import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
@@ -20,6 +21,9 @@ import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.*;
 import jakarta.annotation.security.PermitAll;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Route(value = "cuentas-bancarias", layout = MainLayout.class)
@@ -195,6 +199,11 @@ public class CuentasBancariasView extends VerticalLayout
             numero.setMaxLength(80);
             numero.getElement().setAttribute("autocomplete", "off");
             Checkbox active = new Checkbox("Activa", true);
+            BigDecimalField saldoApertura=new BigDecimalField("Saldo de apertura");
+            saldoApertura.setRequiredIndicatorVisible(true);saldoApertura.setValue(BigDecimal.ZERO);
+            DatePicker fechaSaldo=new DatePicker("Fecha del saldo de apertura");
+            fechaSaldo.setRequired(true);fechaSaldo.setLocale(new Locale("es","DO"));fechaSaldo.setValue(LocalDate.now());
+            saldoApertura.setVisible(nueva);fechaSaldo.setVisible(nueva);
             TextArea description = new TextArea("Descripción");
             description.setMaxLength(500);
             description.addClassName("cc-dialog-span-2");
@@ -222,12 +231,15 @@ public class CuentasBancariasView extends VerticalLayout
             numero.addValueChangeListener(event -> changes.marcar(event.isFromClient()));
             description.addValueChangeListener(event -> changes.marcar(event.isFromClient()));
             active.addValueChangeListener(event -> changes.marcar(event.isFromClient()));
-            dialog.add(form(banco, nombre, tipo, currency, numero, active, description));
+            saldoApertura.addValueChangeListener(event->changes.marcar(event.isFromClient()));
+            fechaSaldo.addValueChangeListener(event->changes.marcar(event.isFromClient()));
+            dialog.add(form(banco,nombre,tipo,currency,numero,active,saldoApertura,fechaSaldo,description));
 
             AppActionButton save = new AppActionButton(ActionType.SAVE, ButtonSize.MAIN, "Guardar", null);
             save.addClickListener(event -> guardar(dialog, save, changes, actual,
                 new CuentaBancariaInput(banco.getValue(), nombre.getValue(), tipo.getValue(),
-                    id(currency.getValue()), numero.getValue(), description.getValue(), active.getValue())));
+                    id(currency.getValue()), numero.getValue(), description.getValue(), active.getValue(),
+                    nueva?saldoApertura.getValue():null,nueva?fechaSaldo.getValue():null)));
             dialog.getFooter().add(save);
             if (actual != null && puede("cuentas_bancarias.desactivar")) {
                 ActionType action = actual.activa() ? ActionType.DEACTIVATE : ActionType.ACTIVATE;
@@ -276,6 +288,9 @@ public class CuentasBancariasView extends VerticalLayout
                 .field("Tipo de cuenta", item.tipo().getEtiqueta())
                 .field("Moneda", item.monedaCodigo() + " - " + item.monedaNombre())
                 .field("Número de cuenta", item.numeroEnmascarado())
+                .field("Saldo de apertura",formato(item.saldoApertura()))
+                .field("Fecha de apertura",item.fechaSaldoApertura()==null?"—":item.fechaSaldoApertura().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                .field("Saldo actual",formato(item.saldoActual()))
                 .field("Estado", item.activa() ? "Activa" : "Inactiva")
                 .field("Descripción", item.descripcion() == null ? "Sin descripción" : item.descripcion()));
             if (puede("cuentas_bancarias.editar")) dialog.getFooter().add(
@@ -355,6 +370,7 @@ public class CuentasBancariasView extends VerticalLayout
     private static UUID id(CuentaBancariaCatalogosDto.MonedaOpcion value) {
         return value == null ? null : value.id();
     }
+    private static String formato(BigDecimal value){return value==null?"—":String.format(Locale.US,"%,.2f",value);}
 
     private static boolean puede(String... permissions) {
         Set<String> actual = TenantContext.principalActual().permisos();

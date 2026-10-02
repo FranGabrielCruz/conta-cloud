@@ -66,4 +66,29 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<MovimientoFinanciero> findByIdAndTenantIdAndEmpresaIdAndTipoCuentaAndCuentaBancariaId(
         UUID id,UUID tenantId,UUID empresaId,TipoCuentaDinero tipoCuenta,UUID cuentaBancariaId);
+
+    @Query("""
+      select m from MovimientoFinanciero m where m.tenantId=:tenant and m.empresaId=:empresa
+        and m.sesionCajaId=:sesion and m.estado=com.citacloud.springboot.contacloud.app.models.EstadoMovimientoFinanciero.REGISTERED
+      """)
+    List<MovimientoFinanciero> movimientosValidosSesion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion);
+
+    @Query("""
+      select m from MovimientoFinanciero m where m.tenantId=:tenant and m.empresaId=:empresa
+        and m.sesionCajaId=:sesion
+      """)
+    Page<MovimientoFinanciero> movimientosSesion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion,Pageable pageable);
+
+    Optional<MovimientoFinanciero> findByTenantIdAndEmpresaIdAndTipoOrigenAndOrigenId(UUID tenant,UUID empresa,
+        TipoOrigenMovimiento tipoOrigen,UUID origenId);
+
+    @Query("""
+      select coalesce(sum(case when m.tipoMovimiento=com.citacloud.springboot.contacloud.app.models.TipoMovimientoFinanciero.INCOME
+        then m.monto else (0-m.monto) end),0) from MovimientoFinanciero m
+      where m.tenantId=:tenant and m.empresaId=:empresa and m.tipoCuenta=com.citacloud.springboot.contacloud.app.models.TipoCuentaDinero.BANK_ACCOUNT
+        and m.cuentaBancariaId=:cuenta and m.estado=com.citacloud.springboot.contacloud.app.models.EstadoMovimientoFinanciero.REGISTERED
+      """)
+    java.math.BigDecimal saldoCuenta(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("cuenta")UUID cuenta);
 }

@@ -28,6 +28,9 @@ public class MovimientoFinanciero {
     @Enumerated(EnumType.STRING) @Column(name="tipo_origen",nullable=false,length=30)
     private TipoOrigenMovimiento tipoOrigen;
     @Column(name="origen_id") private UUID origenId;
+    @Column(name="cash_register_session_id") private UUID sesionCajaId;
+    @Enumerated(EnumType.STRING) @Column(name="payment_method",nullable=false,length=20)
+    private MedioPagoMovimiento medioPago;
     @Column(name="creado_en",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
     @Column(name="creado_por",nullable=false,updatable=false) private UUID creadoPor;
     @Column(name="actualizado_en",nullable=false) private OffsetDateTime actualizadoEn;
@@ -61,30 +64,53 @@ public class MovimientoFinanciero {
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion, UUID usuarioId) {
         this(tenantId,empresaId,tipo,fecha,tipoCuenta,cuentaId,monedaId,monto,concepto,referencia,
-            descripcion,TipoOrigenMovimiento.MANUAL,null,usuarioId);
+            descripcion,TipoOrigenMovimiento.MANUAL,null,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?MedioPagoMovimiento.CASH:MedioPagoMovimiento.BANK_TRANSFER,null,usuarioId);
+    }
+    public MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
+            LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
+            BigDecimal monto, String concepto, String referencia, String descripcion,
+            MedioPagoMovimiento medioPago,UUID sesionCajaId,UUID usuarioId) {
+        this(tenantId,empresaId,tipo,fecha,tipoCuenta,cuentaId,monedaId,monto,concepto,referencia,
+            descripcion,TipoOrigenMovimiento.MANUAL,null,medioPago,sesionCajaId,usuarioId);
     }
     public static MovimientoFinanciero transferencia(UUID tenantId,UUID empresaId,TipoMovimientoFinanciero tipo,
             LocalDate fecha,TipoCuentaDinero tipoCuenta,UUID cuentaId,UUID monedaId,BigDecimal monto,
             String concepto,String referencia,String descripcion,UUID transferenciaId,UUID usuarioId){
         return new MovimientoFinanciero(tenantId,empresaId,tipo,fecha,tipoCuenta,cuentaId,monedaId,monto,
-            concepto,referencia,descripcion,TipoOrigenMovimiento.TRANSFER,transferenciaId,usuarioId);
+            concepto,referencia,descripcion,TipoOrigenMovimiento.TRANSFER,transferenciaId,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?MedioPagoMovimiento.CASH:MedioPagoMovimiento.BANK_TRANSFER,null,usuarioId);
+    }
+    public static MovimientoFinanciero saldoApertura(UUID tenantId,UUID empresaId,TipoMovimientoFinanciero tipo,
+            LocalDate fecha,UUID cuentaId,UUID monedaId,BigDecimal monto,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,tipo,fecha,TipoCuentaDinero.BANK_ACCOUNT,cuentaId,
+            monedaId,monto,"Saldo de apertura",null,"Saldo inicial al incorporar la cuenta bancaria",
+            TipoOrigenMovimiento.OPENING_BALANCE,cuentaId,MedioPagoMovimiento.BANK_TRANSFER,null,usuarioId);
     }
     private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion,
-            TipoOrigenMovimiento tipoOrigen,UUID origenId,UUID usuarioId) {
+            TipoOrigenMovimiento tipoOrigen,UUID origenId,MedioPagoMovimiento medioPago,UUID sesionCajaId,UUID usuarioId) {
         this.tenantId=tenantId; this.empresaId=empresaId; this.tipoMovimiento=tipo; this.fecha=fecha;
         this.tipoCuenta=tipoCuenta; asignarCuenta(tipoCuenta,cuentaId); this.monedaId=monedaId;
         this.monto=monto; this.concepto=concepto; this.referencia=referencia; this.descripcion=descripcion;
         this.estado=EstadoMovimientoFinanciero.REGISTERED; this.tipoOrigen=tipoOrigen;this.origenId=origenId;
+        this.medioPago=medioPago;this.sesionCajaId=sesionCajaId;
         this.creadoPor=usuarioId; this.actualizadoPor=usuarioId; this.actualizadoEn=OffsetDateTime.now();
     }
     @PreUpdate void actualizarMarcaTiempo(){ actualizadoEn=OffsetDateTime.now(); }
     public void actualizar(LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion, UUID usuarioId) {
+        actualizar(fecha,tipoCuenta,cuentaId,monedaId,monto,concepto,referencia,descripcion,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?MedioPagoMovimiento.CASH:MedioPagoMovimiento.BANK_TRANSFER,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
+    }
+    public void actualizar(LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
+            BigDecimal monto, String concepto, String referencia, String descripcion,
+            MedioPagoMovimiento medioPago,UUID sesionCajaId,UUID usuarioId) {
         this.fecha=fecha; this.tipoCuenta=tipoCuenta; asignarCuenta(tipoCuenta,cuentaId); this.monedaId=monedaId;
         this.monto=monto; this.concepto=concepto; this.referencia=referencia; this.descripcion=descripcion;
-        this.actualizadoPor=usuarioId;
+        this.medioPago=medioPago;this.sesionCajaId=sesionCajaId;this.actualizadoPor=usuarioId;
     }
     public void anular(String motivo, UUID usuarioId) {
         estado=EstadoMovimientoFinanciero.VOIDED; motivoAnulacion=motivo; anuladoPor=usuarioId;
@@ -94,6 +120,9 @@ public class MovimientoFinanciero {
         this.caja=caja;
         this.cuentaBancaria=cuentaBancaria;
         this.moneda=moneda;
+    }
+    public void asignarOperacionCaja(UUID sesionCajaId,MedioPagoMovimiento medioPago){
+        this.sesionCajaId=sesionCajaId;this.medioPago=medioPago;
     }
     private void asignarCuenta(TipoCuentaDinero tipo, UUID id) {
         cajaId=tipo==TipoCuentaDinero.CASH_REGISTER?id:null;
@@ -107,6 +136,7 @@ public class MovimientoFinanciero {
     public String getConcepto(){return concepto;} public String getReferencia(){return referencia;}
     public String getDescripcion(){return descripcion;} public EstadoMovimientoFinanciero getEstado(){return estado;}
     public TipoOrigenMovimiento getTipoOrigen(){return tipoOrigen;} public UUID getOrigenId(){return origenId;}
+    public UUID getSesionCajaId(){return sesionCajaId;} public MedioPagoMovimiento getMedioPago(){return medioPago;}
     public OffsetDateTime getCreadoEn(){return creadoEn;} public UUID getCreadoPor(){return creadoPor;}
     public OffsetDateTime getActualizadoEn(){return actualizadoEn;} public UUID getActualizadoPor(){return actualizadoPor;}
     public OffsetDateTime getAnuladoEn(){return anuladoEn;} public UUID getAnuladoPor(){return anuladoPor;}

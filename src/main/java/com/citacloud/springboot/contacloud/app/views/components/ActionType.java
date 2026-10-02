@@ -17,6 +17,9 @@ public enum ActionType {
     MATCH("Conciliar", VaadinIcon.CONNECT, "success"),
     UNMATCH("Desconciliar", VaadinIcon.UNLINK, "danger"),
     FINALIZE("Finalizar", VaadinIcon.LOCK, "danger"),
+    OPEN_CASH("Abrir caja", VaadinIcon.UNLOCK, "success"),
+    CLOSE_CASH("Cerrar caja", VaadinIcon.LOCK, "danger"),
+    REVIEW("Revisar", VaadinIcon.CHECK, "success"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
     REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
 

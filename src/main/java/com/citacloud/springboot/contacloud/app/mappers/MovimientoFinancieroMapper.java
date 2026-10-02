@@ -16,6 +16,6 @@ public class MovimientoFinancieroMapper {
             m.getTipoCuenta()==TipoCuentaDinero.CASH_REGISTER?m.getCajaId():m.getCuentaBancariaId(),
             cuenta,m.getMonedaId(),m.getMoneda().getCodigoIso(),m.getMonto(),m.getConcepto(),m.getReferencia(),
             m.getDescripcion(),m.getEstado(),m.getTipoOrigen(),m.getCreadoEn(),m.getAnuladoEn(),usuario,
-            m.getMotivoAnulacion(),manualRegistrado,manualRegistrado);
+            m.getMotivoAnulacion(),manualRegistrado,manualRegistrado,m.getMedioPago(),m.getSesionCajaId());
     }
 }

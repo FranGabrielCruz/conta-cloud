@@ -8,4 +8,4 @@ public record MovimientoFinancieroDto(UUID id, TipoMovimientoFinanciero tipoMovi
     BigDecimal monto, String concepto, String referencia, String descripcion,
     EstadoMovimientoFinanciero estado, TipoOrigenMovimiento tipoOrigen, OffsetDateTime creadoEn,
     OffsetDateTime anuladoEn, String anuladoPorNombre, String motivoAnulacion,
-    boolean editable, boolean anulable) {}
+    boolean editable, boolean anulable,MedioPagoMovimiento medioPago,UUID sesionCajaId) {}

@@ -90,7 +90,11 @@ public class RolService {
     private Set<UUID> validarPermisos(Set<UUID> ids){Set<UUID> seguros=ids==null?Set.of():Set.copyOf(ids);List<Permiso> seleccionados=permisos.findAllByIdIn(seguros);Set<String> habilitados=modulos.habilitadosActuales();if(seleccionados.size()!=seguros.size()||seleccionados.stream().anyMatch(p->!disponible(p,habilitados)))throw new ReglaNegocioException("La selección contiene permisos de módulos no habilitados para la empresa.");return seguros;}
     private List<Permiso> permisosDisponibles(){Set<String> habilitados=modulos.habilitadosActuales();return permisos.findAllByOrderByModuloAscRecursoAscCodigoAsc().stream().filter(p->disponible(p,habilitados)).toList();}
     private static boolean disponible(Permiso permiso,Set<String> habilitados){return PermisoTenantPolicy.disponibleParaTenant(permiso.getModulo(),permiso.getRecurso())&&PermisoModuloPolicy.moduloRequerido(permiso.getCodigo(),permiso.getRecurso()).filter(habilitados::contains).isPresent();}
-    private void reemplazarPermisos(UUID empresaId,UUID rolId,Set<UUID> ids){rolPermisos.deleteAllByRolId(rolId);UUID tenantId=TenantContext.requerirTenantId();rolPermisos.saveAll(ids.stream().map(id->new RolPermiso(tenantId,empresaId,rolId,id)).toList());}
+    private void reemplazarPermisos(UUID empresaId,UUID rolId,Set<UUID> ids){
+        rolPermisos.deleteAllByRolId(rolId);
+        UUID tenantId=TenantContext.requerirTenantId();
+        rolPermisos.saveAllAndFlush(ids.stream().map(id->new RolPermiso(tenantId,empresaId,rolId,id)).toList());
+    }
     private static String limpiar(String s){return s==null?"":s.trim();}
     private static String limitar(String s,int max){String v=limpiar(s);if(v.length()>max)throw new ReglaNegocioException("La descripción excede "+max+" caracteres.");return v.isEmpty()?null:v;}
 }

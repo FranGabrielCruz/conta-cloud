@@ -10,6 +10,8 @@ import org.springframework.data.domain.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -23,15 +25,20 @@ public class BankAccountService {
     private final CuentaBancariaMapper mapper;
     private final BankAccountNumberService numbers;
     private final AuditoriaService auditoria;
+    private final FinancialMovementService movimientos;
+    private final FinancialMovementRepository financialMovementRepository;
 
     public BankAccountService(BankAccountRepository repository, MonedaRepository monedas,
                               CuentaBancariaMapper mapper, BankAccountNumberService numbers,
-                              AuditoriaService auditoria) {
+                              AuditoriaService auditoria, FinancialMovementService movimientos,
+                              FinancialMovementRepository financialMovementRepository) {
         this.repository = repository;
         this.monedas = monedas;
         this.mapper = mapper;
         this.numbers = numbers;
         this.auditoria = auditoria;
+        this.movimientos = movimientos;
+        this.financialMovementRepository=financialMovementRepository;
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +57,14 @@ public class BankAccountService {
 
     @Transactional(readOnly = true)
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('cuentas_bancarias.ver')")
-    public CuentaBancariaDto obtener(UUID id) { return mapper.toDto(cuentaSegura(id)); }
+    public CuentaBancariaDto obtener(UUID id) {
+        CuentaBancaria cuenta=cuentaSegura(id);
+        MovimientoFinanciero apertura=repositorySaldoApertura(cuenta.getId());
+        BigDecimal inicial=apertura==null?BigDecimal.ZERO:(apertura.getTipoMovimiento()==TipoMovimientoFinanciero.INCOME
+            ?apertura.getMonto():apertura.getMonto().negate());
+        LocalDate fecha=apertura==null?null:apertura.getFecha();
+        return mapper.toDto(cuenta,inicial,fecha,movimientosSaldo(cuenta.getId()));
+    }
 
     @Transactional(readOnly = true)
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('cuentas_bancarias.editar')")
@@ -73,7 +87,7 @@ public class BankAccountService {
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('cuentas_bancarias.crear')")
     public CuentaBancariaDto crear(CuentaBancariaInput input) {
-        CuentaBancariaInput validado = validar(input);
+        CuentaBancariaInput validado = validar(input,true);
         var principal = TenantContext.principalActual();
         UUID empresaId = EmpresaContext.requerirEmpresaId();
         Moneda moneda = validarMoneda(validado.monedaId(), empresaId);
@@ -85,15 +99,16 @@ public class BankAccountService {
             codigo, datos.cifrado(), datos.last4(), datos.fingerprint(), principal.usuarioId());
         entity.asignarMoneda(moneda);
         guardar(entity);
+        movimientos.registrarSaldoApertura(entity,validado.fechaSaldoApertura(),validado.saldoApertura());
         auditoria.registrar("BANK_ACCOUNT_CREATED", "CuentaBancaria", entity.getId(), detalle(entity));
-        return mapper.toDto(entity);
+        return mapper.toDto(entity,validado.saldoApertura(),validado.fechaSaldoApertura(),validado.saldoApertura());
     }
 
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('cuentas_bancarias.editar')")
     public CuentaBancariaDto actualizar(UUID id, CuentaBancariaInput input) {
         CuentaBancaria entity = cuentaSegura(id);
-        CuentaBancariaInput validado = validar(input);
+        CuentaBancariaInput validado = validar(input,false);
         if (validado.activa() != entity.isActivo())
             throw new ReglaNegocioException("Utiliza la acción correspondiente para cambiar el estado de la cuenta bancaria.");
         Moneda moneda = validarMoneda(validado.monedaId(), entity.getEmpresaId());
@@ -136,7 +151,7 @@ public class BankAccountService {
         auditoria.registrar(evento, "CuentaBancaria", entity.getId(), "{\"activo\":" + activo + "}");
     }
 
-    private CuentaBancariaInput validar(CuentaBancariaInput input) {
+    private CuentaBancariaInput validar(CuentaBancariaInput input,boolean creando) {
         if (input == null) throw new ReglaNegocioException("Los datos de la cuenta bancaria son obligatorios.");
         String banco = requerido(input.banco(), "El banco es obligatorio.", 120);
         String nombre = requerido(input.nombre(), "El nombre de cuenta es obligatorio.", 120);
@@ -145,9 +160,23 @@ public class BankAccountService {
         String descripcion = limpiarNulo(input.descripcion());
         if (descripcion != null && descripcion.length() > 500)
             throw new ReglaNegocioException("La descripción excede 500 caracteres.");
-        return new CuentaBancariaInput(banco, nombre, input.tipo(), input.monedaId(),
-            input.numeroCuenta(), descripcion, input.activa());
+        BigDecimal saldo=input.saldoApertura();LocalDate fecha=input.fechaSaldoApertura();
+        if(creando){
+            if(saldo==null)throw new ReglaNegocioException("El saldo de apertura es obligatorio.");
+            if(fecha==null)throw new ReglaNegocioException("La fecha del saldo de apertura es obligatoria.");
+            if(saldo.scale()>4||saldo.precision()-saldo.scale()>15)
+                throw new ReglaNegocioException("El saldo de apertura excede la precisión permitida.");
+        }
+        return new CuentaBancariaInput(banco,nombre,input.tipo(),input.monedaId(),input.numeroCuenta(),
+            descripcion,input.activa(),saldo,fecha);
     }
+
+    private MovimientoFinanciero repositorySaldoApertura(UUID cuentaId){
+        return financialMovementRepository.findByTenantIdAndEmpresaIdAndTipoOrigenAndOrigenId(
+            TenantContext.requerirTenantId(),EmpresaContext.requerirEmpresaId(),TipoOrigenMovimiento.OPENING_BALANCE,cuentaId).orElse(null);
+    }
+    private BigDecimal movimientosSaldo(UUID cuentaId){return financialMovementRepository.saldoCuenta(
+        TenantContext.requerirTenantId(),EmpresaContext.requerirEmpresaId(),cuentaId);}
 
     private Moneda validarMoneda(UUID id, UUID empresaId) {
         return monedas.findByIdAndEmpresaId(id, empresaId).filter(Moneda::isActivo)

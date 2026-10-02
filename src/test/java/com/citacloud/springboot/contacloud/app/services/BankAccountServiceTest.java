@@ -19,10 +19,12 @@ class BankAccountServiceTest {
     private final BankAccountRepository repository = mock(BankAccountRepository.class);
     private final MonedaRepository monedas = mock(MonedaRepository.class);
     private final AuditoriaService auditoria = mock(AuditoriaService.class);
+    private final FinancialMovementService movimientos = mock(FinancialMovementService.class);
+    private final FinancialMovementRepository financialMovementRepository=mock(FinancialMovementRepository.class);
     private final BankAccountNumberService numbers = new BankAccountNumberService(
         "01234567890123456789012345678901".getBytes(StandardCharsets.UTF_8));
     private final BankAccountService service = new BankAccountService(repository, monedas,
-        new CuentaBancariaMapper(numbers), numbers, auditoria);
+        new CuentaBancariaMapper(numbers), numbers, auditoria,movimientos,financialMovementRepository);
     private final UUID tenantId = UUID.randomUUID();
     private final UUID empresaId = UUID.randomUUID();
     private final UUID usuarioId = UUID.randomUUID();

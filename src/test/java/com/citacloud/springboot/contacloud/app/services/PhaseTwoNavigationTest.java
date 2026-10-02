@@ -7,6 +7,7 @@ import com.citacloud.springboot.contacloud.app.views.IngresosView;
 import com.citacloud.springboot.contacloud.app.views.EgresosView;
 import com.citacloud.springboot.contacloud.app.views.TransferenciasView;
 import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
+import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import org.junit.jupiter.api.Test;
@@ -20,13 +21,13 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(19);
+        assertThat(items).hasSize(20);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
             .containsExactly(
                 "clientes", "cotizaciones", "facturas", "notas-credito", "notas-debito",
                 "recibos", "cuentas-por-cobrar", "proveedores", "ordenes-compra",
                 "facturas-proveedores", "notas-credito-proveedores", "pagos-proveedores",
-                "cuentas-por-pagar", "cajas", "cuentas-bancarias", "ingresos", "egresos",
+                "cuentas-por-pagar", "cajas", "operaciones-caja", "cuentas-bancarias", "ingresos", "egresos",
                 "transferencias", "conciliacion-bancaria");
     }
 
@@ -46,6 +47,7 @@ class PhaseTwoNavigationTest {
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(CajasView.class.getAnnotation(Route.class).value(),
+                OperacionesCajaView.class.getAnnotation(Route.class).value(),
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),
                 IngresosView.class.getAnnotation(Route.class).value(),
                 EgresosView.class.getAnnotation(Route.class).value(),

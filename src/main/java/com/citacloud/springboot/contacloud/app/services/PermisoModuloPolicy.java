@@ -26,7 +26,7 @@ public final class PermisoModuloPolicy {
                  "recibos", "cuentas_cobrar" -> "VENTAS";
             case "proveedores", "ordenes_compra", "facturas_proveedores",
                  "notas_credito_proveedores", "pagos_proveedores", "cuentas_pagar" -> "COMPRAS";
-            case "cajas", "cuentas_bancarias", "ingresos", "egresos", "transferencias",
+            case "cajas", "operaciones_caja", "cuentas_bancarias", "ingresos", "egresos", "transferencias",
                  "conciliacion_bancaria" -> "CAJA_BANCOS";
             default -> null;
         });
