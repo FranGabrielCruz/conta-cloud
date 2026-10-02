@@ -199,6 +199,8 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-migration-stages p { margin: 8px 0; }
 .cc-grid-actions { gap: 4px; }
 .cc-review-badge { white-space: nowrap; }
+.cc-form-section { width: 100%; margin-top: 8px; }
+.cc-supplier-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
 .cc-dialog-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; width: 100%; }
 .cc-reconciliation-summary { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; width: 100%; }
 .cc-reconciliation-summary .cc-card { padding: 14px; }
@@ -260,6 +262,7 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-user-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
   .cc-page { padding: 20px 14px; }
   .cc-page-header { flex-wrap: wrap; }
+  .cc-supplier-detail { grid-template-columns: 1fr; }
   .cc-page-header-actions { margin-left: auto; }
   .cc-detail-grid { grid-template-columns: 1fr; gap: var(--cc-spacing-md); }
   .cc-pagination { align-items: start; }

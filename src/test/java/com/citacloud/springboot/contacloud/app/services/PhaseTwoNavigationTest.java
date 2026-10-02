@@ -8,6 +8,7 @@ import com.citacloud.springboot.contacloud.app.views.EgresosView;
 import com.citacloud.springboot.contacloud.app.views.TransferenciasView;
 import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
 import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
+import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class PhaseTwoNavigationTest {
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(CajasView.class.getAnnotation(Route.class).value(),
+                ProveedoresView.class.getAnnotation(Route.class).value(),
                 OperacionesCajaView.class.getAnnotation(Route.class).value(),
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),
                 IngresosView.class.getAnnotation(Route.class).value(),
