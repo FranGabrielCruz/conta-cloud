@@ -15,6 +15,7 @@ public enum ActionType {
     DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),
     VOID("Anular", VaadinIcon.BAN, "danger"),
     ISSUE("Emitir", VaadinIcon.PAPERPLANE, "success"),
+    PRINT("Imprimir", VaadinIcon.PRINT, "neutral"),
     MATCH("Conciliar", VaadinIcon.CONNECT, "success"),
     UNMATCH("Desconciliar", VaadinIcon.UNLINK, "danger"),
     FINALIZE("Finalizar", VaadinIcon.LOCK, "danger"),

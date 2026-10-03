@@ -11,4 +11,6 @@ public record OrdenCompraCatalogosDto(List<ProveedorOpcion> proveedores,List<Suc
     public record MonedaOpcion(UUID id,String codigo,String nombre) {}
     public record CondicionOpcion(UUID id,String nombre) {}
     public record ImpuestoOpcion(UUID id,String nombre,BigDecimal tasa) {}
+    public record ProductoOpcion(UUID id,String codigo,String nombre,String unidad,BigDecimal costoCompra,
+                                 UUID monedaId,UUID impuestoCompraId,String impuestoCompraNombre,BigDecimal impuestoCompraTasa) {}
 }

@@ -200,6 +200,13 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-grid-actions { gap: 4px; }
 .cc-review-badge { white-space: nowrap; }
 .cc-form-section { width: 100%; margin-top: 8px; }
+.cc-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--cc-spacing-md); width: 100%; margin-bottom: var(--cc-spacing-md); }
+.cc-detail-heading h2 { margin: 0; }
+.cc-table-section { min-width: 0; }
+.cc-table-section-header { display: flex; align-items: center; justify-content: flex-end; gap: var(--cc-spacing-md); width: 100%; margin-bottom: var(--cc-spacing-lg); }
+.cc-table-section-header .cc-section-heading { margin: 0; }
+.cc-table-section-body { display: block; width: 100%; min-width: 0; }
+.cc-table-section-body > * { width: 100%; min-width: 0; }
 .cc-supplier-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
 .cc-dialog-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; width: 100%; }
 .cc-reconciliation-summary { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; width: 100%; }

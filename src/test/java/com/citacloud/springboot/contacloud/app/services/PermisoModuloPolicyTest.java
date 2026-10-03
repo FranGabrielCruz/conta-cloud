@@ -44,6 +44,7 @@ class PermisoModuloPolicyTest {
     @Test
     void relacionaLosRecursosDelMenuFinalConSusEntitlements() {
         assertThat(PermisoModuloPolicy.moduloRequerido("productos.ver", "productos")).contains("INVENTARIO");
+        assertThat(PermisoModuloPolicy.moduloRequerido("unidades_medida.ver", "unidades_medida")).contains("INVENTARIO");
         assertThat(PermisoModuloPolicy.moduloRequerido("catalogo_cuentas.ver", "catalogo_cuentas")).contains("CONTABILIDAD");
         assertThat(PermisoModuloPolicy.moduloRequerido("fiscal_606.ver", "fiscal_606")).contains("FISCAL");
         assertThat(PermisoModuloPolicy.moduloRequerido("activos_fijos.ver", "activos_fijos")).contains("ACTIVOS_FIJOS");

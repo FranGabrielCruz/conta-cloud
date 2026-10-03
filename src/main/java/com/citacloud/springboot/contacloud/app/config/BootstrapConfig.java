@@ -44,6 +44,11 @@ public class BootstrapConfig implements ApplicationRunner {
         jdbc.update("INSERT INTO usuario_roles(empresa_id,usuario_id,rol_id) VALUES (?,?,?)", empresaId, usuarioId, rolId);
         jdbc.update("INSERT INTO usuario_empresa(usuario_id,empresa_id,rol_id,activo,acceso_todas_sucursales) VALUES (?,?,?,TRUE,TRUE)",
             usuarioId, empresaId, rolId);
+        if ("DEMO".equalsIgnoreCase(empresaCodigo.trim())) {
+            jdbc.update("INSERT INTO empresa_modulos(tenant_id,empresa_id,module_key,enabled) " +
+                "SELECT ?,?,module_key,TRUE FROM module_catalog WHERE active=TRUE " +
+                "ON CONFLICT(empresa_id,module_key) DO UPDATE SET enabled=TRUE,updated_at=CURRENT_TIMESTAMP", tenantId, empresaId);
+        }
         log.info("Tenant inicial creado: {}", empresaCodigo.trim().toUpperCase());
     }
 }

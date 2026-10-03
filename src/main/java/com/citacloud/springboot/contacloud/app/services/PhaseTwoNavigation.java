@@ -67,6 +67,8 @@ public final class PhaseTwoNavigation {
         new Section("INVENTARIO", List.of(
             item("Productos", "productos", "CUBE", INVENTARIO, "productos.ver", placeholder()),
             item("Categorías", "categorias", "TAG", INVENTARIO, "categorias.ver", placeholder()),
+            item("Unidades de medida", "unidades-medida", "SCALE", INVENTARIO, "unidades_medida.ver",
+                "Administra las unidades de medida utilizadas en productos, servicios y operaciones de inventario."),
             item("Almacenes", "almacenes", "DATABASE", INVENTARIO, "almacenes.ver", placeholder()),
             item("Movimientos", "inventario/movimientos", "EXCHANGE", INVENTARIO, "inventario_movimientos.ver", placeholder()),
             item("Transferencias", "inventario/transferencias", "ARROWS_LONG_H", INVENTARIO, "inventario_transferencias.ver", placeholder()),

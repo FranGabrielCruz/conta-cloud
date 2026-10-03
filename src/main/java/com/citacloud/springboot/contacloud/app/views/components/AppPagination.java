@@ -7,6 +7,7 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.select.Select;
 
 import java.util.Objects;
+import java.util.List;
 import java.util.function.Consumer;
 
 /** Estado visual de paginación; la consulta paginada debe realizarla el servicio backend. */
@@ -22,11 +23,19 @@ public class AppPagination extends Div {
     private long total;
 
     public AppPagination(Consumer<PageRequest> onChange) {
+        this(onChange, 10, 10, 25, 50, 100);
+    }
+
+    public AppPagination(Consumer<PageRequest> onChange, int defaultPageSize, Integer... availablePageSizes) {
         this.onChange = Objects.requireNonNull(onChange);
+        List<Integer> sizes = List.of(availablePageSizes);
+        if (sizes.isEmpty() || !sizes.contains(defaultPageSize)) {
+            throw new IllegalArgumentException("El tamaño predeterminado debe estar disponible");
+        }
         addClassName("cc-pagination");
         pageSize.setLabel("Registros por página");
-        pageSize.setItems(10, 25, 50, 100);
-        pageSize.setValue(10);
+        pageSize.setItems(sizes);
+        pageSize.setValue(defaultPageSize);
         pageSize.addValueChangeListener(event -> {
             if (!event.isFromClient()) return;
             page = 0;

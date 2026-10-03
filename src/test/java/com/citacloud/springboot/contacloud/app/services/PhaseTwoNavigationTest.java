@@ -10,6 +10,8 @@ import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
 import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
 import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.OrdenesCompraView;
+import com.citacloud.springboot.contacloud.app.views.ProductosView;
+import com.citacloud.springboot.contacloud.app.views.UnidadesMedidaView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -24,7 +26,7 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(60);
+        assertThat(items).hasSize(61);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
             .contains("clientes", "ordenes-compra", "transferencias", "productos",
                 "inventario/transferencias", "catalogo-cuentas", "fiscal/606", "activos-fijos",
@@ -51,7 +53,7 @@ class PhaseTwoNavigationTest {
     @Test
     void conservaElOrdenSolicitadoDentroDeCadaNuevaSeccion() {
         assertThat(section("INVENTARIO").items()).extracting(PhaseTwoNavigation.Item::title)
-            .containsExactly("Productos", "Categorías", "Almacenes", "Movimientos", "Transferencias",
+            .containsExactly("Productos", "Categorías", "Unidades de medida", "Almacenes", "Movimientos", "Transferencias",
                 "Ajustes", "Kardex", "Conteo físico");
         assertThat(section("CONTABILIDAD").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("Catálogo de cuentas", "Asientos", "Libro diario", "Libro mayor", "Balanza",
@@ -82,6 +84,8 @@ class PhaseTwoNavigationTest {
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(CajasView.class.getAnnotation(Route.class).value(),
                 ProveedoresView.class.getAnnotation(Route.class).value(),
+                ProductosView.class.getAnnotation(Route.class).value(),
+                UnidadesMedidaView.class.getAnnotation(Route.class).value(),
                 OrdenesCompraView.class.getAnnotation(Route.class).value(),
                 OperacionesCajaView.class.getAnnotation(Route.class).value(),
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),

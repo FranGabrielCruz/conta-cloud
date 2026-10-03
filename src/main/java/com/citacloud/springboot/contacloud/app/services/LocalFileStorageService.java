@@ -34,6 +34,25 @@ public class LocalFileStorageService {
         }
     }
 
+    public String storePdf(String key, byte[] bytes) {
+        if (key == null || !key.endsWith(".pdf")) throw new IllegalArgumentException("La ruta debe corresponder a un PDF");
+        if (bytes == null || bytes.length < 5 || bytes[0] != '%' || bytes[1] != 'P'
+                || bytes[2] != 'D' || bytes[3] != 'F' || bytes[4] != '-') {
+            throw new IllegalArgumentException("Contenido PDF inválido");
+        }
+        Path target = resolveSafePath(key);
+        try {
+            Files.createDirectories(target.getParent());
+            rejectSymlinks(target.getParent());
+            Files.write(target, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            return key;
+        } catch (java.nio.file.FileAlreadyExistsException ex) {
+            throw new IllegalStateException("El PDF oficial de la orden ya existe", ex);
+        } catch (IOException ex) {
+            throw new UncheckedIOException("No fue posible guardar el PDF oficial", ex);
+        }
+    }
+
     public Optional<byte[]> load(String key) {
         return load(key, Long.MAX_VALUE);
     }

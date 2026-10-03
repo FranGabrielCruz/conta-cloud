@@ -29,6 +29,7 @@ public class OrdenCompra {
     @Enumerated(EnumType.STRING) @Column(nullable=false,length=30) private EstadoOrdenCompra status;
     @Column(name="issued_at") private OffsetDateTime emitidaEn;
     @Column(name="issued_by") private UUID emitidaPor;
+    @Column(name="pdf_object_key",length=700) private String pdfObjectKey;
     @Column(name="voided_at") private OffsetDateTime anuladaEn;
     @Column(name="voided_by") private UUID anuladaPor;
     @Column(name="void_reason",length=500) private String motivoAnulacion;
@@ -63,7 +64,7 @@ public class OrdenCompra {
     }
     public void reemplazarLineas(List<LineaOrdenCompra> nuevas){lineas.clear();nuevas.forEach(l->{l.asignarOrden(this);lineas.add(l);});}
     public void totales(BigDecimal subtotal,BigDecimal descuento,BigDecimal impuesto,BigDecimal total){this.subtotal=subtotal;this.descuento=descuento;this.impuesto=impuesto;this.total=total;}
-    public void emitir(String nombreProveedor,String identificacion,UUID usuarioId){proveedorNombre=nombreProveedor;proveedorIdentificacion=identificacion;status=EstadoOrdenCompra.ISSUED;emitidaEn=OffsetDateTime.now();emitidaPor=usuarioId;actualizadaPor=usuarioId;}
+    public void emitir(String nombreProveedor,String identificacion,UUID usuarioId,OffsetDateTime fechaEmision,String pdfKey){proveedorNombre=nombreProveedor;proveedorIdentificacion=identificacion;status=EstadoOrdenCompra.ISSUED;emitidaEn=fechaEmision;emitidaPor=usuarioId;pdfObjectKey=pdfKey;actualizadaPor=usuarioId;}
     public void anular(String motivo,UUID usuarioId){status=EstadoOrdenCompra.VOIDED;motivoAnulacion=motivo;anuladaEn=OffsetDateTime.now();anuladaPor=usuarioId;actualizadaPor=usuarioId;}
     @PreUpdate void marca(){actualizadaEn=OffsetDateTime.now();}
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}
@@ -74,6 +75,7 @@ public class OrdenCompra {
     public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getDescuento(){return descuento;} public BigDecimal getImpuesto(){return impuesto;}
     public BigDecimal getTotal(){return total;} public EstadoOrdenCompra getEstado(){return status;} public long getVersion(){return version;}
     public OffsetDateTime getEmitidaEn(){return emitidaEn;} public OffsetDateTime getAnuladaEn(){return anuladaEn;} public String getMotivoAnulacion(){return motivoAnulacion;}
+    public UUID getEmitidaPor(){return emitidaPor;} public String getPdfObjectKey(){return pdfObjectKey;}
     public List<LineaOrdenCompra> getLineas(){return lineas;} public Sucursal getSucursal(){return sucursal;} public Moneda getMoneda(){return moneda;}
     public CondicionPago getCondicionPago(){return condicionPago;}
 }
