@@ -12,6 +12,7 @@ import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.OrdenesCompraView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import org.junit.jupiter.api.Test;
 
 import java.util.stream.Stream;
@@ -23,14 +24,14 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(20);
+        assertThat(items).hasSize(60);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
-            .containsExactly(
-                "clientes", "cotizaciones", "facturas", "notas-credito", "notas-debito",
-                "recibos", "cuentas-por-cobrar", "proveedores", "ordenes-compra",
-                "facturas-proveedores", "notas-credito-proveedores", "pagos-proveedores",
-                "cuentas-por-pagar", "cajas", "operaciones-caja", "cuentas-bancarias", "ingresos", "egresos",
-                "transferencias", "conciliacion-bancaria");
+            .contains("clientes", "ordenes-compra", "transferencias", "productos",
+                "inventario/transferencias", "catalogo-cuentas", "fiscal/606", "activos-fijos",
+                "presupuestos", "reportes/financieros");
+        assertThat(PhaseTwoNavigation.SECTIONS).extracting(PhaseTwoNavigation.Section::title)
+            .containsExactly("VENTAS", "COMPRAS", "CAJA Y BANCOS", "INVENTARIO", "CONTABILIDAD",
+                "FISCAL", "ACTIVOS FIJOS", "FINANZAS", "REPORTES");
     }
 
     @Test
@@ -39,6 +40,37 @@ class PhaseTwoNavigationTest {
             .extracting(PhaseTwoNavigation.Item::permission).isEqualTo("facturas.ver");
         assertThat(PhaseTwoNavigation.byRoute("facturas/123/editar")).get()
             .extracting(PhaseTwoNavigation.Item::module).isEqualTo("VENTAS");
+        assertThat(PhaseTwoNavigation.byRoute("inventario/transferencias")).get()
+            .extracting(PhaseTwoNavigation.Item::permission).isEqualTo("inventario_transferencias.ver");
+        assertThat(PhaseTwoNavigation.byRoute("fiscal/606/detalle")).get()
+            .extracting(PhaseTwoNavigation.Item::module).isEqualTo("FISCAL");
+        assertThat(PhaseTwoNavigation.byRoute("reportes/inventario")).get()
+            .extracting(PhaseTwoNavigation.Item::permission).isEqualTo("reportes_inventario.ver");
+    }
+
+    @Test
+    void conservaElOrdenSolicitadoDentroDeCadaNuevaSeccion() {
+        assertThat(section("INVENTARIO").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("Productos", "Categorías", "Almacenes", "Movimientos", "Transferencias",
+                "Ajustes", "Kardex", "Conteo físico");
+        assertThat(section("CONTABILIDAD").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("Catálogo de cuentas", "Asientos", "Libro diario", "Libro mayor", "Balanza",
+                "Centros de costos", "Cierres");
+        assertThat(section("FISCAL").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("NCF", "e-CF", "Impuestos", "Retenciones", "606", "607", "608", "609", "IT-1", "IR-17");
+        assertThat(section("ACTIVOS FIJOS").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("Activos", "Depreciaciones", "Mantenimiento", "Bajas");
+        assertThat(section("FINANZAS").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("Presupuestos", "Flujo de efectivo", "Proyecciones", "Rentabilidad");
+        assertThat(section("REPORTES").items()).extracting(PhaseTwoNavigation.Item::title)
+            .containsExactly("Financieros", "Ventas", "Compras", "Inventario", "Fiscal",
+                "Cuentas por cobrar", "Cuentas por pagar");
+    }
+
+    @Test
+    void utilizaIconosDeLaBibliotecaActual() {
+        assertThat(PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()))
+            .allSatisfy(item -> assertThat(VaadinIcon.valueOf(item.icon())).isNotNull());
     }
 
     @Test
@@ -62,5 +94,9 @@ class PhaseTwoNavigationTest {
         assertThat(registered).containsExactlyInAnyOrderElementsOf(
             PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream())
                 .map(PhaseTwoNavigation.Item::route).toList());
+    }
+
+    private static PhaseTwoNavigation.Section section(String title) {
+        return PhaseTwoNavigation.SECTIONS.stream().filter(section -> section.title().equals(title)).findFirst().orElseThrow();
     }
 }

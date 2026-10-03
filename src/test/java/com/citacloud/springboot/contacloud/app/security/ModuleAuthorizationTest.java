@@ -30,6 +30,15 @@ class ModuleAuthorizationTest {
         assertThat(authorization.canAccess("IMPUESTOS", "IMPUESTO_EDITAR")).isFalse();
     }
 
+    @Test
+    void protegeLasNuevasRutasConModuloYPermiso() {
+        authenticate(Set.of("productos.ver"));
+        when(modules.habilitado("INVENTARIO")).thenReturn(false, true);
+        assertThat(authorization.canAccess("INVENTARIO", "productos.ver")).isFalse();
+        assertThat(authorization.canAccess("INVENTARIO", "productos.ver")).isTrue();
+        assertThat(authorization.canAccess("INVENTARIO", "almacenes.ver")).isFalse();
+    }
+
     private void authenticate(Set<String> permissions) {
         TenantPrincipal principal = new TenantPrincipal(UUID.randomUUID(), UUID.randomUUID(), "EMPRESA",
             "Usuario", "user", "hash", true, permissions);

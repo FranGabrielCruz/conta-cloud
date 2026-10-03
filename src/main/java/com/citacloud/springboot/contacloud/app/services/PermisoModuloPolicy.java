@@ -28,6 +28,16 @@ public final class PermisoModuloPolicy {
                  "notas_credito_proveedores", "pagos_proveedores", "cuentas_pagar" -> "COMPRAS";
             case "cajas", "operaciones_caja", "cuentas_bancarias", "ingresos", "egresos", "transferencias",
                  "conciliacion_bancaria" -> "CAJA_BANCOS";
+            case "productos", "categorias", "almacenes", "inventario_movimientos",
+                 "inventario_transferencias", "inventario_ajustes", "kardex", "conteo_fisico" -> "INVENTARIO";
+            case "catalogo_cuentas", "asientos", "libro_diario", "libro_mayor", "balanza",
+                 "centros_costos", "cierres_contables" -> "CONTABILIDAD";
+            case "fiscal_ncf", "fiscal_ecf", "fiscal_impuestos", "fiscal_retenciones", "fiscal_606",
+                 "fiscal_607", "fiscal_608", "fiscal_609", "fiscal_it1", "fiscal_ir17" -> "FISCAL";
+            case "activos_fijos", "depreciaciones", "mantenimiento_activos", "bajas_activos" -> "ACTIVOS_FIJOS";
+            case "presupuestos", "flujo_efectivo", "proyecciones", "rentabilidad" -> "FINANZAS";
+            case "reportes_financieros", "reportes_ventas", "reportes_compras", "reportes_inventario",
+                 "reportes_fiscal", "reportes_cuentas_cobrar", "reportes_cuentas_pagar" -> "REPORTES";
             default -> null;
         });
     }

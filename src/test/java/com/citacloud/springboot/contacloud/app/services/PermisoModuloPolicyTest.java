@@ -40,4 +40,14 @@ class PermisoModuloPolicyTest {
         assertThat(PermisoModuloPolicy.moduloRequerido("conciliacion_bancaria.ver", "conciliacion_bancaria"))
             .contains("CAJA_BANCOS");
     }
+
+    @Test
+    void relacionaLosRecursosDelMenuFinalConSusEntitlements() {
+        assertThat(PermisoModuloPolicy.moduloRequerido("productos.ver", "productos")).contains("INVENTARIO");
+        assertThat(PermisoModuloPolicy.moduloRequerido("catalogo_cuentas.ver", "catalogo_cuentas")).contains("CONTABILIDAD");
+        assertThat(PermisoModuloPolicy.moduloRequerido("fiscal_606.ver", "fiscal_606")).contains("FISCAL");
+        assertThat(PermisoModuloPolicy.moduloRequerido("activos_fijos.ver", "activos_fijos")).contains("ACTIVOS_FIJOS");
+        assertThat(PermisoModuloPolicy.moduloRequerido("presupuestos.ver", "presupuestos")).contains("FINANZAS");
+        assertThat(PermisoModuloPolicy.moduloRequerido("reportes_financieros.ver", "reportes_financieros")).contains("REPORTES");
+    }
 }

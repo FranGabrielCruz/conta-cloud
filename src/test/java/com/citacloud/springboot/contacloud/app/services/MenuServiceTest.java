@@ -203,6 +203,35 @@ class MenuServiceTest {
             .contains("VENTAS", "CAJA Y BANCOS").doesNotContain("COMPRAS");
     }
 
+    @Test
+    void muestraNuevasOpcionesSoloConModuloYPermiso() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of("INVENTARIO", "FISCAL", "REPORTES"));
+        autenticar(Set.of("productos.ver", "almacenes.ver", "fiscal_606.ver", "reportes_inventario.ver"));
+
+        var grupos=service.obtener();
+        assertThat(grupos).extracting(MenuService.GrupoMenu::titulo)
+            .containsExactly("INICIO", "INVENTARIO", "FISCAL", "REPORTES");
+        assertThat(grupos.get(1).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Productos", "Almacenes");
+        assertThat(grupos.get(2).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("606");
+        assertThat(grupos.get(3).opciones()).extracting(MenuService.OpcionMenu::titulo)
+            .containsExactly("Inventario");
+    }
+
+    @Test
+    void ocultaNuevaSeccionSinPermisosOAunqueElModuloEsteDeshabilitado() {
+        autenticar(Set.of("productos.ver", "catalogo_cuentas.ver"));
+        when(modules.habilitadosActuales()).thenReturn(Set.of("INVENTARIO"));
+        assertThat(service.obtener()).extracting(MenuService.GrupoMenu::titulo)
+            .contains("INVENTARIO").doesNotContain("CONTABILIDAD");
+
+        when(modules.habilitadosActuales()).thenReturn(Set.of("CONTABILIDAD"));
+        autenticar(Set.of("productos.ver"));
+        assertThat(service.obtener()).extracting(MenuService.GrupoMenu::titulo)
+            .doesNotContain("INVENTARIO", "CONTABILIDAD");
+    }
+
     private void autenticar(Set<String> permisos) {
         var principal = new TenantPrincipal(UUID.randomUUID(), UUID.randomUUID(), "EMPRESA01",
             "Administrador", "admin", "hash", true, permisos);
