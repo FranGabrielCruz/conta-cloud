@@ -40,9 +40,20 @@ class PurchaseOrderPdfServiceTest {
         PurchaseOrderReportData data=data(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID());
         Map<String,Object> parameters=PurchaseOrderPdfService.parameters(data);
         assertThat(parameters).containsEntry("supplierContactName","Juan Pérez").containsEntry("supplierPhone","809-111-1111")
+            .containsEntry("companyTaxIdentification","101-00000-1").containsEntry("companyPhone","809-000-0000")
+            .containsEntry("supplierTaxIdentification","130-00000-1")
             .containsEntry("currencyCode","DOP").containsEntry("totalLabel","TOTAL DOP").containsEntry("notes","Entregar en almacén.")
             .containsEntry("subtotal",new BigDecimal("200.00")).containsEntry("discount",BigDecimal.ZERO)
             .containsEntry("tax",new BigDecimal("36.00")).containsEntry("total",new BigDecimal("236.00"));
+    }
+
+    @Test void formateaRncYTelefonosSinModificarValoresNoDominicanos(){
+        assertThat(PurchaseOrderPdfService.formatTaxIdentification("124543678")).isEqualTo("124-54367-8");
+        assertThat(PurchaseOrderPdfService.formatTaxIdentification("124-54367-8")).isEqualTo("124-54367-8");
+        assertThat(PurchaseOrderPdfService.formatTaxIdentification("ABC-123")).isEqualTo("ABC-123");
+        assertThat(PurchaseOrderPdfService.formatPhone("2345678665")).isEqualTo("234-567-8665");
+        assertThat(PurchaseOrderPdfService.formatPhone("234-567-8665")).isEqualTo("234-567-8665");
+        assertThat(PurchaseOrderPdfService.formatPhone("+1 809 555 0101")).isEqualTo("+1 809 555 0101");
     }
 
     @Test void conservaNulosEnCamposOpcionalesYOcultaNotasVacias(){

@@ -40,11 +40,11 @@ public class PurchaseOrderPdfService {
     static Map<String,Object> parameters(PurchaseOrderReportData data){
         Map<String,Object> p=new HashMap<>();
         p.put("companyTradeName",value(data.companyTradeName()));p.put("companyLegalName",optional(data.companyLegalName()));
-        p.put("companyTaxIdentification",optional(data.companyTaxIdentification()));p.put("companyAddress",optional(data.companyAddress()));
-        p.put("companyPhone",optional(data.companyPhone()));p.put("companyEmail",optional(data.companyEmail()));
+        p.put("companyTaxIdentification",formatTaxIdentification(data.companyTaxIdentification()));p.put("companyAddress",optional(data.companyAddress()));
+        p.put("companyPhone",formatPhone(data.companyPhone()));p.put("companyEmail",optional(data.companyEmail()));
         p.put("companyLogo",data.companyLogo()==null?null:new ByteArrayInputStream(data.companyLogo()));p.put("orderNumber",value(data.orderNumber()));
-        p.put("supplierName",value(data.supplierName()));p.put("supplierTaxIdentification",value(data.supplierTaxIdentification()));
-        p.put("supplierContactName",value(data.supplierContactName()));p.put("supplierPhone",value(data.supplierPhone()));
+        p.put("supplierName",value(data.supplierName()));p.put("supplierTaxIdentification",value(formatTaxIdentification(data.supplierTaxIdentification())));
+        p.put("supplierContactName",value(data.supplierContactName()));p.put("supplierPhone",value(formatPhone(data.supplierPhone())));
         p.put("supplierEmail",optional(data.supplierEmail()));p.put("orderDate",format(data.orderDate()));
         p.put("expectedDeliveryDate",format(data.expectedDeliveryDate()));p.put("branchName",value(data.branchName()));
         p.put("currencyCode",value(data.currencyCode()));p.put("paymentTermName",value(data.paymentTermName()));
@@ -79,4 +79,12 @@ public class PurchaseOrderPdfService {
     private static String value(String value){return value==null||value.isBlank()?"—":value;}
     private static String optional(String value){return blank(value)?null:value.trim();}
     private static boolean blank(String value){return value==null||value.isBlank();}
+    static String formatTaxIdentification(String value){
+        String trimmed=optional(value);if(trimmed==null)return null;String digits=trimmed.replaceAll("\\D","");
+        return digits.length()==9?digits.substring(0,3)+"-"+digits.substring(3,8)+"-"+digits.substring(8):trimmed;
+    }
+    static String formatPhone(String value){
+        String trimmed=optional(value);if(trimmed==null)return null;String digits=trimmed.replaceAll("\\D","");
+        return digits.length()==10?digits.substring(0,3)+"-"+digits.substring(3,6)+"-"+digits.substring(6):trimmed;
+    }
 }
