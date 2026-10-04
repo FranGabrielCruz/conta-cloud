@@ -156,7 +156,7 @@ class MenuServiceTest {
         autenticar(Set.of(
             "clientes.ver", "cotizaciones.ver", "facturas.ver", "notas_credito.ver",
             "notas_debito.ver", "recibos.ver", "cuentas_cobrar.ver",
-            "proveedores.ver", "ordenes_compra.ver", "facturas_proveedores.ver",
+            "proveedores.ver", "ordenes_compra.ver", "recepciones.ver", "facturas_proveedores.ver",
             "notas_credito_proveedores.ver", "pagos_proveedores.ver", "cuentas_pagar.ver",
             "cajas.ver", "cuentas_bancarias.ver", "ingresos.ver", "egresos.ver",
             "transferencias.ver", "conciliacion_bancaria.ver"));
@@ -169,7 +169,7 @@ class MenuServiceTest {
             .containsExactly("Clientes", "Cotizaciones", "Facturas", "Notas de crédito",
                 "Notas de débito", "Recibos", "Cuentas por cobrar");
         assertThat(grupos.get(2).opciones()).extracting(MenuService.OpcionMenu::titulo)
-            .containsExactly("Proveedores", "Órdenes de compra", "Facturas de proveedores",
+            .containsExactly("Proveedores", "Órdenes de compra", "Recepciones", "Facturas de proveedores",
                 "Notas de crédito", "Pagos", "Cuentas por pagar");
         assertThat(grupos.get(3).opciones()).extracting(MenuService.OpcionMenu::titulo)
             .containsExactly("Cajas", "Cuentas bancarias", "Ingresos", "Egresos",

@@ -28,4 +28,12 @@ public interface PurchaseOrderRepository extends JpaRepository<OrdenCompra,UUID>
     @EntityGraph(attributePaths={"lineas","sucursal","moneda","condicionPago"})
     @Query("select o from OrdenCompra o where o.id=:id and o.tenantId=:tenant and o.empresaId=:empresa")
     Optional<OrdenCompra> bloquear(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
+
+    @EntityGraph(attributePaths={"lineas"})
+    @Query("""
+      select distinct o from OrdenCompra o where o.tenantId=:tenant and o.empresaId=:empresa
+      and o.proveedorId=:proveedor and o.status in :estados order by o.fecha desc,o.numero desc
+      """)
+    List<OrdenCompra> disponibles(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("proveedor")UUID proveedor,@Param("estados")Collection<EstadoOrdenCompra> estados);
 }

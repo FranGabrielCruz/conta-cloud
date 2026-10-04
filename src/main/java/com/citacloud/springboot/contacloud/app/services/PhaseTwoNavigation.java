@@ -41,6 +41,8 @@ public final class PhaseTwoNavigation {
                 "Administra los proveedores de la empresa."),
             item("Órdenes de compra", "ordenes-compra", "CART", COMPRAS, "ordenes_compra.ver",
                 "Administra las órdenes de compra realizadas a proveedores."),
+            item("Recepciones", "recepciones", "STOCK", COMPRAS, "recepciones.ver",
+                "Confirma la recepción de productos y sus entradas al inventario."),
             item("Facturas de proveedores", "facturas-proveedores", "INVOICE", COMPRAS, "facturas_proveedores.ver",
                 "Administra las facturas recibidas de proveedores."),
             item("Notas de crédito", "notas-credito-proveedores", "FILE_REMOVE", COMPRAS,

@@ -10,6 +10,8 @@ import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
 import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
 import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.OrdenesCompraView;
+import com.citacloud.springboot.contacloud.app.views.RecepcionesView;
+import com.citacloud.springboot.contacloud.app.views.FacturasProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.ProductosView;
 import com.citacloud.springboot.contacloud.app.views.CategoriasView;
 import com.citacloud.springboot.contacloud.app.views.UnidadesMedidaView;
@@ -27,7 +29,7 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(61);
+        assertThat(items).hasSize(62);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
             .contains("clientes", "ordenes-compra", "transferencias", "productos",
                 "inventario/transferencias", "catalogo-cuentas", "fiscal/606", "activos-fijos",
@@ -89,6 +91,8 @@ class PhaseTwoNavigationTest {
                 CategoriasView.class.getAnnotation(Route.class).value(),
                 UnidadesMedidaView.class.getAnnotation(Route.class).value(),
                 OrdenesCompraView.class.getAnnotation(Route.class).value(),
+                RecepcionesView.class.getAnnotation(Route.class).value(),
+                FacturasProveedoresView.class.getAnnotation(Route.class).value(),
                 OperacionesCajaView.class.getAnnotation(Route.class).value(),
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),
                 IngresosView.class.getAnnotation(Route.class).value(),

@@ -66,6 +66,8 @@ public class OrdenCompra {
     public void totales(BigDecimal subtotal,BigDecimal descuento,BigDecimal impuesto,BigDecimal total){this.subtotal=subtotal;this.descuento=descuento;this.impuesto=impuesto;this.total=total;}
     public void emitir(String nombreProveedor,String identificacion,UUID usuarioId,OffsetDateTime fechaEmision,String pdfKey){proveedorNombre=nombreProveedor;proveedorIdentificacion=identificacion;status=EstadoOrdenCompra.ISSUED;emitidaEn=fechaEmision;emitidaPor=usuarioId;pdfObjectKey=pdfKey;actualizadaPor=usuarioId;}
     public void anular(String motivo,UUID usuarioId){status=EstadoOrdenCompra.VOIDED;motivoAnulacion=motivo;anuladaEn=OffsetDateTime.now();anuladaPor=usuarioId;actualizadaPor=usuarioId;}
+    public void actualizarEstadoRecepcion(boolean completa,UUID usuarioId){status=completa?EstadoOrdenCompra.RECEIVED:EstadoOrdenCompra.PARTIALLY_RECEIVED;actualizadaPor=usuarioId;}
+    public void restaurarEstadoRecepcion(boolean tieneRecepciones,boolean completa,UUID usuarioId){status=!tieneRecepciones?EstadoOrdenCompra.ISSUED:(completa?EstadoOrdenCompra.RECEIVED:EstadoOrdenCompra.PARTIALLY_RECEIVED);actualizadaPor=usuarioId;}
     @PreUpdate void marca(){actualizadaEn=OffsetDateTime.now();}
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}
     public String getNumero(){return numero;} public UUID getProveedorId(){return proveedorId;} public String getProveedorNombre(){return proveedorNombre;}
