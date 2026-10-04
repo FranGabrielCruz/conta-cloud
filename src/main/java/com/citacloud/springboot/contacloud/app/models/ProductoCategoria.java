@@ -1,25 +1,29 @@
 package com.citacloud.springboot.contacloud.app.models;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-@Entity @Table(name="product_category")
+@Entity @Table(name="product_category",uniqueConstraints=@UniqueConstraint(name="uk_product_category_normalized_name",columnNames={"tenant_id","empresa_id","normalized_name"}))
 public class ProductoCategoria {
     @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
     @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;
     @Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
     @Column(name="name",nullable=false,length=120) private String nombre;
+    @Column(name="normalized_name",nullable=false,length=120) private String nombreNormalizado;
     @Column(name="description",length=500) private String descripcion;
     @Column(name="active",nullable=false) private boolean activo=true;
-    @Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
-    @Column(name="created_by",updatable=false) private UUID creadoPor;
+    @ColumnDefault("CURRENT_TIMESTAMP") @Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
+    @Column(name="created_by",nullable=false,updatable=false) private UUID creadoPor;
     @Column(name="updated_at",nullable=false) private OffsetDateTime actualizadoEn;
     @Column(name="updated_by") private UUID actualizadoPor;
     @Version @Column(nullable=false) private long version;
     protected ProductoCategoria(){}
-    public ProductoCategoria(UUID tenantId,UUID empresaId,String nombre,String descripcion,UUID usuarioId){this.tenantId=tenantId;this.empresaId=empresaId;this.nombre=nombre;this.descripcion=descripcion;this.creadoPor=usuarioId;this.actualizadoPor=usuarioId;this.actualizadoEn=OffsetDateTime.now();}
+    public ProductoCategoria(UUID tenantId,UUID empresaId,String nombre,String nombreNormalizado,String descripcion,boolean activo,UUID usuarioId){this.tenantId=tenantId;this.empresaId=empresaId;this.nombre=nombre;this.nombreNormalizado=nombreNormalizado;this.descripcion=descripcion;this.activo=activo;this.creadoPor=usuarioId;this.actualizadoPor=usuarioId;this.actualizadoEn=OffsetDateTime.now();}
+    public void actualizar(String nombre,String nombreNormalizado,String descripcion,UUID usuarioId){this.nombre=nombre;this.nombreNormalizado=nombreNormalizado;this.descripcion=descripcion;this.actualizadoPor=usuarioId;}
+    public void cambiarEstado(boolean activo,UUID usuarioId){this.activo=activo;this.actualizadoPor=usuarioId;}
     @PreUpdate void marca(){actualizadoEn=OffsetDateTime.now();}
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}
-    public String getNombre(){return nombre;} public String getDescripcion(){return descripcion;} public boolean isActivo(){return activo;}
+    public String getNombre(){return nombre;} public String getNombreNormalizado(){return nombreNormalizado;} public String getDescripcion(){return descripcion;} public boolean isActivo(){return activo;} public long getVersion(){return version;}
 }

@@ -11,6 +11,7 @@ import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
 import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.OrdenesCompraView;
 import com.citacloud.springboot.contacloud.app.views.ProductosView;
+import com.citacloud.springboot.contacloud.app.views.CategoriasView;
 import com.citacloud.springboot.contacloud.app.views.UnidadesMedidaView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
@@ -85,6 +86,7 @@ class PhaseTwoNavigationTest {
             Stream.of(CajasView.class.getAnnotation(Route.class).value(),
                 ProveedoresView.class.getAnnotation(Route.class).value(),
                 ProductosView.class.getAnnotation(Route.class).value(),
+                CategoriasView.class.getAnnotation(Route.class).value(),
                 UnidadesMedidaView.class.getAnnotation(Route.class).value(),
                 OrdenesCompraView.class.getAnnotation(Route.class).value(),
                 OperacionesCajaView.class.getAnnotation(Route.class).value(),

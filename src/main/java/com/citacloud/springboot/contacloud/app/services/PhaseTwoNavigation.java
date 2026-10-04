@@ -66,7 +66,8 @@ public final class PhaseTwoNavigation {
                 "conciliacion_bancaria.ver", "Administra la conciliación de las cuentas bancarias."))),
         new Section("INVENTARIO", List.of(
             item("Productos", "productos", "CUBE", INVENTARIO, "productos.ver", placeholder()),
-            item("Categorías", "categorias", "TAG", INVENTARIO, "categorias.ver", placeholder()),
+            item("Categorías", "categorias", "TAG", INVENTARIO, "categorias.ver",
+                "Administra las categorías utilizadas para clasificar productos y servicios."),
             item("Unidades de medida", "unidades-medida", "SCALE", INVENTARIO, "unidades_medida.ver",
                 "Administra las unidades de medida utilizadas en productos, servicios y operaciones de inventario."),
             item("Almacenes", "almacenes", "DATABASE", INVENTARIO, "almacenes.ver", placeholder()),

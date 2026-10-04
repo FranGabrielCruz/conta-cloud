@@ -48,9 +48,17 @@ public class ProductService {
     @PreAuthorize("@empresaModuloService.habilitado('INVENTARIO') and hasAuthority('productos.editar')")
     public ProductoCatalogosDto.UnidadOpcion unitOption(UUID id){var p=TenantContext.principalActual();UnidadMedida unit=units.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId()).orElseThrow(()->new RecursoNoEncontradoException("Unidad de medida no encontrada."));return new ProductoCatalogosDto.UnidadOpcion(unit.getId(),unit.getNombre(),unit.getAbreviatura());}
 
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('INVENTARIO') and hasAuthority('productos.editar')")
+    public ProductoCatalogosDto.CategoriaOpcion categoryOption(UUID id){var p=TenantContext.principalActual();ProductoCategoria category=categories.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId()).orElseThrow(()->new RecursoNoEncontradoException("Categoría no encontrada."));return new ProductoCatalogosDto.CategoriaOpcion(category.getId(),category.getNombre());}
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('INVENTARIO') and hasAuthority('productos.editar')")
+    public ProductoCatalogosDto.ImpuestoOpcion taxOption(UUID id){var p=TenantContext.principalActual();Impuesto tax=taxes.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),EmpresaContext.requerirEmpresaId()).orElseThrow(()->new RecursoNoEncontradoException("Impuesto no encontrado."));return new ProductoCatalogosDto.ImpuestoOpcion(tax.getId(),tax.getNombre(),tax.getPorcentaje());}
+
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('INVENTARIO') and hasAuthority('productos.crear')")
-    public ProductoDto createProduct(ProductoInput input){var p=TenantContext.principalActual();Validated v=validate(input,p.tenantId(),p.empresaId(),null);
+    public ProductoDto createProduct(ProductoInput input){var p=TenantContext.principalActual();Validated v=validate(input,p.tenantId(),p.empresaId(),null,null,null,null);
         Producto product=mapper.toEntity(v.input(),p.tenantId(),p.empresaId(),codes.next(p.tenantId(),p.empresaId(),v.input().tipo()),
             v.name(),v.barcode(),v.description(),v.track(),v.negative(),v.minimum(),p.usuarioId());
         try{product=products.saveAndFlush(product);}catch(DataIntegrityViolationException ex){throw duplicate(ex);}
@@ -59,7 +67,7 @@ public class ProductService {
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('INVENTARIO') and hasAuthority('productos.editar')")
     public ProductoDto updateProduct(UUID id,ProductoInput input){Producto product=safe(id);expected(product,input==null?null:input.version());
-        Validated v=validate(input,product.getTenantId(),product.getEmpresaId(),product.getId());
+        Validated v=validate(input,product.getTenantId(),product.getEmpresaId(),product.getId(),product.getCategoriaId(),product.getImpuestoCompraId(),product.getImpuestoVentaId());
         if(v.input().activo()!=product.isActivo())throw new ReglaNegocioException("Utiliza la acción correspondiente para cambiar el estado del producto.");
         product.actualizar(v.name(),v.input().tipo(),v.input().categoriaId(),v.input().unidadMedidaId(),v.barcode(),v.description(),
             v.input().costoCompra(),v.input().precioVenta(),v.input().monedaId(),v.input().impuestoCompraId(),v.input().impuestoVentaId(),
@@ -76,22 +84,22 @@ public class ProductService {
 
     private void changeState(Producto p,boolean active,String event){if(p.isActivo()==active)throw new ReglaNegocioException(active?"El producto ya está activo.":"El producto ya está inactivo.");
         p.cambiarEstado(active,TenantContext.principalActual().usuarioId());try{products.saveAndFlush(p);}catch(OptimisticLockingFailureException ex){throw concurrency(ex);}audit.registrar(event,"Producto",p.getId(),detail(p));}
-    private Validated validate(ProductoInput input,UUID tenant,UUID company,UUID currentId){if(input==null)throw new ReglaNegocioException("Los datos del producto son obligatorios.");
+    private Validated validate(ProductoInput input,UUID tenant,UUID company,UUID currentId,UUID currentCategoryId,UUID currentPurchaseTaxId,UUID currentSalesTaxId){if(input==null)throw new ReglaNegocioException("Los datos del producto son obligatorios.");
         String name=required(input.nombre(),180,"El nombre es obligatorio.","El nombre excede 180 caracteres.");
         if(input.tipo()==null)throw new ReglaNegocioException("Selecciona el tipo.");
         if(input.unidadMedidaId()==null)throw new ReglaNegocioException("Selecciona una unidad de medida.");
         units.findByIdAndTenantIdAndEmpresaId(input.unidadMedidaId(),tenant,company).filter(UnidadMedida::isActivo).orElseThrow(()->new ReglaNegocioException("La unidad de medida seleccionada no está disponible."));
-        if(input.categoriaId()!=null)categories.findByIdAndTenantIdAndEmpresaId(input.categoriaId(),tenant,company).filter(ProductoCategoria::isActivo).orElseThrow(()->new ReglaNegocioException("La categoría seleccionada no está disponible."));
+        if(input.categoriaId()!=null){ProductoCategoria category=categories.findByIdAndTenantIdAndEmpresaId(input.categoriaId(),tenant,company).orElseThrow(()->new ReglaNegocioException("La categoría seleccionada no está disponible."));if(!category.isActivo()&&!Objects.equals(input.categoriaId(),currentCategoryId))throw new ReglaNegocioException("La categoría seleccionada no está disponible.");}
         nonNegative(input.costoCompra(),"El costo de compra no puede ser negativo.");nonNegative(input.precioVenta(),"El precio de venta no puede ser negativo.");nonNegative(input.stockMinimo(),"El stock mínimo no puede ser negativo.");
         if((input.costoCompra()!=null||input.precioVenta()!=null)&&input.monedaId()==null)throw new ReglaNegocioException("Selecciona la moneda de los importes.");
         if(input.monedaId()!=null)currencies.findByIdAndEmpresaId(input.monedaId(),company).filter(Moneda::isActivo).orElseThrow(()->new ReglaNegocioException("La moneda seleccionada no está disponible."));
-        validateTax(input.impuestoCompraId(),tenant,company);validateTax(input.impuestoVentaId(),tenant,company);
+        validateTax(input.impuestoCompraId(),currentPurchaseTaxId,tenant,company);validateTax(input.impuestoVentaId(),currentSalesTaxId,tenant,company);
         String barcode=optional(input.codigoBarras(),100,"El código de barras excede 100 caracteres.");
         boolean duplicate=barcode!=null&&(currentId==null?products.existsByTenantIdAndEmpresaIdAndCodigoBarras(tenant,company,barcode):products.existsByTenantIdAndEmpresaIdAndCodigoBarrasAndIdNot(tenant,company,barcode,currentId));
         if(duplicate)throw new ReglaNegocioException("El código de barras ya está registrado.");String description=optional(input.descripcion(),1000,"La descripción excede 1000 caracteres.");
         boolean track=input.tipo()==TipoProducto.PRODUCT&&input.controlaExistencia();boolean negative=track&&input.permiteExistenciaNegativa();BigDecimal minimum=track?input.stockMinimo():null;
         return new Validated(input,name,barcode,description,track,negative,minimum);}
-    private void validateTax(UUID id,UUID tenant,UUID company){if(id!=null)taxes.findByIdAndTenantIdAndEmpresaId(id,tenant,company).filter(Impuesto::isActivo).orElseThrow(()->new ReglaNegocioException("El impuesto seleccionado no está disponible."));}
+    private void validateTax(UUID id,UUID currentId,UUID tenant,UUID company){if(id!=null){Impuesto tax=taxes.findByIdAndTenantIdAndEmpresaId(id,tenant,company).orElseThrow(()->new ReglaNegocioException("El impuesto seleccionado no está disponible."));if(!tax.isActivo()&&!Objects.equals(id,currentId))throw new ReglaNegocioException("El impuesto seleccionado no está disponible.");}}
     private Producto safe(UUID id){if(id==null)throw new RecursoNoEncontradoException("Producto no encontrado.");var p=TenantContext.principalActual();return products.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId()).orElseThrow(()->new RecursoNoEncontradoException("Producto no encontrado."));}
     private static void expected(Producto p,Long version){if(version==null||p.getVersion()!=version)throw concurrency(null);}
     private static void nonNegative(BigDecimal value,String message){if(value!=null&&value.signum()<0)throw new ReglaNegocioException(message);}

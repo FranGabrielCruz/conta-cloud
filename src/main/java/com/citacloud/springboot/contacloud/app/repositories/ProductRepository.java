@@ -25,4 +25,7 @@ public interface ProductRepository extends JpaRepository<Producto,UUID> {
     boolean existsByTenantIdAndEmpresaIdAndCodigoBarras(UUID tenant,UUID empresa,String barcode);
     boolean existsByTenantIdAndEmpresaIdAndCodigoBarrasAndIdNot(UUID tenant,UUID empresa,String barcode,UUID id);
     boolean existsByTenantIdAndEmpresaIdAndUnidadMedidaIdAndActivoTrue(UUID tenant,UUID empresa,UUID unidadMedidaId);
+    long countByTenantIdAndEmpresaIdAndCategoriaId(UUID tenant,UUID empresa,UUID categoriaId);
+    @Query("select p.categoriaId,count(p) from Producto p where p.tenantId=:tenant and p.empresaId=:empresa and p.categoriaId in :categorias group by p.categoriaId")
+    List<Object[]> contarPorCategorias(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("categorias")Collection<UUID> categorias);
 }
