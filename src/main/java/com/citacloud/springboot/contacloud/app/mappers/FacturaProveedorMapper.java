@@ -8,8 +8,8 @@ import java.util.*;
 
 @Component
 public class FacturaProveedorMapper {
-    public FacturaProveedor toEntity(FacturaProveedorInput i,UUID tenant,UUID empresa,String normalizado,UUID usuario){
-        return new FacturaProveedor(tenant,empresa,i.proveedorId(),i.sucursalId(),i.numeroFactura(),normalizado,
+    public FacturaProveedor toEntity(FacturaProveedorInput i,UUID tenant,UUID empresa,String numeroInterno,String normalizado,UUID usuario){
+        return new FacturaProveedor(tenant,empresa,numeroInterno,i.proveedorId(),i.sucursalId(),i.numeroFactura(),normalizado,
             i.numeroFiscal(),i.fecha(),i.vencimiento(),i.condicionPagoId(),i.monedaId(),i.ordenCompraId(),
             i.referencia(),i.notas(),usuario);
     }

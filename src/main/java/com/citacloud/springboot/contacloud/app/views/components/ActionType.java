@@ -22,6 +22,7 @@ public enum ActionType {
     OPEN_CASH("Abrir caja", VaadinIcon.UNLOCK, "success"),
     CLOSE_CASH("Cerrar caja", VaadinIcon.LOCK, "danger"),
     REVIEW("Revisar", VaadinIcon.CHECK, "success"),
+    APPLY_CREDIT("Aplicar crédito", VaadinIcon.CHECK_CIRCLE, "success"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
     REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
 

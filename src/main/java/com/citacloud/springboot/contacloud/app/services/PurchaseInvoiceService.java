@@ -23,14 +23,15 @@ public class PurchaseInvoiceService {
     private final PurchaseOrderRepository orders; private final PurchaseOrderCalculationService calculations;
     private final FacturaProveedorMapper mapper; private final AuditoriaService audit;
     private final SupplierPaymentService supplierPayments; private final CuentaDineroResolver accountResolver;
+    private final PurchaseInvoiceNumberService invoiceNumbers;
     public PurchaseInvoiceService(PurchaseInvoiceRepository invoices,AccountsPayableRepository payables,SupplierRepository suppliers,
             SucursalRepository branches,MonedaRepository currencies,CondicionPagoRepository terms,ImpuestoRepository taxes,
             ProductRepository products,PurchaseOrderRepository orders,PurchaseOrderCalculationService calculations,
             FacturaProveedorMapper mapper,AuditoriaService audit,SupplierPaymentService supplierPayments,
-            CuentaDineroResolver accountResolver){this.invoices=invoices;this.payables=payables;this.suppliers=suppliers;
+            CuentaDineroResolver accountResolver,PurchaseInvoiceNumberService invoiceNumbers){this.invoices=invoices;this.payables=payables;this.suppliers=suppliers;
         this.branches=branches;this.currencies=currencies;this.terms=terms;this.taxes=taxes;this.products=products;
         this.orders=orders;this.calculations=calculations;this.mapper=mapper;this.audit=audit;
-        this.supplierPayments=supplierPayments;this.accountResolver=accountResolver;}
+        this.supplierPayments=supplierPayments;this.accountResolver=accountResolver;this.invoiceNumbers=invoiceNumbers;}
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.ver')")
@@ -97,7 +98,7 @@ public class PurchaseInvoiceService {
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.crear')")
     public FacturaProveedorDto create(FacturaProveedorInput input){var p=TenantContext.principalActual();Validated v=validate(input,p.tenantId(),p.empresaId(),null);
-        FacturaProveedor f=mapper.toEntity(cleanInput(input,v),p.tenantId(),p.empresaId(),v.normalizedNumber(),p.usuarioId());apply(f,v,p);f=invoices.saveAndFlush(f);
+        FacturaProveedor f=mapper.toEntity(cleanInput(input,v),p.tenantId(),p.empresaId(),invoiceNumbers.next(p.tenantId(),p.empresaId()),v.normalizedNumber(),p.usuarioId());apply(f,v,p);f=invoices.saveAndFlush(f);
         audit.registrar("PURCHASE_INVOICE_CREATED","FacturaProveedor",f.getId(),detail(f));return mapper.toDto(f,null);}
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.crear') and hasAuthority('facturas_proveedores.registrar')")
@@ -105,7 +106,7 @@ public class PurchaseInvoiceService {
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.crear') and hasAuthority('facturas_proveedores.registrar')")
     public FacturaProveedorDto createAndRegister(FacturaProveedorInput input,PagoFacturaProveedorInput payment){var p=TenantContext.principalActual();Validated v=validate(input,p.tenantId(),p.empresaId(),null);
-        FacturaProveedor f=mapper.toEntity(cleanInput(input,v),p.tenantId(),p.empresaId(),v.normalizedNumber(),p.usuarioId());apply(f,v,p);f=invoices.saveAndFlush(f);
+        FacturaProveedor f=mapper.toEntity(cleanInput(input,v),p.tenantId(),p.empresaId(),invoiceNumbers.next(p.tenantId(),p.empresaId()),v.normalizedNumber(),p.usuarioId());apply(f,v,p);f=invoices.saveAndFlush(f);
         audit.registrar("PURCHASE_INVOICE_CREATED","FacturaProveedor",f.getId(),detail(f));return registerNew(f,p,v.term(),payment);}
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.editar')")

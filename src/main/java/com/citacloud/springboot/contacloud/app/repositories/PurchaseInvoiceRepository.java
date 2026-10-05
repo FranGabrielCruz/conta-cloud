@@ -40,4 +40,28 @@ public interface PurchaseInvoiceRepository extends JpaRepository<FacturaProveedo
         @Param("proveedor")UUID proveedor,@Param("buscar")String buscar,Pageable pageable);
     boolean existsByTenantIdAndEmpresaIdAndProveedorIdAndNumeroNormalizado(UUID tenantId,UUID empresaId,UUID proveedorId,String numero);
     boolean existsByTenantIdAndEmpresaIdAndProveedorIdAndNumeroNormalizadoAndIdNot(UUID tenantId,UUID empresaId,UUID proveedorId,String numero,UUID id);
+    @EntityGraph(attributePaths={"proveedor","moneda"})
+    @Query("""
+      select f from FacturaProveedor f
+      where f.tenantId=:tenant and f.empresaId=:empresa and f.proveedorId=:proveedor and f.monedaId=:moneda
+      and f.status=com.citacloud.springboot.contacloud.app.models.EstadoFacturaProveedor.REGISTERED
+      and (:buscar='' or lower(f.numeroInterno) like lower(concat('%',:buscar,'%'))
+        or lower(f.numeroProveedor) like lower(concat('%',:buscar,'%'))
+        or lower(coalesce(f.numeroFiscal,'')) like lower(concat('%',:buscar,'%')))
+      """)
+    Page<FacturaProveedor> buscarParaNotaCredito(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("proveedor")UUID proveedor,@Param("moneda")UUID moneda,@Param("buscar")String buscar,Pageable pageable);
+    @EntityGraph(attributePaths={"proveedor","moneda"})
+    @Query("""
+      select f from FacturaProveedor f, CuentaPagar c
+      where c.facturaId=f.id and f.tenantId=:tenant and f.empresaId=:empresa
+      and c.tenantId=:tenant and c.empresaId=:empresa and c.voided=false and c.montoAplicado<c.montoOriginal
+      and f.proveedorId=:proveedor and f.monedaId=:moneda
+      and f.status=com.citacloud.springboot.contacloud.app.models.EstadoFacturaProveedor.REGISTERED
+      and (:buscar='' or lower(f.numeroInterno) like lower(concat('%',:buscar,'%'))
+        or lower(f.numeroProveedor) like lower(concat('%',:buscar,'%'))
+        or lower(coalesce(f.numeroFiscal,'')) like lower(concat('%',:buscar,'%')))
+      """)
+    Page<FacturaProveedor> buscarPendientesParaAplicar(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("proveedor")UUID proveedor,@Param("moneda")UUID moneda,@Param("buscar")String buscar,Pageable pageable);
 }
