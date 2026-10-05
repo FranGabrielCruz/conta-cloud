@@ -13,6 +13,7 @@ public class RecepcionCompra {
     @Column(name = "receipt_number", nullable = false, updatable = false, length = 30) private String numero;
     @Column(name = "supplier_id", nullable = false) private UUID proveedorId;
     @Column(name = "purchase_order_id") private UUID ordenCompraId;
+    @Column(name = "purchase_invoice_id") private UUID facturaProveedorId;
     @Column(name = "warehouse_id", nullable = false) private UUID almacenId;
     @Column(name = "receipt_date", nullable = false) private LocalDate fecha;
     @Column(length = 100) private String reference;
@@ -34,25 +35,33 @@ public class RecepcionCompra {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "supplier_id", insertable = false, updatable = false) private Proveedor proveedor;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "warehouse_id", insertable = false, updatable = false) private Almacen almacen;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "purchase_order_id", insertable = false, updatable = false) private OrdenCompra ordenCompra;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "purchase_invoice_id", insertable = false, updatable = false) private FacturaProveedor facturaProveedor;
 
     protected RecepcionCompra() {}
 
     public RecepcionCompra(UUID tenantId, UUID empresaId, String numero, UUID proveedorId, UUID ordenCompraId,
             UUID almacenId, LocalDate fecha, String referencia, String notas, UUID usuarioId) {
-        this(tenantId, empresaId, numero, proveedorId, ordenCompraId, almacenId, fecha, referencia, notas, null, usuarioId);
+        this(tenantId, empresaId, numero, proveedorId, ordenCompraId, null, almacenId, fecha, referencia, notas, null, usuarioId);
     }
 
     public RecepcionCompra(UUID tenantId, UUID empresaId, String numero, UUID proveedorId, UUID ordenCompraId,
             UUID almacenId, LocalDate fecha, String referencia, String notas, UUID claveIdempotencia, UUID usuarioId) {
+        this(tenantId, empresaId, numero, proveedorId, ordenCompraId, null, almacenId, fecha, referencia, notas,
+            claveIdempotencia, usuarioId);
+    }
+
+    public RecepcionCompra(UUID tenantId, UUID empresaId, String numero, UUID proveedorId, UUID ordenCompraId,
+            UUID facturaProveedorId, UUID almacenId, LocalDate fecha, String referencia, String notas,
+            UUID claveIdempotencia, UUID usuarioId) {
         this.tenantId = tenantId; this.empresaId = empresaId; this.numero = numero; this.proveedorId = proveedorId;
-        this.ordenCompraId = ordenCompraId; this.almacenId = almacenId; this.fecha = fecha; this.reference = referencia;
+        this.ordenCompraId = ordenCompraId; this.facturaProveedorId = facturaProveedorId; this.almacenId = almacenId; this.fecha = fecha; this.reference = referencia;
         this.notes = notas; this.claveIdempotencia = claveIdempotencia; this.status = EstadoRecepcionCompra.DRAFT; this.creadaPor = usuarioId;
         this.actualizadaPor = usuarioId; this.actualizadaEn = OffsetDateTime.now();
     }
 
-    public void actualizar(UUID proveedorId, UUID ordenCompraId, UUID almacenId, LocalDate fecha,
+    public void actualizar(UUID proveedorId, UUID ordenCompraId, UUID facturaProveedorId, UUID almacenId, LocalDate fecha,
             String referencia, String notas, String motivoDiferencia, UUID usuarioId) {
-        this.proveedorId = proveedorId; this.ordenCompraId = ordenCompraId; this.almacenId = almacenId;
+        this.proveedorId = proveedorId; this.ordenCompraId = ordenCompraId; this.facturaProveedorId = facturaProveedorId; this.almacenId = almacenId;
         this.fecha = fecha; this.reference = referencia; this.notes = notas; this.motivoDiferencia = motivoDiferencia;
         this.actualizadaPor = usuarioId;
     }
@@ -84,6 +93,7 @@ public class RecepcionCompra {
     public String getNumero() { return numero; }
     public UUID getProveedorId() { return proveedorId; }
     public UUID getOrdenCompraId() { return ordenCompraId; }
+    public UUID getFacturaProveedorId() { return facturaProveedorId; }
     public UUID getAlmacenId() { return almacenId; }
     public LocalDate getFecha() { return fecha; }
     public String getReferencia() { return reference; }
@@ -98,5 +108,6 @@ public class RecepcionCompra {
     public Proveedor getProveedor() { return proveedor; }
     public Almacen getAlmacen() { return almacen; }
     public OrdenCompra getOrdenCompra() { return ordenCompra; }
+    public FacturaProveedor getFacturaProveedor() { return facturaProveedor; }
     public String getMotivoAnulacion() { return motivoAnulacion; }
 }

@@ -11,6 +11,7 @@ public class LineaRecepcionCompra {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private UUID id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "purchase_receipt_id", nullable = false) private RecepcionCompra recepcion;
     @Column(name = "purchase_order_line_id") private UUID lineaOrdenId;
+    @Column(name = "purchase_invoice_line_id") private UUID lineaFacturaId;
     @Column(name = "tenant_id", nullable = false) private UUID tenantId;
     @Column(name = "empresa_id", nullable = false) private UUID empresaId;
     @Column(name = "product_id", nullable = false) private UUID productoId;
@@ -27,17 +28,18 @@ public class LineaRecepcionCompra {
 
     public LineaRecepcionCompra(UUID tenantId, UUID empresaId, UUID lineaOrdenId, UUID productoId,
             String productoCodigo, String descripcion, String unidad, BigDecimal cantidad, int ordenLinea) {
-        this(tenantId, empresaId, lineaOrdenId, productoId, productoCodigo, descripcion, unidad, cantidad,
-            lineaOrdenId == null ? OrigenLineaRecepcion.MANUAL : OrigenLineaRecepcion.ORDER_LINE,
+        this(tenantId, empresaId, lineaOrdenId, null, productoId, productoCodigo, descripcion, unidad, cantidad,
+            lineaOrdenId == null ? OrigenLineaRecepcion.MANUAL : OrigenLineaRecepcion.PURCHASE_ORDER,
             TipoDiferenciaRecepcion.NONE, ordenLinea);
     }
 
-    public LineaRecepcionCompra(UUID tenantId, UUID empresaId, UUID lineaOrdenId, UUID productoId,
+    public LineaRecepcionCompra(UUID tenantId, UUID empresaId, UUID lineaOrdenId, UUID lineaFacturaId, UUID productoId,
             String productoCodigo, String descripcion, String unidad, BigDecimal cantidad,
             OrigenLineaRecepcion origen, TipoDiferenciaRecepcion diferencia, int ordenLinea) {
         this.tenantId = tenantId;
         this.empresaId = empresaId;
         this.lineaOrdenId = lineaOrdenId;
+        this.lineaFacturaId = lineaFacturaId;
         this.productoId = productoId;
         this.productoCodigo = productoCodigo;
         this.descripcion = descripcion;
@@ -55,6 +57,7 @@ public class LineaRecepcionCompra {
     }
 
     public UUID getLineaOrdenId() { return lineaOrdenId; }
+    public UUID getLineaFacturaId() { return lineaFacturaId; }
     public UUID getProductoId() { return productoId; }
     public String getProductoCodigo() { return productoCodigo; }
     public String getDescripcion() { return descripcion; }

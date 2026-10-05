@@ -87,6 +87,13 @@ public class MovimientoFinanciero {
             monedaId,monto,"Saldo de apertura",null,"Saldo inicial al incorporar la cuenta bancaria",
             TipoOrigenMovimiento.OPENING_BALANCE,cuentaId,MedioPagoMovimiento.BANK_TRANSFER,null,usuarioId);
     }
+    public static MovimientoFinanciero pagoProveedor(UUID tenantId,UUID empresaId,LocalDate fecha,
+            TipoCuentaDinero tipoCuenta,UUID cuentaId,UUID monedaId,BigDecimal monto,String concepto,
+            String referencia,UUID pagoId,MedioPagoMovimiento medioPago,UUID sesionCajaId,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,TipoMovimientoFinanciero.EXPENSE,fecha,tipoCuenta,
+            cuentaId,monedaId,monto,concepto,referencia,"Pago al contado de factura de proveedor",
+            TipoOrigenMovimiento.SUPPLIER_PAYMENT,pagoId,medioPago,sesionCajaId,usuarioId);
+    }
     private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion,

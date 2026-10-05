@@ -26,11 +26,12 @@ class PurchaseReceiptAuthorizationTest {
     private final AlmacenRepository warehouses = mock(AlmacenRepository.class);
     private final ProductRepository products = mock(ProductRepository.class);
     private final PurchaseOrderRepository orders = mock(PurchaseOrderRepository.class);
+    private final PurchaseInvoiceRepository invoices = mock(PurchaseInvoiceRepository.class);
     private final PurchaseReceiptNumberService numbers = mock(PurchaseReceiptNumberService.class);
     private final InventoryMovementService inventory = mock(InventoryMovementService.class);
     private final AuditoriaService audit = mock(AuditoriaService.class);
     private final PurchaseReceiptService service = new PurchaseReceiptService(receipts, receiptLines, suppliers,
-        warehouses, products, orders, numbers, inventory, new RecepcionCompraMapper(), audit);
+        warehouses, products, orders, invoices, numbers, inventory, new RecepcionCompraMapper(), audit);
     private final UUID tenant = UUID.randomUUID(), empresa = UUID.randomUUID(), usuario = UUID.randomUUID();
 
     @BeforeEach
@@ -43,18 +44,14 @@ class PurchaseReceiptAuthorizationTest {
     void clearSecurity() { SecurityContextHolder.clearContext(); }
 
     @Test
-    void productoFueraDeOrdenSeConfirmaSinPermisoEspecialYRegistraDiferencia() {
+    void productoFueraDeOrdenNoSeConfirmaSinPermisoEspecial() {
         authenticate(Set.of("recepciones.crear", "recepciones.confirmar"));
         Fixture fixture = fixtureWithOrder();
         RecepcionCompraInput input = input(fixture, null, "Producto adicional aceptado.");
 
-        RecepcionCompraDto result = service.createAndConfirm(input);
-
-        assertThat(result.estado()).isEqualTo(EstadoRecepcionCompra.CONFIRMED);
-        assertThat(result.lineas().getFirst().diferencia()).isEqualTo(TipoDiferenciaRecepcion.UNORDERED_PRODUCT);
-        verify(inventory).receive(any(), any(), eq(fixture.product()), eq(usuario));
-        verify(audit).registrar(eq("PURCHASE_RECEIPT_DIFFERENCE_CONFIRMED"), eq("RecepcionCompra"),
-            nullable(UUID.class), contains("Producto adicional aceptado"));
+        assertThatThrownBy(() -> service.createAndConfirm(input)).isInstanceOf(ReglaNegocioException.class)
+            .hasMessageContaining("autorización");
+        verifyNoInteractions(inventory);
     }
 
     @Test
@@ -86,6 +83,49 @@ class PurchaseReceiptAuthorizationTest {
     }
 
     @Test
+    void facturaRegistradaPermiteRecepcionParcialSinModificarCuentaPorPagar() {
+        authenticate(Set.of("recepciones.crear", "recepciones.confirmar"));
+        Fixture fixture = fixtureWithoutOrder();
+        UUID invoiceId = UUID.randomUUID(), invoiceLineId = UUID.randomUUID(), orderId = UUID.randomUUID(), orderLineId = UUID.randomUUID();
+        OrdenCompra order = new OrdenCompra(tenant, empresa, "OC-000020", fixture.supplierId(), "Proveedor", null,
+            UUID.randomUUID(), LocalDate.now(), null, UUID.randomUUID(), null, null, null, usuario);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        LineaOrdenCompra orderLine = new LineaOrdenCompra(tenant, empresa, 1, fixture.productId(), "P-MAN", UUID.randomUUID(),
+            "Unidad", "Und", "Teclado", new BigDecimal("2.0000"), BigDecimal.ONE, BigDecimal.ZERO, null, null,
+            BigDecimal.ZERO, new BigDecimal("2.0000"), new BigDecimal("2.0000"), BigDecimal.ZERO, new BigDecimal("2.0000"));
+        ReflectionTestUtils.setField(orderLine, "id", orderLineId);
+        order.reemplazarLineas(List.of(orderLine));
+        order.emitir("Proveedor", null, usuario, OffsetDateTime.now(), null);
+        FacturaProveedor invoice = new FacturaProveedor(tenant, empresa, fixture.supplierId(), UUID.randomUUID(),
+            "FAC-100", "fac-100", null, LocalDate.now(), LocalDate.now(), null, UUID.randomUUID(), orderId,
+            null, null, usuario);
+        ReflectionTestUtils.setField(invoice, "id", invoiceId);
+        LineaFacturaProveedor invoiceLine = new LineaFacturaProveedor(tenant, empresa, fixture.productId(), "P-MAN",
+            "Teclado", "Unidad", new BigDecimal("10.0000"), BigDecimal.ONE, BigDecimal.ZERO, null, null,
+            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN, BigDecimal.TEN, 1);
+        ReflectionTestUtils.setField(invoiceLine, "id", invoiceLineId);
+        invoice.reemplazarLineas(List.of(invoiceLine));
+        invoice.registrar(usuario);
+        when(invoices.findByIdAndTenantIdAndEmpresaId(invoiceId, tenant, empresa)).thenReturn(Optional.of(invoice));
+        when(invoices.bloquear(invoiceId, tenant, empresa)).thenReturn(Optional.of(invoice));
+        when(orders.findByIdAndTenantIdAndEmpresaId(orderId, tenant, empresa)).thenReturn(Optional.of(order));
+        when(orders.bloquear(orderId, tenant, empresa)).thenReturn(Optional.of(order));
+        when(receiptLines.recibidoConfirmado(orderLineId, tenant, empresa)).thenReturn(BigDecimal.ZERO);
+        when(receiptLines.recibidoConfirmadoFactura(invoiceLineId, tenant, empresa)).thenReturn(BigDecimal.ZERO);
+        RecepcionCompraInput input = new RecepcionCompraInput(fixture.supplierId(), orderId, invoiceId,
+            fixture.warehouseId(), LocalDate.now(), null, null, null,
+            List.of(new LineaRecepcionCompraInput(orderLineId, invoiceLineId, fixture.productId(), new BigDecimal("4.0000"))),
+            null, UUID.randomUUID());
+
+        RecepcionCompraDto result = service.createAndConfirm(input);
+
+        assertThat(result.estado()).isEqualTo(EstadoRecepcionCompra.CONFIRMED);
+        assertThat(result.lineas().getFirst().lineaFacturaId()).isEqualTo(invoiceLineId);
+        assertThat(result.lineas().getFirst().origen()).isEqualTo(OrigenLineaRecepcion.PURCHASE_INVOICE);
+        verify(inventory).receive(any(), any(), eq(fixture.product()), eq(usuario));
+    }
+
+    @Test
     void reintentoConMismaClaveNoDuplicaRecepcionNiInventario() {
         authenticate(Set.of("recepciones.crear", "recepciones.confirmar"));
         UUID key = UUID.randomUUID();
@@ -94,7 +134,8 @@ class PurchaseReceiptAuthorizationTest {
         ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
         existing.confirmar(usuario);
         when(receipts.findByTenantIdAndEmpresaIdAndClaveIdempotencia(tenant, empresa, key)).thenReturn(Optional.of(existing));
-        RecepcionCompraInput retry = new RecepcionCompraInput(null, null, null, null, null, null, null, List.of(), null, key);
+        RecepcionCompraInput retry = new RecepcionCompraInput(null, null, null, null, null, null, null, null,
+            List.of(), null, key);
 
         RecepcionCompraDto result = service.createAndConfirm(retry);
 
@@ -119,9 +160,9 @@ class PurchaseReceiptAuthorizationTest {
             assertThat(existing.getLineas()).isEmpty();
             return null;
         }).when(receipts).flush();
-        RecepcionCompraInput update = new RecepcionCompraInput(fixture.supplierId(), null, fixture.warehouseId(),
+        RecepcionCompraInput update = new RecepcionCompraInput(fixture.supplierId(), null, null, fixture.warehouseId(),
             LocalDate.now(), null, null, null,
-            List.of(new LineaRecepcionCompraInput(null, fixture.productId(), new BigDecimal("2.0000"))),
+            List.of(new LineaRecepcionCompraInput(null, null, fixture.productId(), new BigDecimal("2.0000"))),
             existing.getVersion(), null);
 
         RecepcionCompraDto result = service.updateAndConfirm(receiptId, update);
@@ -171,8 +212,8 @@ class PurchaseReceiptAuthorizationTest {
     }
 
     private RecepcionCompraInput input(Fixture fixture, UUID orderLineId, String note) {
-        return new RecepcionCompraInput(fixture.supplierId(), fixture.orderId(), fixture.warehouseId(), LocalDate.now(),
-            null, null, note, List.of(new LineaRecepcionCompraInput(orderLineId, fixture.productId(), new BigDecimal("5.0000"))),
+        return new RecepcionCompraInput(fixture.supplierId(), fixture.orderId(), null, fixture.warehouseId(), LocalDate.now(),
+            null, null, note, List.of(new LineaRecepcionCompraInput(orderLineId, null, fixture.productId(), new BigDecimal("5.0000"))),
             null, UUID.randomUUID());
     }
 

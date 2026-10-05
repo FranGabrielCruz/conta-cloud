@@ -27,6 +27,17 @@ public interface PurchaseInvoiceRepository extends JpaRepository<FacturaProveedo
     @EntityGraph(attributePaths={"lineas","proveedor","sucursal","moneda","condicionPago","ordenCompra"})
     @Query("select f from FacturaProveedor f where f.id=:id and f.tenantId=:tenant and f.empresaId=:empresa")
     Optional<FacturaProveedor> bloquear(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
+    @EntityGraph(attributePaths={"proveedor","moneda","ordenCompra"})
+    @Query("""
+      select f from FacturaProveedor f
+      where f.tenantId=:tenant and f.empresaId=:empresa
+      and f.status=com.citacloud.springboot.contacloud.app.models.EstadoFacturaProveedor.REGISTERED
+      and (:proveedor is null or f.proveedorId=:proveedor)
+      and (:buscar='' or lower(f.numeroProveedor) like lower(concat('%',:buscar,'%'))
+        or lower(coalesce(f.numeroFiscal,'')) like lower(concat('%',:buscar,'%')))
+      """)
+    Page<FacturaProveedor> registradasParaRecepcion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("proveedor")UUID proveedor,@Param("buscar")String buscar,Pageable pageable);
     boolean existsByTenantIdAndEmpresaIdAndProveedorIdAndNumeroNormalizado(UUID tenantId,UUID empresaId,UUID proveedorId,String numero);
     boolean existsByTenantIdAndEmpresaIdAndProveedorIdAndNumeroNormalizadoAndIdNot(UUID tenantId,UUID empresaId,UUID proveedorId,String numero,UUID id);
 }

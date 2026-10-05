@@ -1,6 +1,7 @@
 package com.citacloud.springboot.contacloud.app.models;
 
 public enum OrigenLineaRecepcion {
-    ORDER_LINE,
+    PURCHASE_ORDER,
+    PURCHASE_INVOICE,
     MANUAL
 }

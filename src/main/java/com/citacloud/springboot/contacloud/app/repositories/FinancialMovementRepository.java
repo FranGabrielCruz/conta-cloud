@@ -84,6 +84,11 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
     Optional<MovimientoFinanciero> findByTenantIdAndEmpresaIdAndTipoOrigenAndOrigenId(UUID tenant,UUID empresa,
         TipoOrigenMovimiento tipoOrigen,UUID origenId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from MovimientoFinanciero m where m.tenantId=:tenant and m.empresaId=:empresa and m.tipoOrigen=:origen and m.origenId=:origenId")
+    Optional<MovimientoFinanciero> bloquearPorOrigen(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("origen")TipoOrigenMovimiento origen,@Param("origenId")UUID origenId);
+
     @Query("""
       select coalesce(sum(case when m.tipoMovimiento=com.citacloud.springboot.contacloud.app.models.TipoMovimientoFinanciero.INCOME
         then m.monto else (0-m.monto) end),0) from MovimientoFinanciero m

@@ -13,4 +13,10 @@ public interface PurchaseReceiptLineRepository extends JpaRepository<LineaRecepc
       and r.status=com.citacloud.springboot.contacloud.app.models.EstadoRecepcionCompra.CONFIRMED
       """)
     BigDecimal recibidoConfirmado(@Param("linea")UUID linea,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
+    @Query("""
+      select coalesce(sum(l.cantidad),0) from LineaRecepcionCompra l join l.recepcion r
+      where l.lineaFacturaId=:linea and r.tenantId=:tenant and r.empresaId=:empresa
+      and r.status=com.citacloud.springboot.contacloud.app.models.EstadoRecepcionCompra.CONFIRMED
+      """)
+    BigDecimal recibidoConfirmadoFactura(@Param("linea")UUID linea,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
 }

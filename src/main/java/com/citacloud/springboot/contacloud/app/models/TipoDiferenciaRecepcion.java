@@ -3,5 +3,7 @@ package com.citacloud.springboot.contacloud.app.models;
 public enum TipoDiferenciaRecepcion {
     NONE,
     UNORDERED_PRODUCT,
-    OVER_RECEIPT
+    UNINVOICED_PRODUCT,
+    OVER_ORDERED_QUANTITY,
+    OVER_INVOICED_QUANTITY
 }

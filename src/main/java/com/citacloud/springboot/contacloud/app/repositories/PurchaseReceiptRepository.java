@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 public interface PurchaseReceiptRepository extends JpaRepository<RecepcionCompra,UUID> {
-    @EntityGraph(attributePaths={"proveedor","almacen","ordenCompra"})
+    @EntityGraph(attributePaths={"proveedor","almacen","ordenCompra","facturaProveedor"})
     @Query("""
       select r from RecepcionCompra r where r.tenantId=:tenant and r.empresaId=:empresa
       and (:buscar='' or lower(r.numero) like lower(concat('%',:buscar,'%'))
@@ -21,12 +21,12 @@ public interface PurchaseReceiptRepository extends JpaRepository<RecepcionCompra
     Page<RecepcionCompra> buscar(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
         @Param("buscar")String buscar,@Param("desde")LocalDate desde,@Param("hasta")LocalDate hasta,
         @Param("estado")EstadoRecepcionCompra estado,Pageable pageable);
-    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra"})
+    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra","facturaProveedor"})
     Optional<RecepcionCompra> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenantId,UUID empresaId);
-    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra"})
+    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra","facturaProveedor"})
     Optional<RecepcionCompra> findByTenantIdAndEmpresaIdAndClaveIdempotencia(UUID tenantId,UUID empresaId,UUID claveIdempotencia);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra"})
+    @EntityGraph(attributePaths={"lineas","proveedor","almacen","ordenCompra","facturaProveedor"})
     @Query("select r from RecepcionCompra r where r.id=:id and r.tenantId=:tenant and r.empresaId=:empresa")
     Optional<RecepcionCompra> bloquear(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
 }

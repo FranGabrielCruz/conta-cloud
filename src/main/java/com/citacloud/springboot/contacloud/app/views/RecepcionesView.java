@@ -122,13 +122,18 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             Dialog dialog = dialog(current == null ? "NUEVA RECEPCIÓN" : "EDITAR RECEPCIÓN");
             ComboBox<ComprasCatalogosDto.Opcion> supplier = combo("Proveedor", catalogs.proveedores());
             ComboBox<ComprasCatalogosDto.Opcion> order = combo("Orden de compra (opcional)", catalogs.ordenes());
+            ComboBox<FacturaRecepcionOpcionDto> invoice = new ComboBox<>("Factura de proveedor (opcional)");
+            invoice.setItems(query -> service.searchRegisteredInvoices(id(supplier), query.getFilter().orElse(""),
+                query.getOffset(), query.getLimit()).stream());
+            invoice.setItemLabelGenerator(FacturaRecepcionOpcionDto::etiqueta);
+            invoice.setClearButtonVisible(true);
             ComboBox<ComprasCatalogosDto.Opcion> warehouse = combo("Almacén", catalogs.almacenes());
             DatePicker date = new DatePicker("Fecha de recepción");
             TextField reference = new TextField("Referencia");
             TextArea notes = new TextArea("Notas");
             TextArea differenceNote = new TextArea("Motivo / Observación de diferencia");
             UUID idempotencyKey = current == null ? UUID.randomUUID() : null;
-            Span differenceWarning = new Span("⚠ Esta recepción contiene diferencias respecto de la orden de compra.");
+            Span differenceWarning = new Span("⚠ Esta recepción contiene diferencias respecto del documento de origen.");
             differenceWarning.getStyle().set("color", "var(--lumo-warning-text-color)").set("font-weight", "600");
             supplier.setRequiredIndicatorVisible(true);
             warehouse.setRequiredIndicatorVisible(true);
@@ -139,22 +144,26 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             differenceNote.setWidthFull();
 
             List<LineDraft> lines = new ArrayList<>();
-            Grid<LineDraft> lineGrid = lineGrid(lines, order, differenceWarning, differenceNote);
-            Runnable refresh = () -> refreshLines(lineGrid, lines, order.getValue() != null, differenceWarning, differenceNote);
+            Grid<LineDraft> lineGrid = lineGrid(lines, order, invoice, differenceWarning, differenceNote);
+            Runnable refresh = () -> refreshLines(lineGrid, lines, order.getValue() != null,
+                invoice.getValue() != null, differenceWarning, differenceNote);
 
             if (current == null) {
                 date.setValue(LocalDate.now());
             } else {
                 select(supplier, catalogs.proveedores(), current.proveedorId());
                 select(order, catalogs.ordenes(), current.ordenCompraId());
+                if (current.facturaProveedorId() != null)
+                    invoice.setValue(service.registeredInvoiceOption(current.facturaProveedorId()));
                 select(warehouse, catalogs.almacenes(), current.almacenId());
                 date.setValue(current.fecha());
                 reference.setValue(value(current.referencia()));
                 notes.setValue(value(current.notas()));
                 differenceNote.setValue(value(current.motivoDiferencia()));
                 for (var line : current.lineas()) {
-                    lines.add(new LineDraft(line.lineaOrdenId(), service.productOption(line.productoId()), line.cantidad(),
-                        line.ordenada(), line.recibidaAntes()));
+                    lines.add(new LineDraft(line.lineaOrdenId(), line.lineaFacturaId(), service.productOption(line.productoId()),
+                        line.cantidad(), line.ordenada(), line.facturada(), line.recibidaAntesOrden(),
+                        line.recibidaAntesFactura()));
                 }
             }
             refresh.run();
@@ -163,9 +172,11 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
                 if (event.getValue() == null) return;
                 var updated = service.catalogs(event.getValue().id());
                 order.setItems(updated.ordenes());
+                invoice.getDataProvider().refreshAll();
                 if (event.isFromClient()) {
                     order.clear();
-                    lines.removeIf(line -> line.orderLineId() != null);
+                    invoice.clear();
+                    lines.clear();
                     refresh.run();
                 }
             });
@@ -180,21 +191,43 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
                 if (lines.isEmpty()) change.run();
                 else confirmOrderChange(change, () -> order.setValue(event.getOldValue()));
             });
+            invoice.addValueChangeListener(event -> {
+                if (!event.isFromClient()) return;
+                if (event.getValue() == null) {
+                    lines.removeIf(line -> line.invoiceLineId() != null);
+                    refresh.run();
+                    return;
+                }
+                Runnable change = () -> {
+                    FacturaRecepcionOpcionDto selected = event.getValue();
+                    if (supplier.getValue() == null) {
+                        select(supplier, catalogs.proveedores(), selected.proveedorId());
+                    }
+                    if (selected.ordenCompraId() != null) {
+                        var updated = service.catalogs(selected.proveedorId());
+                        order.setItems(updated.ordenes());
+                        select(order, updated.ordenes(), selected.ordenCompraId());
+                    }
+                    loadInvoiceLines(selected.id(), lines, refresh);
+                };
+                if (lines.isEmpty()) change.run();
+                else confirmInvoiceChange(change, () -> invoice.setValue(event.getOldValue()));
+            });
 
             AppActionButton add = new AppActionButton(ActionType.NEW, ButtonSize.MAIN, "Agregar producto",
-                event -> lineForm(null, lines, order, refresh));
+                event -> lineForm(null, lines, order, invoice, refresh));
             HorizontalLayout heading = new HorizontalLayout(new H3("PRODUCTOS"), add);
             heading.setWidthFull();
             heading.setJustifyContentMode(JustifyContentMode.BETWEEN);
             heading.setAlignItems(Alignment.CENTER);
-            dialog.add(section("INFORMACIÓN GENERAL", supplier, order, warehouse, date, reference, notes),
+            dialog.add(section("INFORMACIÓN GENERAL", supplier, order, invoice, warehouse, date, reference, notes),
                 heading, lineGrid, differenceWarning, differenceNote);
 
             AppActionButton save = new AppActionButton(ActionType.SAVE, ButtonSize.MAIN, "Guardar", null);
             save.addClickListener(event -> {
                 save.setEnabled(false);
                 try {
-                    RecepcionCompraInput input = receiptInput(supplier, order, warehouse, date, reference, notes,
+                    RecepcionCompraInput input = receiptInput(supplier, order, invoice, warehouse, date, reference, notes,
                         differenceNote, lines, current, idempotencyKey);
                     if (current == null) service.create(input); else service.update(current.id(), input);
                     dialog.close();
@@ -208,11 +241,12 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
 
             if (can("recepciones.confirmar")) {
                 AppActionButton confirm = new AppActionButton(ActionType.ISSUE, ButtonSize.MAIN, "Confirmar recepción", null);
-                confirm.addClickListener(event -> showConfirmation(lines, order.getValue(), differenceNote.getValue(), () -> {
+                confirm.addClickListener(event -> showConfirmation(lines, order.getValue(), invoice.getValue(),
+                    differenceNote.getValue(), () -> {
                     confirm.setEnabled(false);
                     save.setEnabled(false);
                     try {
-                        RecepcionCompraInput input = receiptInput(supplier, order, warehouse, date, reference, notes,
+                        RecepcionCompraInput input = receiptInput(supplier, order, invoice, warehouse, date, reference, notes,
                             differenceNote, lines, current, idempotencyKey);
                         if (current == null) service.createAndConfirm(input);
                         else service.updateAndConfirm(current.id(), input);
@@ -236,27 +270,29 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private Grid<LineDraft> lineGrid(List<LineDraft> lines, ComboBox<ComprasCatalogosDto.Opcion> order,
-            Span warning, TextArea differenceNote) {
+            ComboBox<FacturaRecepcionOpcionDto> invoice, Span warning, TextArea differenceNote) {
         Grid<LineDraft> grid = new Grid<>(LineDraft.class, false);
         grid.setAllRowsVisible(true);
         grid.setWidthFull();
         grid.addColumn(item -> item.product().nombre()).setHeader("Producto").setFlexGrow(1);
         grid.addColumn(item -> number(item.ordered())).setHeader("Ordenado").setAutoWidth(true);
-        grid.addColumn(item -> number(item.previouslyReceived())).setHeader("Recibido antes").setAutoWidth(true);
+        grid.addColumn(item -> number(item.invoiced())).setHeader("Facturado").setAutoWidth(true);
+        grid.addColumn(item -> number(item.previouslyReceivedOrder())).setHeader("Recibido OC").setAutoWidth(true);
+        grid.addColumn(item -> number(item.previouslyReceivedInvoice())).setHeader("Recibido factura").setAutoWidth(true);
         grid.addColumn(item -> number(item.quantity())).setHeader("Recibir ahora").setAutoWidth(true);
-        grid.addColumn(item -> number(item.pending())).setHeader("Pendiente").setAutoWidth(true);
-        grid.addColumn(item -> item.ordered() == null ? "—" : number(item.excess())).setHeader("Exceso").setAutoWidth(true);
-        grid.addColumn(item -> item.origin(order.getValue() != null)).setHeader("Origen").setAutoWidth(true);
+        grid.addColumn(item -> number(item.pendingOrder())).setHeader("Pendiente OC").setAutoWidth(true);
+        grid.addColumn(item -> number(item.pendingInvoice())).setHeader("Pendiente factura").setAutoWidth(true);
+        grid.addColumn(item -> item.origin(order.getValue() != null, invoice.getValue() != null)).setHeader("Origen").setAutoWidth(true);
         grid.addComponentColumn(item -> {
             HorizontalLayout actions = actions();
             actions.add(new AppActionButton(ActionType.EDIT, ButtonSize.GRID_ACTION,
-                item.orderLineId() == null ? "Editar producto" : "Editar cantidad",
-                event -> lineForm(item, lines, order, () -> refreshLines(grid, lines,
-                    order.getValue() != null, warning, differenceNote))));
-            if (item.orderLineId() == null)
+                item.orderLineId() == null && item.invoiceLineId() == null ? "Editar producto" : "Editar cantidad",
+                event -> lineForm(item, lines, order, invoice, () -> refreshLines(grid, lines,
+                    order.getValue() != null, invoice.getValue() != null, warning, differenceNote))));
+            if (item.orderLineId() == null && item.invoiceLineId() == null)
                 actions.add(new AppActionButton(ActionType.DELETE, ButtonSize.GRID_ACTION, "Eliminar producto", event -> {
                     lines.remove(item);
-                    refreshLines(grid, lines, order.getValue() != null, warning, differenceNote);
+                    refreshLines(grid, lines, order.getValue() != null, invoice.getValue() != null, warning, differenceNote);
                 }));
             return actions;
         }).setHeader("Acciones").setAutoWidth(true);
@@ -270,8 +306,8 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             lines.addAll(manual);
             for (var line : service.pendingFromOrder(orderId)) {
                 if (lines.stream().noneMatch(item -> Objects.equals(item.product().id(), line.productoId())))
-                    lines.add(new LineDraft(line.lineaOrdenId(), service.productOption(line.productoId()), line.pendiente(),
-                        line.ordenada(), line.recibidaAntes()));
+                    lines.add(new LineDraft(line.lineaOrdenId(), null, service.productOption(line.productoId()), line.pendiente(),
+                        line.ordenada(), null, line.recibidaAntes(), null));
             }
             refresh.run();
         } catch (RuntimeException exception) {
@@ -279,8 +315,30 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
         }
     }
 
+    private void loadInvoiceLines(UUID invoiceId, List<LineDraft> lines, Runnable refresh) {
+        try {
+            List<LineDraft> manual = lines.stream().filter(line -> line.invoiceLineId() == null
+                && line.orderLineId() == null).toList();
+            lines.clear();
+            lines.addAll(manual);
+            for (var line : service.pendingFromInvoice(invoiceId)) {
+                if (lines.stream().noneMatch(item -> Objects.equals(item.product().id(), line.productoId()))) {
+                    LineaRecepcionPendienteDto orderLine = line.lineaOrdenId() == null ? null
+                        : service.orderLineForProduct(service.registeredInvoiceOption(invoiceId).ordenCompraId(), line.productoId());
+                    lines.add(new LineDraft(line.lineaOrdenId(), line.lineaFacturaId(),
+                        service.productOption(line.productoId()), line.pendiente(),
+                        orderLine == null ? null : orderLine.ordenada(), line.facturada(),
+                        orderLine == null ? null : orderLine.recibidaAntes(), line.recibidaAntes()));
+                }
+            }
+            refresh.run();
+        } catch (RuntimeException exception) {
+            error(exception, "No fue posible cargar la factura.");
+        }
+    }
+
     private void lineForm(LineDraft current, List<LineDraft> lines, ComboBox<ComprasCatalogosDto.Opcion> order,
-            Runnable refresh) {
+            ComboBox<FacturaRecepcionOpcionDto> invoice, Runnable refresh) {
         Dialog dialog = dialog(current == null ? "AGREGAR PRODUCTO" : "EDITAR PRODUCTO");
         ComboBox<OrdenCompraCatalogosDto.ProductoOpcion> product = new ComboBox<>("Producto");
         product.setItems(query -> service.searchProducts(query.getFilter().orElse(""), query.getOffset(), query.getLimit()).stream());
@@ -293,7 +351,7 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
         if (current == null) quantity.setValue(BigDecimal.ONE);
         else {
             product.setValue(current.product());
-            product.setReadOnly(current.orderLineId() != null);
+            product.setReadOnly(current.orderLineId() != null || current.invoiceLineId() != null);
             quantity.setValue(current.quantity());
         }
         dialog.add(section("PRODUCTO", product, unit, quantity));
@@ -306,9 +364,14 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
                     throw new ReglaNegocioException("El producto ya existe en la recepción.");
                 LineaRecepcionPendienteDto matched = order.getValue() == null ? null
                     : service.orderLineForProduct(order.getValue().id(), product.getValue().id());
-                LineDraft updated = new LineDraft(matched == null ? null : matched.lineaOrdenId(), product.getValue(),
+                LineaRecepcionFacturaPendienteDto matchedInvoice = invoice.getValue() == null ? null
+                    : service.invoiceLineForProduct(invoice.getValue().id(), product.getValue().id());
+                LineDraft updated = new LineDraft(matched == null ? null : matched.lineaOrdenId(),
+                    matchedInvoice == null ? null : matchedInvoice.lineaFacturaId(), product.getValue(),
                     quantity.getValue(), matched == null ? null : matched.ordenada(),
-                    matched == null ? null : matched.recibidaAntes());
+                    matchedInvoice == null ? null : matchedInvoice.facturada(),
+                    matched == null ? null : matched.recibidaAntes(),
+                    matchedInvoice == null ? null : matchedInvoice.recibidaAntes());
                 Runnable persist = () -> {
                     if (current == null) lines.add(updated); else lines.set(lines.indexOf(current), updated);
                     refresh.run();
@@ -337,19 +400,24 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private void showConfirmation(List<LineDraft> lines, ComprasCatalogosDto.Opcion order,
-            String differenceNote, Runnable confirmAction) {
-        boolean differences = hasDifferences(lines, order != null);
+            FacturaRecepcionOpcionDto invoice, String differenceNote, Runnable confirmAction) {
+        boolean differences = hasDifferences(lines, order != null, invoice != null);
+        String origin = invoice != null ? invoice.etiqueta() : order != null ? order.nombre() : "la recepción manual";
         StringBuilder text = new StringBuilder(differences
-            ? "Esta recepción contiene diferencias respecto de " + order.nombre() + ".\n\n"
+            ? "Esta recepción contiene diferencias respecto de " + origin + ".\n\n"
             : "La recepción generará las entradas correspondientes en el inventario.");
         if (differences) {
             for (LineDraft line : lines) {
-                if (line.unordered(true)) text.append("\n• ").append(line.product().nombre()).append(": producto fuera de la orden.");
-                else if (line.excess().signum() > 0) text.append("\n• ").append(line.product().nombre())
-                    .append(": exceso de ").append(line.excess().toPlainString()).append(".");
+                if (invoice == null && line.unordered(order != null)) text.append("\n• ").append(line.product().nombre()).append(": producto fuera de la orden.");
+                if (line.uninvoiced(invoice != null)) text.append("\n• ").append(line.product().nombre()).append(": producto fuera de la factura.");
+                if (invoice == null && line.excessOrder().signum() > 0) text.append("\n• ").append(line.product().nombre())
+                    .append(": exceso sobre la orden de ").append(line.excessOrder().toPlainString()).append(".");
+                if (line.excessInvoice().signum() > 0) text.append("\n• ").append(line.product().nombre())
+                    .append(": exceso sobre la factura de ").append(line.excessInvoice().toPlainString()).append(".");
             }
             if (!value(differenceNote).isBlank()) text.append("\n\nMotivo: ").append(differenceNote.trim());
         }
+        if (invoice != null) text.append("\n\nLa confirmación no modificará la cuenta por pagar de la factura.");
         ConfirmDialog confirmation = new ConfirmDialog();
         confirmation.setHeader("CONFIRMAR RECEPCIÓN");
         confirmation.setText(text.toString());
@@ -372,6 +440,19 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
         confirmation.open();
     }
 
+    private void confirmInvoiceChange(Runnable continueAction, Runnable cancelAction) {
+        ConfirmDialog confirmation = new ConfirmDialog();
+        confirmation.setHeader("CAMBIAR FACTURA DE PROVEEDOR");
+        confirmation.setText("Cambiar la factura reemplazará las líneas relacionadas con la factura actual. "
+            + "Los productos agregados manualmente se conservarán.");
+        confirmation.setConfirmText("Continuar");
+        confirmation.setCancelText("Cancelar");
+        confirmation.setCancelable(true);
+        confirmation.addConfirmListener(event -> continueAction.run());
+        confirmation.addCancelListener(event -> cancelAction.run());
+        confirmation.open();
+    }
+
     private void detail(UUID id) {
         try {
             var receipt = service.get(id);
@@ -381,15 +462,21 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             lines.setWidthFull();
             lines.addColumn(LineaRecepcionCompraDto::descripcion).setHeader("Producto").setFlexGrow(1);
             lines.addColumn(line -> number(line.ordenada())).setHeader("Ordenado");
-            lines.addColumn(line -> number(line.recibidaAntes())).setHeader("Recibido antes");
+            lines.addColumn(line -> number(line.facturada())).setHeader("Facturado");
+            lines.addColumn(line -> number(line.recibidaAntesOrden())).setHeader("Recibido OC");
+            lines.addColumn(line -> number(line.recibidaAntesFactura())).setHeader("Recibido factura");
             lines.addColumn(line -> number(line.cantidad())).setHeader("Esta recepción");
-            lines.addColumn(line -> number(line.pendiente())).setHeader("Pendiente");
-            lines.addColumn(line -> number(line.exceso())).setHeader("Exceso");
-            lines.addColumn(line -> line.origen() == OrigenLineaRecepcion.ORDER_LINE
-                ? value(receipt.ordenCompra()) : receipt.ordenCompraId() == null ? "Manual" : "Fuera de OC").setHeader("Origen");
+            lines.addColumn(line -> number(line.pendienteOrden())).setHeader("Pendiente OC");
+            lines.addColumn(line -> number(line.pendienteFactura())).setHeader("Pendiente factura");
+            lines.addColumn(line -> switch (line.origen()) {
+                case PURCHASE_ORDER -> value(receipt.ordenCompra());
+                case PURCHASE_INVOICE -> value(receipt.facturaProveedor());
+                case MANUAL -> "Manual";
+            }).setHeader("Origen");
             lines.setItems(receipt.lineas());
             AppDetailSection information = new AppDetailSection("INFORMACIÓN")
                 .field("Proveedor", receipt.proveedor()).field("Orden", receipt.ordenCompra() == null ? "Sin orden" : receipt.ordenCompra())
+                .field("Factura", receipt.facturaProveedor() == null ? "Sin factura" : receipt.facturaProveedor())
                 .field("Almacén", receipt.almacen()).field("Fecha", DATE.format(receipt.fecha()))
                 .field("Estado", state(receipt.estado())).field("Referencia", receipt.referencia());
             if (receipt.confirmadaEn() != null) information.field("Confirmada", DATE_TIME.format(receipt.confirmadaEn()));
@@ -435,25 +522,29 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private static void refreshLines(Grid<LineDraft> grid, List<LineDraft> lines, boolean hasOrder,
-            Span warning, TextArea differenceNote) {
+            boolean hasInvoice, Span warning, TextArea differenceNote) {
         grid.setItems(lines);
-        boolean differences = hasDifferences(lines, hasOrder);
+        boolean differences = hasDifferences(lines, hasOrder, hasInvoice);
         warning.setVisible(differences);
         differenceNote.setVisible(differences);
         differenceNote.setRequiredIndicatorVisible(differences);
     }
 
-    private static boolean hasDifferences(List<LineDraft> lines, boolean hasOrder) {
-        return hasOrder && lines.stream().anyMatch(line -> line.unordered(true) || line.excess().signum() > 0);
+    private static boolean hasDifferences(List<LineDraft> lines, boolean hasOrder, boolean hasInvoice) {
+        if (hasInvoice) return lines.stream().anyMatch(line -> line.uninvoiced(true) || line.excessInvoice().signum() > 0);
+        return hasOrder && lines.stream().anyMatch(line -> line.unordered(true) || line.excessOrder().signum() > 0);
     }
 
     private static RecepcionCompraInput receiptInput(ComboBox<ComprasCatalogosDto.Opcion> supplier,
-            ComboBox<ComprasCatalogosDto.Opcion> order, ComboBox<ComprasCatalogosDto.Opcion> warehouse,
+            ComboBox<ComprasCatalogosDto.Opcion> order, ComboBox<FacturaRecepcionOpcionDto> invoice,
+            ComboBox<ComprasCatalogosDto.Opcion> warehouse,
             DatePicker date, TextField reference, TextArea notes, TextArea differenceNote,
             List<LineDraft> lines, RecepcionCompraDto current, UUID idempotencyKey) {
-        return new RecepcionCompraInput(id(supplier), id(order), id(warehouse), date.getValue(), reference.getValue(),
+        return new RecepcionCompraInput(id(supplier), id(order), invoice.getValue() == null ? null : invoice.getValue().id(),
+            id(warehouse), date.getValue(), reference.getValue(),
             notes.getValue(), differenceNote.getValue(), lines.stream()
-                .map(line -> new LineaRecepcionCompraInput(line.orderLineId(), line.product().id(), line.quantity())).toList(),
+                .map(line -> new LineaRecepcionCompraInput(line.orderLineId(), line.invoiceLineId(),
+                    line.product().id(), line.quantity())).toList(),
             current == null ? null : current.version(), idempotencyKey);
     }
 
@@ -510,17 +601,33 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             ? exception.getMessage() : fallback);
     }
 
-    private record LineDraft(UUID orderLineId, OrdenCompraCatalogosDto.ProductoOpcion product,
-                             BigDecimal quantity, BigDecimal ordered, BigDecimal previouslyReceived) {
-        BigDecimal pending() {
-            return ordered == null ? null : ordered.subtract(previouslyReceived == null ? BigDecimal.ZERO : previouslyReceived)
+    private record LineDraft(UUID orderLineId, UUID invoiceLineId, OrdenCompraCatalogosDto.ProductoOpcion product,
+                             BigDecimal quantity, BigDecimal ordered, BigDecimal invoiced,
+                             BigDecimal previouslyReceivedOrder, BigDecimal previouslyReceivedInvoice) {
+        BigDecimal pendingOrder() {
+            return ordered == null ? null : ordered.subtract(zero(previouslyReceivedOrder))
                 .subtract(quantity).max(BigDecimal.ZERO);
         }
-        BigDecimal excess() {
-            return ordered == null ? BigDecimal.ZERO : (previouslyReceived == null ? BigDecimal.ZERO : previouslyReceived)
+        BigDecimal pendingInvoice() {
+            return invoiced == null ? null : invoiced.subtract(zero(previouslyReceivedInvoice))
+                .subtract(quantity).max(BigDecimal.ZERO);
+        }
+        BigDecimal excessOrder() {
+            return ordered == null ? BigDecimal.ZERO : zero(previouslyReceivedOrder)
                 .add(quantity).subtract(ordered).max(BigDecimal.ZERO);
         }
+        BigDecimal excessInvoice() {
+            return invoiced == null ? BigDecimal.ZERO : zero(previouslyReceivedInvoice)
+                .add(quantity).subtract(invoiced).max(BigDecimal.ZERO);
+        }
         boolean unordered(boolean hasOrder) { return hasOrder && orderLineId == null; }
-        String origin(boolean hasOrder) { return orderLineId != null ? "De OC" : hasOrder ? "Fuera de OC" : "Manual"; }
+        boolean uninvoiced(boolean hasInvoice) { return hasInvoice && invoiceLineId == null; }
+        String origin(boolean hasOrder, boolean hasInvoice) {
+            if (invoiceLineId != null) return "Factura";
+            if (orderLineId != null) return "Orden de compra";
+            if (hasInvoice) return "Fuera de factura";
+            return hasOrder ? "Fuera de OC" : "Manual";
+        }
+        private static BigDecimal zero(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
     }
 }

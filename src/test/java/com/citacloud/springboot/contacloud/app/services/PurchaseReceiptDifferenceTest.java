@@ -18,22 +18,22 @@ class PurchaseReceiptDifferenceTest {
         UUID lineaOrden = UUID.randomUUID(), producto = UUID.randomUUID();
         RecepcionCompra receipt = new RecepcionCompra(tenant, empresa, "REC-000001", UUID.randomUUID(),
             UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), null, null, usuario);
-        LineaRecepcionCompra line = new LineaRecepcionCompra(tenant, empresa, lineaOrden, producto, "P-1",
-            "Laptop", "Unidad", new BigDecimal("12.0000"), OrigenLineaRecepcion.ORDER_LINE,
-            TipoDiferenciaRecepcion.OVER_RECEIPT, 1);
+        LineaRecepcionCompra line = new LineaRecepcionCompra(tenant, empresa, lineaOrden, null, producto, "P-1",
+            "Laptop", "Unidad", new BigDecimal("12.0000"), OrigenLineaRecepcion.PURCHASE_ORDER,
+            TipoDiferenciaRecepcion.OVER_ORDERED_QUANTITY, 1);
         receipt.reemplazarLineas(java.util.List.of(line));
 
         var dto = new RecepcionCompraMapper().toDto(receipt,
-            Map.of(lineaOrden, new BigDecimal("10.0000")), Map.of(lineaOrden, BigDecimal.ZERO));
+            Map.of(lineaOrden, new BigDecimal("10.0000")), Map.of(lineaOrden, BigDecimal.ZERO), Map.of(), Map.of());
 
-        assertThat(dto.lineas().getFirst().diferencia()).isEqualTo(TipoDiferenciaRecepcion.OVER_RECEIPT);
-        assertThat(dto.lineas().getFirst().exceso()).isEqualByComparingTo("2.0000");
+        assertThat(dto.lineas().getFirst().diferencia()).isEqualTo(TipoDiferenciaRecepcion.OVER_ORDERED_QUANTITY);
+        assertThat(dto.lineas().getFirst().excesoOrden()).isEqualByComparingTo("2.0000");
         assertThat(dto.lineas().getFirst().ordenada()).isEqualByComparingTo("10.0000");
     }
 
     @Test
     void lineaManualFueraDeOrdenConservaOrigenYDiferenciaExplicitos() {
-        LineaRecepcionCompra line = new LineaRecepcionCompra(UUID.randomUUID(), UUID.randomUUID(), null,
+        LineaRecepcionCompra line = new LineaRecepcionCompra(UUID.randomUUID(), UUID.randomUUID(), null, null,
             UUID.randomUUID(), "P-2", "Teclado", "Unidad", new BigDecimal("5.0000"),
             OrigenLineaRecepcion.MANUAL, TipoDiferenciaRecepcion.UNORDERED_PRODUCT, 1);
 

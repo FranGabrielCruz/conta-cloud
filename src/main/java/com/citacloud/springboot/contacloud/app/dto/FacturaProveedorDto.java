@@ -11,4 +11,6 @@ public record FacturaProveedorDto(UUID id,UUID proveedorId,String proveedor,UUID
         String condicionPago,UUID monedaId,String moneda,UUID ordenCompraId,String ordenCompra,
         String referencia,String notas,BigDecimal subtotal,BigDecimal descuento,BigDecimal impuesto,
         BigDecimal total,EstadoFacturaProveedor estado,long version,String motivoAnulacion,
-        BigDecimal saldo,EstadoCuentaPagar estadoCuenta,List<LineaFacturaProveedorDto> lineas) {}
+        BigDecimal saldo,EstadoCuentaPagar estadoCuenta,TipoCondicionPago tipoCondicionPago,
+        Integer diasCondicionPago,EstadoFinancieroFactura estadoFinanciero,boolean pagoContado,
+        List<LineaFacturaProveedorDto> lineas) {}

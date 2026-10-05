@@ -52,6 +52,18 @@ public interface CashRegisterRepository extends JpaRepository<Caja, UUID> {
         @Param("sucursal")UUID sucursal,@Param("abierta")Boolean abierta,@Param("todas")boolean todas,
         @Param("sucursales")Set<UUID> sucursales,Pageable pageable);
 
+    @EntityGraph(attributePaths = {"sucursal", "moneda"})
+    @Query("""
+        select c from Caja c where c.tenantId=:tenant and c.empresaId=:empresa and c.activo=true
+          and c.monedaId=:moneda and (:buscar='' or lower(c.nombre) like lower(concat('%',:buscar,'%')))
+          and (:todas=true or c.sucursalId in :sucursales)
+          and exists(select s.id from SesionCaja s where s.tenantId=:tenant and s.empresaId=:empresa
+            and s.cajaId=c.id and s.status=com.citacloud.springboot.contacloud.app.models.EstadoSesionCaja.OPEN)
+        """)
+    Page<Caja> buscarFuentesPago(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("moneda")UUID moneda,@Param("buscar")String buscar,@Param("todas")boolean todas,
+        @Param("sucursales")Set<UUID> sucursales,Pageable pageable);
+
     boolean existsByTenantIdAndEmpresaIdAndSucursalIdAndNombreIgnoreCase(
         UUID tenantId, UUID empresaId, UUID sucursalId, String nombre);
     boolean existsByTenantIdAndEmpresaIdAndSucursalIdAndNombreIgnoreCaseAndIdNot(

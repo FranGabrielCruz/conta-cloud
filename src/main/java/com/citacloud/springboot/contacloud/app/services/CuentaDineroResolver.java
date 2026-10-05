@@ -5,6 +5,7 @@ import com.citacloud.springboot.contacloud.app.models.*;
 import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.*;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.*;
 import java.util.*;
 
 @Service
@@ -41,6 +42,26 @@ public class CuentaDineroResolver {
         CuentaBancaria c=cuentas.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),empresaId).filter(CuentaBancaria::isActivo)
             .orElseThrow(()->new ReglaNegocioException("La cuenta bancaria seleccionada no es válida o está inactiva."));
         return new CuentaResuelta(tipo,id,c.getMonedaId(),c.getMoneda(),null,c,c.getBancoNombre()+" · "+c.getNombreCuenta());
+    }
+
+    public List<CuentaDineroOpcionDto> buscarFuentesPago(TipoCuentaDinero tipo,UUID monedaId,String filtro,
+            int offset,int limit){
+        if(tipo==null||monedaId==null||offset<0||limit<1||limit>50)
+            throw new ReglaNegocioException("Parámetros de búsqueda de la fuente de pago inválidos.");
+        var p=TenantContext.principalActual();UUID empresaId=EmpresaContext.requerirEmpresaId();
+        String text=filtro==null?"":filtro.trim();
+        if(tipo==TipoCuentaDinero.CASH_REGISTER){
+            Set<UUID> branches=p.sucursalIds().isEmpty()?Set.of(new UUID(0,0)):p.sucursalIds();
+            return cajas.buscarFuentesPago(p.tenantId(),empresaId,monedaId,text,p.accesoTodasSucursales(),branches,
+                PageRequest.of(offset/limit,limit,Sort.by("nombre")))
+                .stream()
+                .map(c->new CuentaDineroOpcionDto(c.getId(),tipo,"Caja · "+c.getNombre()+" · "+c.getSucursal().getNombre(),
+                    c.getMonedaId(),c.getMoneda().getCodigoIso())).toList();
+        }
+        return cuentas.buscar(p.tenantId(),empresaId,text,monedaId,true,
+            PageRequest.of(offset/limit,limit,Sort.by("bancoNombre","nombreCuenta"))).stream()
+            .map(c->new CuentaDineroOpcionDto(c.getId(),tipo,"Cuenta bancaria · "+c.getBancoNombre()+" · "+c.getNombreCuenta(),
+                c.getMonedaId(),c.getMoneda().getCodigoIso())).toList();
     }
 
     public record CuentaResuelta(TipoCuentaDinero tipo,UUID id,UUID monedaId,Moneda moneda,Caja caja,
