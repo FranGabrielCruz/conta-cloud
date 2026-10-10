@@ -19,12 +19,13 @@ import com.vaadin.flow.data.value.ValueChangeMode;
 import java.math.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Consumer;
 
 final class SupplierCreditApplicationDialog {
     private static final DateTimeFormatter DATE=DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private final SupplierCreditNoteService service;
     private final NotaCreditoProveedorDto note;
-    private final Runnable afterApply;
+    private final Consumer<NotaCreditoProveedorDto> afterApply;
     private final Map<UUID,BigDecimal> allocations=new LinkedHashMap<>();
     private final Map<UUID,FacturaAplicacionCreditoDto> knownInvoices=new HashMap<>();
     private final Set<UUID> invalidAmounts=new HashSet<>();
@@ -36,7 +37,7 @@ final class SupplierCreditApplicationDialog {
     private final AppPagination[] pagination=new AppPagination[1];
     private Dialog dialog;
 
-    SupplierCreditApplicationDialog(SupplierCreditNoteService service,NotaCreditoProveedorDto note,Runnable afterApply) {
+    SupplierCreditApplicationDialog(SupplierCreditNoteService service,NotaCreditoProveedorDto note,Consumer<NotaCreditoProveedorDto> afterApply) {
         this.service=service;this.note=note;this.afterApply=afterApply;
         this.applyButton=new AppActionButton(ActionType.APPLY_CREDIT,ButtonSize.MAIN,"Aplicar crédito",event->confirm());
         configureGrid();
@@ -117,7 +118,7 @@ final class SupplierCreditApplicationDialog {
     private static Div metric(String label,Span value){Div div=new Div(new Span(label),value);div.getStyle().set("display","flex").set("flex-direction","column").set("gap","4px");value.getStyle().set("font-weight","700");return div;}
 
     private void confirm(){if(!valid())return;BigDecimal total=SupplierCreditAllocationCalculator.total(allocations);long count=allocations.size();String message="¿Desea aplicar "+currency(total)+" de la Nota de Crédito "+note.numero()+" a "+count+(count==1?" factura?":" facturas?")+"\n\nCrédito disponible: "+currency(note.disponible())+"\nTotal a aplicar: "+currency(total)+"\nCrédito restante: "+currency(note.disponible().subtract(total));ConfirmDialog confirmation=new ConfirmDialog("CONFIRMAR APLICACIÓN",message,"Confirmar",event->apply(),"Cancelar",event->{});confirmation.open();}
-    private void apply(){try{var items=allocations.entrySet().stream().map(entry->new AplicarCreditoProveedorInput.Aplicacion(entry.getKey(),entry.getValue())).toList();service.apply(note.id(),new AplicarCreditoProveedorInput(items,note.version()));dialog.close();afterApply.run();Notification.show("Crédito aplicado correctamente.");}catch(RuntimeException exception){Notification.show(exception instanceof ReglaNegocioException||exception instanceof RecursoNoEncontradoException?exception.getMessage():"No fue posible aplicar el crédito. Actualiza los saldos e inténtalo nuevamente.");loadPage();}}
+    private void apply(){try{var items=allocations.entrySet().stream().map(entry->new AplicarCreditoProveedorInput.Aplicacion(entry.getKey(),entry.getValue())).toList();NotaCreditoProveedorDto applied=service.apply(note.id(),new AplicarCreditoProveedorInput(items,note.version()));dialog.close();afterApply.accept(applied);Notification.show("Crédito aplicado correctamente.");}catch(RuntimeException exception){Notification.show(exception instanceof ReglaNegocioException||exception instanceof RecursoNoEncontradoException?exception.getMessage():"No fue posible aplicar el crédito. Actualiza los saldos e inténtalo nuevamente.");loadPage();}}
     private BigDecimal amount(UUID invoiceId){return allocations.getOrDefault(invoiceId,BigDecimal.ZERO);}
     private String currency(BigDecimal value){String symbol="DOP".equalsIgnoreCase(note.moneda())?"RD$":text(note.moneda());return symbol+" "+String.format(Locale.US,"%,.2f",value==null?BigDecimal.ZERO:value);}
     private static String text(String value){return value==null||value.isBlank()?"—":value;}

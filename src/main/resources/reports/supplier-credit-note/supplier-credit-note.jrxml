@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" name="supplier_credit_note" pageWidth="842" pageHeight="595" orientation="Landscape" columnWidth="782" leftMargin="30" rightMargin="30" topMargin="24" bottomMargin="24" whenNoDataType="AllSectionsNoDetail" isSummaryWithPageHeaderAndFooter="true">
+    <style name="Base" fontName="SansSerif" fontSize="9"/>
+    <style name="Heading" style="Base" fontSize="15" isBold="true"/>
+    <style name="Section" style="Base" fontSize="8" isBold="true" forecolor="#334155"/>
+    <style name="TableHeader" style="Base" isBold="true" forecolor="#FFFFFF" backcolor="#334155" mode="Opaque"/>
+    <style name="MetricLabel" style="Base" fontSize="8" forecolor="#475569"/>
+
+    <subDataset name="TaxDataset">
+        <parameter name="currencyPrefix" class="java.lang.String"/>
+        <field name="nombre" class="java.lang.String"/><field name="importe" class="java.math.BigDecimal"/>
+    </subDataset>
+    <subDataset name="ApplicationDataset">
+        <parameter name="currencyPrefix" class="java.lang.String"/>
+        <field name="fecha" class="java.lang.String"/><field name="factura" class="java.lang.String"/><field name="numeroProveedor" class="java.lang.String"/><field name="importe" class="java.math.BigDecimal"/>
+    </subDataset>
+
+    <parameter name="companyTradeName" class="java.lang.String"/><parameter name="companyLegalName" class="java.lang.String"/><parameter name="companyTaxIdentification" class="java.lang.String"/><parameter name="companyAddress" class="java.lang.String"/><parameter name="companyPhone" class="java.lang.String"/><parameter name="companyEmail" class="java.lang.String"/><parameter name="companyLogo" class="java.io.InputStream"/>
+    <parameter name="noteNumber" class="java.lang.String"/><parameter name="noteDate" class="java.lang.String"/><parameter name="status" class="java.lang.String"/>
+    <parameter name="supplierName" class="java.lang.String"/><parameter name="supplierTaxIdentification" class="java.lang.String"/><parameter name="supplierCreditNumber" class="java.lang.String"/><parameter name="fiscalNumber" class="java.lang.String"/>
+    <parameter name="currencyCode" class="java.lang.String"/><parameter name="currencyPrefix" class="java.lang.String"/><parameter name="reason" class="java.lang.String"/><parameter name="relatedInvoice" class="java.lang.String"/><parameter name="notes" class="java.lang.String"/>
+    <parameter name="subtotal" class="java.math.BigDecimal"/><parameter name="discount" class="java.math.BigDecimal"/><parameter name="tax" class="java.math.BigDecimal"/><parameter name="total" class="java.math.BigDecimal"/><parameter name="applied" class="java.math.BigDecimal"/><parameter name="available" class="java.math.BigDecimal"/>
+    <parameter name="generatedByDisplayName" class="java.lang.String"/><parameter name="generatedAt" class="java.lang.String"/><parameter name="taxDataSource" class="net.sf.jasperreports.engine.JRDataSource"/><parameter name="applicationDataSource" class="net.sf.jasperreports.engine.JRDataSource"/><parameter name="hasTaxes" class="java.lang.Boolean"/><parameter name="hasApplications" class="java.lang.Boolean"/>
+    <field name="numero" class="java.lang.Integer"/><field name="descripcion" class="java.lang.String"/><field name="cantidad" class="java.math.BigDecimal"/><field name="precioUnitario" class="java.math.BigDecimal"/><field name="impuesto" class="java.math.BigDecimal"/><field name="total" class="java.math.BigDecimal"/>
+
+    <title><band height="184" splitType="Prevent">
+        <image onErrorType="Blank"><reportElement x="0" y="0" width="78" height="58"><printWhenExpression><![CDATA[$P{companyLogo} != null]]></printWhenExpression></reportElement><imageExpression><![CDATA[$P{companyLogo}]]></imageExpression></image>
+        <frame><reportElement x="90" y="0" width="430" height="88"/>
+            <textField textAdjust="StretchHeight"><reportElement style="Heading" x="0" y="0" width="430" height="20"/><textFieldExpression><![CDATA[$P{companyTradeName}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement style="Base" positionType="Float" x="0" y="21" width="430" height="13"><printWhenExpression><![CDATA[$P{companyLegalName} != null && !$P{companyLegalName}.trim().isEmpty()]]></printWhenExpression></reportElement><textFieldExpression><![CDATA[$P{companyLegalName}]]></textFieldExpression></textField>
+            <textField><reportElement style="Base" positionType="Float" x="0" y="35" width="430" height="13"><printWhenExpression><![CDATA[$P{companyTaxIdentification} != null && !$P{companyTaxIdentification}.trim().isEmpty()]]></printWhenExpression></reportElement><textFieldExpression><![CDATA["RNC / Identificación: " + $P{companyTaxIdentification}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement style="Base" positionType="Float" x="0" y="49" width="430" height="13"><printWhenExpression><![CDATA[$P{companyAddress} != null && !$P{companyAddress}.trim().isEmpty()]]></printWhenExpression></reportElement><textFieldExpression><![CDATA["Dirección: " + $P{companyAddress}]]></textFieldExpression></textField>
+            <textField><reportElement style="Base" positionType="Float" x="0" y="63" width="210" height="13"><printWhenExpression><![CDATA[$P{companyPhone} != null && !$P{companyPhone}.trim().isEmpty()]]></printWhenExpression></reportElement><textFieldExpression><![CDATA["Teléfono: " + $P{companyPhone}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement style="Base" positionType="Float" x="215" y="63" width="215" height="13"><printWhenExpression><![CDATA[$P{companyEmail} != null && !$P{companyEmail}.trim().isEmpty()]]></printWhenExpression></reportElement><textFieldExpression><![CDATA["Correo: " + $P{companyEmail}]]></textFieldExpression></textField>
+        </frame>
+        <staticText><reportElement style="Section" x="535" y="0" width="247" height="14"/><textElement textAlignment="Right"/><text><![CDATA[NOTA DE CRÉDITO DE PROVEEDOR]]></text></staticText>
+        <textField><reportElement style="Heading" x="535" y="18" width="247" height="22"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{noteNumber}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="535" y="44" width="247" height="15"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Estado: " + $P{status}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="535" y="61" width="247" height="15"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Fecha: " + $P{noteDate}]]></textFieldExpression></textField>
+
+        <line><reportElement x="0" y="90" width="782" height="1" forecolor="#94A3B8"/></line>
+        <rectangle radius="4"><reportElement x="0" y="100" width="782" height="80" forecolor="#CBD5E1"/></rectangle>
+        <line><reportElement x="391" y="100" width="1" height="80" forecolor="#CBD5E1"/></line>
+        <staticText><reportElement style="Section" x="10" y="106" width="360" height="13"/><text><![CDATA[PROVEEDOR]]></text></staticText>
+        <textField textAdjust="StretchHeight"><reportElement style="Base" x="10" y="123" width="365" height="16"/><textFieldExpression><![CDATA[$P{supplierName}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="10" y="143" width="365" height="14"/><textFieldExpression><![CDATA["RNC / Identificación: " + $P{supplierTaxIdentification}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="10" y="160" width="365" height="14"/><textFieldExpression><![CDATA["No. nota proveedor: " + $P{supplierCreditNumber}]]></textFieldExpression></textField>
+
+        <staticText><reportElement style="Section" x="402" y="106" width="370" height="13"/><text><![CDATA[DATOS DE LA NOTA]]></text></staticText>
+        <textField><reportElement style="Base" x="402" y="123" width="185" height="14"/><textFieldExpression><![CDATA["NCF / e-NCF: " + $P{fiscalNumber}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="592" y="123" width="180" height="14"/><textFieldExpression><![CDATA["Moneda: " + $P{currencyCode}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="402" y="143" width="370" height="14"/><textFieldExpression><![CDATA["Motivo: " + $P{reason}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="402" y="160" width="370" height="14"/><textFieldExpression><![CDATA["Factura relacionada: " + $P{relatedInvoice}]]></textFieldExpression></textField>
+    </band></title>
+
+    <pageHeader><band height="42" splitType="Prevent"><printWhenExpression><![CDATA[$V{PAGE_NUMBER} > 1]]></printWhenExpression>
+        <textField><reportElement style="Heading" x="0" y="0" width="390" height="20"/><textFieldExpression><![CDATA[$P{companyTradeName}]]></textFieldExpression></textField>
+        <staticText><reportElement style="Section" x="500" y="0" width="282" height="14"/><textElement textAlignment="Right"/><text><![CDATA[NOTA DE CRÉDITO DE PROVEEDOR]]></text></staticText>
+        <textField><reportElement style="Heading" x="500" y="15" width="282" height="20"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{noteNumber}]]></textFieldExpression></textField>
+        <line><reportElement x="0" y="39" width="782" height="1" forecolor="#CBD5E1"/></line>
+    </band></pageHeader>
+
+    <columnHeader><band height="24">
+        <staticText><reportElement style="TableHeader" x="0" y="0" width="34" height="24"/><textElement textAlignment="Center" verticalAlignment="Middle"/><text><![CDATA[#]]></text></staticText>
+        <staticText><reportElement style="TableHeader" x="34" y="0" width="402" height="24"/><textElement verticalAlignment="Middle"/><text><![CDATA[Descripción]]></text></staticText>
+        <staticText><reportElement style="TableHeader" x="436" y="0" width="78" height="24"/><textElement textAlignment="Right" verticalAlignment="Middle"/><text><![CDATA[Cantidad]]></text></staticText>
+        <staticText><reportElement style="TableHeader" x="514" y="0" width="90" height="24"/><textElement textAlignment="Right" verticalAlignment="Middle"/><text><![CDATA[Precio]]></text></staticText>
+        <staticText><reportElement style="TableHeader" x="604" y="0" width="84" height="24"/><textElement textAlignment="Right" verticalAlignment="Middle"/><text><![CDATA[Impuestos]]></text></staticText>
+        <staticText><reportElement style="TableHeader" x="688" y="0" width="94" height="24"/><textElement textAlignment="Right" verticalAlignment="Middle"/><text><![CDATA[Total]]></text></staticText>
+    </band></columnHeader>
+
+    <detail><band height="22" splitType="Prevent">
+        <textField><reportElement style="Base" x="0" y="2" width="34" height="18"/><textElement textAlignment="Center" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{numero}]]></textFieldExpression></textField>
+        <textField textAdjust="StretchHeight"><reportElement style="Base" x="34" y="2" width="402" height="18"/><textElement verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{descripcion}]]></textFieldExpression></textField>
+        <textField pattern="#,##0.00##"><reportElement style="Base" x="436" y="2" width="78" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{cantidad}]]></textFieldExpression></textField>
+        <textField pattern="#,##0.00"><reportElement style="Base" x="514" y="2" width="90" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{precioUnitario}]]></textFieldExpression></textField>
+        <textField pattern="#,##0.00"><reportElement style="Base" x="604" y="2" width="84" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{impuesto}]]></textFieldExpression></textField>
+        <textField pattern="#,##0.00"><reportElement style="Base" x="688" y="2" width="94" height="18"/><textElement textAlignment="Right" verticalAlignment="Middle"/><textFieldExpression><![CDATA[$F{total}]]></textFieldExpression></textField>
+        <line><reportElement positionType="Float" x="0" y="21" width="782" height="1" forecolor="#E2E8F0"/></line>
+    </band></detail>
+
+    <pageFooter><band height="18">
+        <textField><reportElement style="Base" x="0" y="2" width="480" height="14"/><textFieldExpression><![CDATA["Emitida por: " + $P{generatedByDisplayName} + "   " + $P{generatedAt}]]></textFieldExpression></textField>
+        <textField><reportElement style="Base" x="596" y="2" width="154" height="14"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA["Página " + $V{PAGE_NUMBER} + " de"]]></textFieldExpression></textField>
+        <textField evaluationTime="Report"><reportElement style="Base" x="754" y="2" width="28" height="14"/><textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression></textField>
+    </band></pageFooter>
+
+    <summary><band height="218" splitType="Stretch">
+        <staticText><reportElement style="Section" x="0" y="8" width="200" height="14"/><text><![CDATA[OBSERVACIÓN]]></text></staticText>
+        <textField textAdjust="StretchHeight"><reportElement style="Base" x="0" y="25" width="245" height="58"/><textFieldExpression><![CDATA[$P{notes} == null ? "—" : $P{notes}]]></textFieldExpression></textField>
+
+        <staticText><reportElement style="Section" x="265" y="8" width="220" height="14"/><text><![CDATA[DESGLOSE DE IMPUESTOS]]></text></staticText>
+        <componentElement><reportElement x="265" y="25" width="220" height="58"><printWhenExpression><![CDATA[$P{hasTaxes}]]></printWhenExpression></reportElement>
+            <jr:table>
+                <datasetRun subDataset="TaxDataset"><datasetParameter name="currencyPrefix"><datasetParameterExpression><![CDATA[$P{currencyPrefix}]]></datasetParameterExpression></datasetParameter><dataSourceExpression><![CDATA[$P{taxDataSource}]]></dataSourceExpression></datasetRun>
+                <jr:column width="130"><jr:detailCell height="16"><textField><reportElement style="Base" x="0" y="0" width="130" height="16"/><textFieldExpression><![CDATA[$F{nombre}]]></textFieldExpression></textField></jr:detailCell></jr:column>
+                <jr:column width="90"><jr:detailCell height="16"><textField pattern="#,##0.00"><reportElement style="Base" x="0" y="0" width="90" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($F{importe})]]></textFieldExpression></textField></jr:detailCell></jr:column>
+            </jr:table>
+        </componentElement>
+        <staticText><reportElement style="Base" x="265" y="25" width="220" height="16"><printWhenExpression><![CDATA[!$P{hasTaxes}]]></printWhenExpression></reportElement><text><![CDATA[Sin impuestos.]]></text></staticText>
+
+        <staticText><reportElement style="Section" x="510" y="8" width="125" height="16"/><textElement textAlignment="Right"/><text><![CDATA[Subtotal]]></text></staticText>
+        <textField><reportElement style="Base" x="640" y="8" width="142" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{subtotal})]]></textFieldExpression></textField>
+        <staticText><reportElement style="Section" x="510" y="26" width="125" height="16"/><textElement textAlignment="Right"/><text><![CDATA[Descuento]]></text></staticText>
+        <textField><reportElement style="Base" x="640" y="26" width="142" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{discount})]]></textFieldExpression></textField>
+        <staticText><reportElement style="Section" x="510" y="44" width="125" height="16"/><textElement textAlignment="Right"/><text><![CDATA[Impuestos]]></text></staticText>
+        <textField><reportElement style="Base" x="640" y="44" width="142" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{tax})]]></textFieldExpression></textField>
+        <line><reportElement x="510" y="63" width="272" height="1" forecolor="#94A3B8"/></line>
+        <staticText><reportElement style="Heading" x="510" y="68" width="125" height="22"/><textElement textAlignment="Right"/><text><![CDATA[TOTAL]]></text></staticText>
+        <textField><reportElement style="Heading" x="640" y="68" width="142" height="22"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{total})]]></textFieldExpression></textField>
+
+        <staticText><reportElement style="Section" positionType="Float" x="0" y="100" width="200" height="14"/><text><![CDATA[ESTADO DEL CRÉDITO]]></text></staticText>
+        <frame><reportElement positionType="Float" x="0" y="117" width="782" height="44" forecolor="#CBD5E1"/>
+            <rectangle radius="4"><reportElement x="0" y="0" width="782" height="44" forecolor="#CBD5E1"/></rectangle>
+            <line><reportElement x="260" y="0" width="1" height="44" forecolor="#CBD5E1"/></line><line><reportElement x="521" y="0" width="1" height="44" forecolor="#CBD5E1"/></line>
+            <staticText><reportElement style="MetricLabel" x="10" y="5" width="240" height="13"/><text><![CDATA[Importe de la nota]]></text></staticText><textField><reportElement style="Base" x="10" y="21" width="240" height="16"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{total})]]></textFieldExpression></textField>
+            <staticText><reportElement style="MetricLabel" x="271" y="5" width="240" height="13"/><text><![CDATA[Aplicado]]></text></staticText><textField><reportElement style="Base" x="271" y="21" width="240" height="16"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{applied})]]></textFieldExpression></textField>
+            <staticText><reportElement style="MetricLabel" x="532" y="5" width="240" height="13"/><text><![CDATA[Disponible]]></text></staticText><textField><reportElement style="Heading" x="532" y="19" width="240" height="19"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($P{available})]]></textFieldExpression></textField>
+        </frame>
+
+        <staticText><reportElement style="Section" positionType="Float" x="0" y="172" width="250" height="14"/><text><![CDATA[HISTORIAL DE APLICACIONES]]></text></staticText>
+        <componentElement><reportElement positionType="Float" x="0" y="190" width="782" height="28"><printWhenExpression><![CDATA[$P{hasApplications}]]></printWhenExpression></reportElement>
+            <jr:table>
+                <datasetRun subDataset="ApplicationDataset"><datasetParameter name="currencyPrefix"><datasetParameterExpression><![CDATA[$P{currencyPrefix}]]></datasetParameterExpression></datasetParameter><dataSourceExpression><![CDATA[$P{applicationDataSource}]]></dataSourceExpression></datasetRun>
+                <jr:column width="130"><jr:columnHeader height="20"><staticText><reportElement style="TableHeader" x="0" y="0" width="130" height="20"/><textElement verticalAlignment="Middle"/><text><![CDATA[Fecha]]></text></staticText></jr:columnHeader><jr:detailCell height="18"><textField><reportElement style="Base" x="0" y="1" width="130" height="16"/><textFieldExpression><![CDATA[$F{fecha}]]></textFieldExpression></textField></jr:detailCell></jr:column>
+                <jr:column width="180"><jr:columnHeader height="20"><staticText><reportElement style="TableHeader" x="0" y="0" width="180" height="20"/><textElement verticalAlignment="Middle"/><text><![CDATA[Factura]]></text></staticText></jr:columnHeader><jr:detailCell height="18"><textField><reportElement style="Base" x="0" y="1" width="180" height="16"/><textFieldExpression><![CDATA[$F{factura}]]></textFieldExpression></textField></jr:detailCell></jr:column>
+                <jr:column width="280"><jr:columnHeader height="20"><staticText><reportElement style="TableHeader" x="0" y="0" width="280" height="20"/><textElement verticalAlignment="Middle"/><text><![CDATA[No. proveedor]]></text></staticText></jr:columnHeader><jr:detailCell height="18"><textField><reportElement style="Base" x="0" y="1" width="280" height="16"/><textFieldExpression><![CDATA[$F{numeroProveedor}]]></textFieldExpression></textField></jr:detailCell></jr:column>
+                <jr:column width="192"><jr:columnHeader height="20"><staticText><reportElement style="TableHeader" x="0" y="0" width="192" height="20"/><textElement textAlignment="Right" verticalAlignment="Middle"/><text><![CDATA[Importe]]></text></staticText></jr:columnHeader><jr:detailCell height="18"><textField><reportElement style="Base" x="0" y="1" width="192" height="16"/><textElement textAlignment="Right"/><textFieldExpression><![CDATA[$P{currencyPrefix} + " " + new java.text.DecimalFormat("#,##0.00").format($F{importe})]]></textFieldExpression></textField></jr:detailCell></jr:column>
+            </jr:table>
+        </componentElement>
+        <staticText><reportElement style="Base" positionType="Float" x="0" y="190" width="782" height="18"><printWhenExpression><![CDATA[!$P{hasApplications}]]></printWhenExpression></reportElement><text><![CDATA[No existen aplicaciones registradas.]]></text></staticText>
+    </band></summary>
+</jasperReport>
