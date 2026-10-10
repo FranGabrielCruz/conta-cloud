@@ -1,6 +1,5 @@
 package com.citacloud.springboot.contacloud.app.models;
 
 public enum EstadoPagoProveedor {
-    REGISTERED,
-    VOIDED
+    DRAFT, AVAILABLE, PARTIALLY_APPLIED, APPLIED, VOIDED
 }

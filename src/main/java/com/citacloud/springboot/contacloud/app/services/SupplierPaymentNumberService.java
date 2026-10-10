@@ -1,0 +1,3 @@
+package com.citacloud.springboot.contacloud.app.services;
+import jakarta.persistence.EntityManager;import org.springframework.stereotype.Service;import java.util.UUID;
+@Service public class SupplierPaymentNumberService{private final EntityManager em;public SupplierPaymentNumberService(EntityManager em){this.em=em;}public String next(UUID tenant,UUID empresa){Object n=em.createNativeQuery("INSERT INTO supplier_payment_sequence(tenant_id,empresa_id,last_number) VALUES (:tenant,:empresa,1) ON CONFLICT (tenant_id,empresa_id) DO UPDATE SET last_number=supplier_payment_sequence.last_number+1 RETURNING last_number").setParameter("tenant",tenant).setParameter("empresa",empresa).getSingleResult();return "PG-%06d".formatted(((Number)n).longValue());}}

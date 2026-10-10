@@ -5,54 +5,29 @@ import java.math.BigDecimal;
 import java.time.*;
 import java.util.UUID;
 
-@Entity
-@Table(name = "supplier_payment")
+@Entity @Table(name="supplier_payment")
 public class PagoProveedor {
-    @Id @GeneratedValue(strategy = GenerationType.UUID) private UUID id;
-    @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;
-    @Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
-    @Column(name="supplier_id",nullable=false,updatable=false) private UUID proveedorId;
-    @Column(name="purchase_invoice_id",nullable=false,updatable=false) private UUID facturaId;
-    @Column(name="accounts_payable_id",updatable=false) private UUID cuentaPagarId;
-    @Column(nullable=false) private LocalDate fecha;
-    @Column(name="currency_id",nullable=false,updatable=false) private UUID monedaId;
-    @Column(nullable=false,precision=19,scale=4,updatable=false) private BigDecimal monto;
-    @Enumerated(EnumType.STRING) @Column(name="source_type",nullable=false,length=20,updatable=false)
-    private TipoCuentaDinero tipoFuente;
-    @Column(name="cash_register_id",updatable=false) private UUID cajaId;
-    @Column(name="bank_account_id",updatable=false) private UUID cuentaBancariaId;
-    @Column(name="financial_movement_id") private UUID movimientoFinancieroId;
-    @Column(length=100) private String referencia;
-    @Enumerated(EnumType.STRING) @Column(nullable=false,length=12) private EstadoPagoProveedor status;
-    @Column(name="idempotency_key",nullable=false,updatable=false) private UUID claveIdempotencia;
-    @Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
-    @Column(name="created_by",nullable=false,updatable=false) private UUID creadoPor;
-    @Column(name="voided_at") private OffsetDateTime anuladoEn;
-    @Column(name="voided_by") private UUID anuladoPor;
-    @Column(name="void_reason",length=500) private String motivoAnulacion;
-    @Version @Column(nullable=false) private long version;
-
-    protected PagoProveedor() {}
-
-    public PagoProveedor(UUID tenantId,UUID empresaId,UUID proveedorId,UUID facturaId,LocalDate fecha,
-            UUID monedaId,BigDecimal monto,TipoCuentaDinero tipoFuente,UUID fuenteId,String referencia,
-            UUID claveIdempotencia,UUID usuarioId) {
-        this.tenantId=tenantId;this.empresaId=empresaId;this.proveedorId=proveedorId;this.facturaId=facturaId;
-        this.fecha=fecha;this.monedaId=monedaId;this.monto=monto;this.tipoFuente=tipoFuente;
-        this.cajaId=tipoFuente==TipoCuentaDinero.CASH_REGISTER?fuenteId:null;
-        this.cuentaBancariaId=tipoFuente==TipoCuentaDinero.BANK_ACCOUNT?fuenteId:null;
-        this.referencia=referencia;this.claveIdempotencia=claveIdempotencia;this.creadoPor=usuarioId;
-        this.status=EstadoPagoProveedor.REGISTERED;
-    }
-
-    public void vincularMovimiento(UUID id){movimientoFinancieroId=id;}
-    public void anular(String motivo,UUID usuarioId){status=EstadoPagoProveedor.VOIDED;motivoAnulacion=motivo;
-        anuladoPor=usuarioId;anuladoEn=OffsetDateTime.now();}
-    public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}
-    public UUID getProveedorId(){return proveedorId;} public UUID getFacturaId(){return facturaId;}
-    public LocalDate getFecha(){return fecha;} public UUID getMonedaId(){return monedaId;} public BigDecimal getMonto(){return monto;}
-    public TipoCuentaDinero getTipoFuente(){return tipoFuente;} public UUID getCajaId(){return cajaId;}
-    public UUID getCuentaBancariaId(){return cuentaBancariaId;} public UUID getMovimientoFinancieroId(){return movimientoFinancieroId;}
-    public String getReferencia(){return referencia;} public EstadoPagoProveedor getEstado(){return status;}
-    public UUID getClaveIdempotencia(){return claveIdempotencia;} public long getVersion(){return version;}
+ @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
+ @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;@Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
+ @Column(name="internal_number",nullable=false,updatable=false,length=30) private String numero;@Column(name="supplier_id",nullable=false) private UUID proveedorId;
+ @Column(name="purchase_invoice_id") private UUID facturaId;@Column(name="accounts_payable_id") private UUID cuentaPagarId;@Column(nullable=false) private LocalDate fecha;
+ @Column(name="currency_id",nullable=false) private UUID monedaId;@Column(nullable=false,precision=19,scale=4) private BigDecimal monto;@Column(name="applied_amount",nullable=false,precision=19,scale=4) private BigDecimal montoAplicado;
+ @Enumerated(EnumType.STRING) @Column(name="source_type",nullable=false,length=20) private TipoCuentaDinero tipoFuente;@Column(name="cash_register_id") private UUID cajaId;@Column(name="bank_account_id") private UUID cuentaBancariaId;@Column(name="financial_movement_id") private UUID movimientoFinancieroId;
+ @Enumerated(EnumType.STRING) @Column(name="payment_method",nullable=false,length=20) private MedioPagoMovimiento medioPago;@Column(name="check_number",length=50) private String numeroCheque;@Column(length=100) private String referencia;@Column(length=1000) private String notes;
+ @Enumerated(EnumType.STRING) @Column(nullable=false,length=30) private EstadoPagoProveedor status;@Column(name="idempotency_key",nullable=false,updatable=false) private UUID claveIdempotencia;
+ @Column(name="confirmed_at") private OffsetDateTime confirmadoEn;@Column(name="confirmed_by") private UUID confirmadoPor;@Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;@Column(name="created_by",nullable=false,updatable=false) private UUID creadoPor;
+ @Column(name="updated_at",nullable=false) private OffsetDateTime actualizadoEn;@Column(name="updated_by",nullable=false) private UUID actualizadoPor;@Column(name="voided_at") private OffsetDateTime anuladoEn;@Column(name="voided_by") private UUID anuladoPor;@Column(name="void_reason",length=500) private String motivoAnulacion;@Version @Column(nullable=false) private long version;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="supplier_id",insertable=false,updatable=false) private Proveedor proveedor;@ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="currency_id",insertable=false,updatable=false) private Moneda moneda;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="cash_register_id",insertable=false,updatable=false) private Caja caja;@ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="bank_account_id",insertable=false,updatable=false) private CuentaBancaria cuentaBancaria;
+ protected PagoProveedor(){}
+ public PagoProveedor(UUID tenant,UUID empresa,String numero,UUID proveedor,LocalDate fecha,UUID moneda,BigDecimal monto,TipoCuentaDinero tipoFuente,UUID fuenteId,MedioPagoMovimiento medio,String cheque,String referencia,String notas,UUID clave,UUID usuario){this.tenantId=tenant;this.empresaId=empresa;this.numero=numero;proveedorId=proveedor;this.fecha=fecha;monedaId=moneda;this.monto=monto;montoAplicado=BigDecimal.ZERO;this.tipoFuente=tipoFuente;asignarFuente(tipoFuente,fuenteId);medioPago=medio;numeroCheque=cheque;this.referencia=referencia;this.notes=notas;claveIdempotencia=clave;creadoPor=usuario;actualizadoPor=usuario;actualizadoEn=OffsetDateTime.now();status=EstadoPagoProveedor.DRAFT;}
+ public void actualizar(UUID proveedor,LocalDate fecha,UUID moneda,BigDecimal monto,TipoCuentaDinero tipo,UUID fuente,MedioPagoMovimiento medio,String cheque,String referencia,String notas,UUID usuario){proveedorId=proveedor;this.fecha=fecha;monedaId=moneda;this.monto=monto;tipoFuente=tipo;asignarFuente(tipo,fuente);medioPago=medio;numeroCheque=cheque;this.referencia=referencia;this.notes=notas;actualizadoPor=usuario;}
+ private void asignarFuente(TipoCuentaDinero tipo,UUID id){cajaId=tipo==TipoCuentaDinero.CASH_REGISTER?id:null;cuentaBancariaId=tipo==TipoCuentaDinero.BANK_ACCOUNT?id:null;}
+ public void confirmar(UUID usuario){confirmadoEn=OffsetDateTime.now();confirmadoPor=usuario;actualizadoPor=usuario;recalcularEstado();}
+ public void aplicar(BigDecimal valor,UUID usuario){if(valor==null||valor.signum()<=0||valor.compareTo(disponible())>0)throw new IllegalArgumentException("Aplicación inválida");montoAplicado=montoAplicado.add(valor);actualizadoPor=usuario;recalcularEstado();}
+ public void revertir(BigDecimal valor,UUID usuario){if(valor==null||valor.signum()<=0||valor.compareTo(montoAplicado)>0)throw new IllegalArgumentException("Reversión inválida");montoAplicado=montoAplicado.subtract(valor);actualizadoPor=usuario;recalcularEstado();}
+ private void recalcularEstado(){if(confirmadoEn==null){status=EstadoPagoProveedor.DRAFT;return;}status=montoAplicado.signum()==0?EstadoPagoProveedor.AVAILABLE:montoAplicado.compareTo(monto)>=0?EstadoPagoProveedor.APPLIED:EstadoPagoProveedor.PARTIALLY_APPLIED;}
+ public void vincularMovimiento(UUID id){movimientoFinancieroId=id;}public void vincularFacturaContado(UUID factura,UUID cuenta){facturaId=factura;cuentaPagarId=cuenta;}
+ public void anular(String motivo,UUID usuario){status=EstadoPagoProveedor.VOIDED;motivoAnulacion=motivo;anuladoPor=usuario;anuladoEn=OffsetDateTime.now();actualizadoPor=usuario;}@PreUpdate void marca(){actualizadoEn=OffsetDateTime.now();}
+ public BigDecimal disponible(){return monto.subtract(montoAplicado);}public UUID getId(){return id;}public UUID getTenantId(){return tenantId;}public UUID getEmpresaId(){return empresaId;}public String getNumero(){return numero;}public UUID getProveedorId(){return proveedorId;}public UUID getFacturaId(){return facturaId;}public UUID getCuentaPagarId(){return cuentaPagarId;}public LocalDate getFecha(){return fecha;}public UUID getMonedaId(){return monedaId;}public BigDecimal getMonto(){return monto;}public BigDecimal getMontoAplicado(){return montoAplicado;}public TipoCuentaDinero getTipoFuente(){return tipoFuente;}public UUID getCajaId(){return cajaId;}public UUID getCuentaBancariaId(){return cuentaBancariaId;}public UUID getMovimientoFinancieroId(){return movimientoFinancieroId;}public MedioPagoMovimiento getMedioPago(){return medioPago;}public String getNumeroCheque(){return numeroCheque;}public String getReferencia(){return referencia;}public String getNotas(){return notes;}public EstadoPagoProveedor getEstado(){return status;}public UUID getClaveIdempotencia(){return claveIdempotencia;}public OffsetDateTime getConfirmadoEn(){return confirmadoEn;}public UUID getConfirmadoPor(){return confirmadoPor;}public long getVersion(){return version;}public Proveedor getProveedor(){return proveedor;}public Moneda getMoneda(){return moneda;}public Caja getCaja(){return caja;}public CuentaBancaria getCuentaBancaria(){return cuentaBancaria;}public String getMotivoAnulacion(){return motivoAnulacion;}
 }

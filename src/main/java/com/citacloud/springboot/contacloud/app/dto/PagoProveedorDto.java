@@ -1,0 +1,3 @@
+package com.citacloud.springboot.contacloud.app.dto;
+import com.citacloud.springboot.contacloud.app.models.*;import java.math.BigDecimal;import java.time.LocalDate;import java.util.*;
+public record PagoProveedorDto(UUID id,String numero,UUID proveedorId,String proveedor,String identificacionProveedor,LocalDate fecha,UUID monedaId,String moneda,BigDecimal monto,BigDecimal aplicado,BigDecimal disponible,MedioPagoMovimiento medioPago,TipoCuentaDinero tipoFuente,UUID fuenteId,String fuente,String numeroCheque,String referencia,String observacion,EstadoPagoProveedor estado,long version,List<AplicacionPagoProveedorDto> aplicaciones,String motivoAnulacion){}
