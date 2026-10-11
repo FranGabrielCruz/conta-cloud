@@ -39,6 +39,8 @@ class PermisoModuloPolicyTest {
             .contains("COMPRAS");
         assertThat(PermisoModuloPolicy.moduloRequerido("conciliacion_bancaria.ver", "conciliacion_bancaria"))
             .contains("CAJA_BANCOS");
+        assertThat(PermisoModuloPolicy.moduloRequerido("saldos_cuentas.ver", "saldos_cuentas"))
+            .contains("CAJA_BANCOS");
     }
 
     @Test

@@ -159,7 +159,7 @@ class MenuServiceTest {
             "proveedores.ver", "ordenes_compra.ver", "recepciones.ver", "facturas_proveedores.ver",
             "notas_credito_proveedores.ver", "pagos_proveedores.ver", "cuentas_pagar.ver",
             "cajas.ver", "cuentas_bancarias.ver", "ingresos.ver", "egresos.ver",
-            "transferencias.ver", "conciliacion_bancaria.ver"));
+            "transferencias.ver", "saldos_cuentas.ver", "conciliacion_bancaria.ver"));
 
         var grupos = service.obtener();
 
@@ -173,7 +173,7 @@ class MenuServiceTest {
                 "Notas de crédito", "Pagos", "Cuentas por pagar");
         assertThat(grupos.get(3).opciones()).extracting(MenuService.OpcionMenu::titulo)
             .containsExactly("Cajas", "Cuentas bancarias", "Ingresos", "Egresos",
-                "Transferencias", "Conciliación bancaria");
+                "Transferencias", "Saldos de cuentas", "Conciliación bancaria");
     }
 
     @Test

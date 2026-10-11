@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.*;
+import java.math.BigDecimal;
 public interface CashRegisterSessionRepository extends JpaRepository<SesionCaja,UUID>{
     Optional<SesionCaja> findByTenantIdAndEmpresaIdAndCajaIdAndStatus(UUID tenant,UUID empresa,UUID caja,EstadoSesionCaja estado);
     Optional<SesionCaja> findByTenantIdAndEmpresaIdAndAbiertoPorAndStatus(UUID tenant,UUID empresa,UUID usuario,EstadoSesionCaja estado);
@@ -31,4 +32,13 @@ public interface CashRegisterSessionRepository extends JpaRepository<SesionCaja,
     Page<SesionCaja> buscarHistorial(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("buscar")String buscar,
         @Param("desde")LocalDate desde,@Param("hasta")LocalDate hasta,@Param("caja")UUID caja,
         @Param("revision")EstadoRevisionCaja revision,@Param("todas")boolean todas,@Param("sucursales")Set<UUID> sucursales,Pageable pageable);
+
+    @Query(value="""
+      select coalesce((select s.opening_amount from cash_register_session s
+        where s.tenant_id=:tenant and s.empresa_id=:empresa and s.cash_register_id=:caja
+          and s.business_date<=:hasta
+        order by s.business_date,s.opened_at,s.id limit 1),0)
+      """,nativeQuery=true)
+    BigDecimal fondoInicialHasta(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("caja")UUID caja,@Param("hasta")LocalDate hasta);
 }

@@ -294,3 +294,86 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-metrics-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
   .cc-settings-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
 }
+/* Saldos de cuentas */
+.cc-balance-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--lumo-space-m);
+  width: 100%;
+  margin: var(--lumo-space-m) 0;
+}
+
+.cc-balance-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lumo-space-xs);
+  padding: var(--lumo-space-m);
+  border: 1px solid var(--lumo-contrast-20pct);
+  border-radius: var(--lumo-border-radius-l);
+  background: var(--lumo-base-color);
+  min-width: 0;
+  min-height: 112px;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.cc-balance-card-title {
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-s);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.cc-balance-value {
+  color: var(--lumo-body-text-color);
+  font-size: clamp(var(--lumo-font-size-l), 2.1vw, var(--lumo-font-size-xxl));
+  font-weight: 750;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.cc-balance-negative { color: var(--lumo-error-text-color); }
+.cc-balance-card-general {
+  border-color: var(--lumo-primary-color-50pct);
+  background: var(--lumo-primary-color-10pct);
+}
+.cc-balance-card-general .cc-balance-card-title,
+.cc-balance-card-general .cc-balance-value { font-weight: 800; }
+.cc-balance-equivalent { color: var(--lumo-secondary-text-color); font-size: var(--lumo-font-size-xs); }
+.cc-balance-updated { display: block; width: 100%; text-align: right; color: var(--lumo-secondary-text-color); font-size: var(--lumo-font-size-s); }
+.cc-balance-refresh { flex: 0 0 auto; }
+.cc-balance-card-loading::before,
+.cc-balance-card-loading::after {
+  content: "";
+  display: block;
+  border-radius: var(--lumo-border-radius-s);
+  background: var(--lumo-contrast-10pct);
+  animation: cc-balance-pulse 1.2s ease-in-out infinite alternate;
+}
+.cc-balance-card-loading::before { width: 48%; height: 14px; }
+.cc-balance-card-loading::after { width: 72%; height: 30px; margin-top: var(--lumo-space-m); }
+@keyframes cc-balance-pulse { to { opacity: .42; } }
+.cc-balance-error {
+  width: 100%; box-sizing: border-box; padding: var(--lumo-space-m); border: 1px solid var(--lumo-error-color-50pct);
+  border-radius: var(--lumo-border-radius-l); background: var(--lumo-error-color-10pct);
+}
+.cc-balance-warning {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--lumo-space-m);
+  border-radius: var(--lumo-border-radius-m);
+  background: var(--lumo-warning-color-10pct);
+  color: var(--lumo-warning-text-color);
+}
+
+.cc-section-title { margin: var(--lumo-space-l) 0 var(--lumo-space-s); }
+
+@media (min-width: 701px) and (max-width: 1100px) {
+  .cc-balance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-balance-card-general { grid-column: 1 / -1; }
+}
+
+@media (max-width: 700px) {
+  .cc-balance-summary { grid-template-columns: 1fr; }
+  .cc-balance-card-general { grid-column: auto; }
+  .cc-balance-updated { text-align: left; }
+  .cc-balance-value { font-size: var(--lumo-font-size-xl); }
+}

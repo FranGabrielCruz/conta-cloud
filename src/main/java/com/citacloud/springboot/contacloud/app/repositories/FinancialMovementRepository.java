@@ -96,4 +96,102 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
         and m.cuentaBancariaId=:cuenta and m.estado=com.citacloud.springboot.contacloud.app.models.EstadoMovimientoFinanciero.REGISTERED
       """)
     java.math.BigDecimal saldoCuenta(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("cuenta")UUID cuenta);
+
+    @Query(value="""
+      select b.id as "cuentaId", concat(b.banco_nombre,' · ',b.nombre_cuenta,' · •••• ',b.numero_cuenta_ultimos4) as cuenta,
+        b.moneda_id as "monedaId", mo.codigo_iso as moneda,mo.simbolo as simbolo,null::uuid as "sucursalId",null::varchar as sucursal,b.activo as activo,
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta and m.tipo_origen='OPENING_BALANCE' then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end),0) as "saldoInicial",
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta and m.tipo_origen<>'OPENING_BALANCE' and m.tipo_movimiento='INCOME' then m.monto else 0 end),0) as entradas,
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta and m.tipo_origen<>'OPENING_BALANCE' and m.tipo_movimiento='EXPENSE' then m.monto else 0 end),0) as salidas,
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end),0) as "saldoActual"
+      from cuentas_bancarias b join monedas mo on mo.id=b.moneda_id and mo.empresa_id=b.empresa_id
+      left join movimientos_financieros m on m.tenant_id=b.tenant_id and m.empresa_id=b.empresa_id and m.cuenta_bancaria_id=b.id
+      where b.tenant_id=:tenant and b.empresa_id=:empresa and (:moneda is null or b.moneda_id=:moneda) and (:activo is null or b.activo=:activo)
+        and (:buscar='' or lower(b.banco_nombre) like lower(concat('%',:buscar,'%')) or lower(b.nombre_cuenta) like lower(concat('%',:buscar,'%')) or b.numero_cuenta_ultimos4 like concat('%',:buscar,'%') or lower(b.codigo) like lower(concat('%',:buscar,'%')))
+      group by b.id,b.banco_nombre,b.nombre_cuenta,b.numero_cuenta_ultimos4,b.moneda_id,mo.codigo_iso,mo.simbolo,b.activo
+      order by b.banco_nombre,b.nombre_cuenta,b.id
+      """,countQuery="""
+      select count(*) from cuentas_bancarias b where b.tenant_id=:tenant and b.empresa_id=:empresa
+        and (:moneda is null or b.moneda_id=:moneda) and (:activo is null or b.activo=:activo)
+        and (:buscar='' or lower(b.banco_nombre) like lower(concat('%',:buscar,'%')) or lower(b.nombre_cuenta) like lower(concat('%',:buscar,'%')) or b.numero_cuenta_ultimos4 like concat('%',:buscar,'%') or lower(b.codigo) like lower(concat('%',:buscar,'%')))
+      """,nativeQuery=true)
+    Page<SaldoCuentaProjection> saldosBancarios(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("hasta")LocalDate hasta,
+        @Param("buscar")String buscar,@Param("moneda")UUID moneda,@Param("activo")Boolean activo,Pageable pageable);
+
+    @Query(value="""
+      select c.id as "cuentaId",c.nombre as cuenta,c.moneda_id as "monedaId",mo.codigo_iso as moneda,mo.simbolo as simbolo,
+        c.sucursal_id as "sucursalId",s.nombre as sucursal,c.activo as activo,
+        coalesce((select cs.opening_amount from cash_register_session cs where cs.tenant_id=c.tenant_id and cs.empresa_id=c.empresa_id and cs.cash_register_id=c.id and cs.business_date<=:hasta order by cs.business_date,cs.opened_at,cs.id limit 1),0) as "saldoInicial",
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta and m.tipo_movimiento='INCOME' then m.monto else 0 end),0) as entradas,
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta and m.tipo_movimiento='EXPENSE' then m.monto else 0 end),0) as salidas,
+        coalesce((select cs.opening_amount from cash_register_session cs where cs.tenant_id=c.tenant_id and cs.empresa_id=c.empresa_id and cs.cash_register_id=c.id and cs.business_date<=:hasta order by cs.business_date,cs.opened_at,cs.id limit 1),0)
+          +coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end),0) as "saldoActual"
+      from cajas c join monedas mo on mo.id=c.moneda_id and mo.empresa_id=c.empresa_id join sucursales s on s.id=c.sucursal_id and s.empresa_id=c.empresa_id
+      left join movimientos_financieros m on m.tenant_id=c.tenant_id and m.empresa_id=c.empresa_id and m.caja_id=c.id
+      where c.tenant_id=:tenant and c.empresa_id=:empresa and (:moneda is null or c.moneda_id=:moneda) and (:activo is null or c.activo=:activo)
+        and (:sucursal is null or c.sucursal_id=:sucursal) and (:todas=true or c.sucursal_id in (:sucursales))
+        and (:buscar='' or lower(c.nombre) like lower(concat('%',:buscar,'%')) or lower(c.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(c.descripcion,'')) like lower(concat('%',:buscar,'%')))
+      group by c.id,c.nombre,c.moneda_id,mo.codigo_iso,mo.simbolo,c.sucursal_id,s.nombre,c.activo
+      order by c.nombre,c.id
+      """,countQuery="""
+      select count(*) from cajas c where c.tenant_id=:tenant and c.empresa_id=:empresa and (:moneda is null or c.moneda_id=:moneda) and (:activo is null or c.activo=:activo)
+        and (:sucursal is null or c.sucursal_id=:sucursal) and (:todas=true or c.sucursal_id in (:sucursales))
+        and (:buscar='' or lower(c.nombre) like lower(concat('%',:buscar,'%')) or lower(c.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(c.descripcion,'')) like lower(concat('%',:buscar,'%')))
+      """,nativeQuery=true)
+    Page<SaldoCuentaProjection> saldosCajas(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("hasta")LocalDate hasta,
+        @Param("buscar")String buscar,@Param("moneda")UUID moneda,@Param("activo")Boolean activo,@Param("sucursal")UUID sucursal,
+        @Param("todas")boolean todas,@Param("sucursales")Set<UUID> sucursales,Pageable pageable);
+
+    @Query(value="""
+      select b.moneda_id as "monedaId",mo.codigo_iso as moneda,
+        coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end),0) as total
+      from cuentas_bancarias b join monedas mo on mo.id=b.moneda_id and mo.empresa_id=b.empresa_id
+      left join movimientos_financieros m on m.tenant_id=b.tenant_id and m.empresa_id=b.empresa_id and m.cuenta_bancaria_id=b.id
+      where b.tenant_id=:tenant and b.empresa_id=:empresa and (:moneda is null or b.moneda_id=:moneda) and (:activo is null or b.activo=:activo)
+        and (:buscar='' or lower(b.banco_nombre) like lower(concat('%',:buscar,'%')) or lower(b.nombre_cuenta) like lower(concat('%',:buscar,'%')) or b.numero_cuenta_ultimos4 like concat('%',:buscar,'%') or lower(b.codigo) like lower(concat('%',:buscar,'%')))
+      group by b.moneda_id,mo.codigo_iso
+      """,nativeQuery=true)
+    List<TotalSaldoMonedaProjection> totalesBancarios(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("hasta")LocalDate hasta,@Param("buscar")String buscar,@Param("moneda")UUID moneda,@Param("activo")Boolean activo);
+
+    @Query(value="""
+      select x."monedaId",x.moneda,sum(x.saldo) as total from (
+        select c.id,c.moneda_id as "monedaId",mo.codigo_iso as moneda,
+          coalesce((select cs.opening_amount from cash_register_session cs where cs.tenant_id=c.tenant_id and cs.empresa_id=c.empresa_id and cs.cash_register_id=c.id and cs.business_date<=:hasta order by cs.business_date,cs.opened_at,cs.id limit 1),0)
+          +coalesce(sum(case when m.estado='REGISTERED' and m.fecha<=:hasta then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end),0) as saldo
+        from cajas c join monedas mo on mo.id=c.moneda_id and mo.empresa_id=c.empresa_id
+        left join movimientos_financieros m on m.tenant_id=c.tenant_id and m.empresa_id=c.empresa_id and m.caja_id=c.id
+        where c.tenant_id=:tenant and c.empresa_id=:empresa and (:moneda is null or c.moneda_id=:moneda) and (:activo is null or c.activo=:activo)
+          and (:sucursal is null or c.sucursal_id=:sucursal) and (:todas=true or c.sucursal_id in (:sucursales))
+          and (:buscar='' or lower(c.nombre) like lower(concat('%',:buscar,'%')) or lower(c.codigo) like lower(concat('%',:buscar,'%')) or lower(coalesce(c.descripcion,'')) like lower(concat('%',:buscar,'%')))
+        group by c.id,c.moneda_id,mo.codigo_iso
+      ) x group by x."monedaId",x.moneda
+      """,nativeQuery=true)
+    List<TotalSaldoMonedaProjection> totalesCajas(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("hasta")LocalDate hasta,@Param("buscar")String buscar,@Param("moneda")UUID moneda,@Param("activo")Boolean activo,
+        @Param("sucursal")UUID sucursal,@Param("todas")boolean todas,@Param("sucursales")Set<UUID> sucursales);
+
+    @Query(value="""
+      with ordered as (
+        select m.id,m.fecha,m.creado_en as "registradoEn",
+          case when m.tipo_origen='SUPPLIER_PAYMENT' then coalesce((select p.internal_number from supplier_payment p where p.id=m.origen_id),'—')
+               when m.tipo_origen='OPENING_BALANCE' then 'SALDO INICIAL' else coalesce(m.referencia,'—') end as documento,
+          m.concepto,m.tipo_movimiento as tipo,m.monto,m.estado,m.tipo_origen as origen,m.origen_id as "origenId",
+          :saldoInicial + sum(case when m.estado='REGISTERED' then case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end)
+            over(order by m.fecha,m.creado_en,m.id) as saldo
+        from movimientos_financieros m where m.tenant_id=:tenant and m.empresa_id=:empresa and m.tipo_cuenta=:tipo
+          and ((:tipo='BANK_ACCOUNT' and m.cuenta_bancaria_id=:cuenta) or (:tipo='CASH_REGISTER' and m.caja_id=:cuenta)) and m.fecha<=:hasta
+      ) select * from ordered where (:desde is null or fecha>=:desde) and (:buscar='' or lower(concepto) like lower(concat('%',:buscar,'%')) or lower(documento) like lower(concat('%',:buscar,'%')))
+        and (:direccion is null or tipo=:direccion) order by fecha desc,"registradoEn" desc,id desc
+      """,countQuery="""
+      select count(*) from movimientos_financieros m where m.tenant_id=:tenant and m.empresa_id=:empresa and m.tipo_cuenta=:tipo
+        and ((:tipo='BANK_ACCOUNT' and m.cuenta_bancaria_id=:cuenta) or (:tipo='CASH_REGISTER' and m.caja_id=:cuenta))
+        and m.fecha<=:hasta and (:desde is null or m.fecha>=:desde) and (:buscar='' or lower(m.concepto) like lower(concat('%',:buscar,'%'))
+          or lower(case when m.tipo_origen='SUPPLIER_PAYMENT' then coalesce((select p.internal_number from supplier_payment p where p.id=m.origen_id),'—')
+            when m.tipo_origen='OPENING_BALANCE' then 'SALDO INICIAL' else coalesce(m.referencia,'—') end) like lower(concat('%',:buscar,'%')))
+        and (:direccion is null or m.tipo_movimiento=:direccion)
+      """,nativeQuery=true)
+    Page<MovimientoSaldoProjection> detalleSaldo(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("tipo")String tipo,
+        @Param("cuenta")UUID cuenta,@Param("saldoInicial")java.math.BigDecimal saldoInicial,@Param("desde")LocalDate desde,@Param("hasta")LocalDate hasta,
+        @Param("buscar")String buscar,@Param("direccion")String direccion,Pageable pageable);
 }

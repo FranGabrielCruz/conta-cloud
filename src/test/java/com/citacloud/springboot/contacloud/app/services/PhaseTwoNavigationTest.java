@@ -8,6 +8,8 @@ import com.citacloud.springboot.contacloud.app.views.EgresosView;
 import com.citacloud.springboot.contacloud.app.views.TransferenciasView;
 import com.citacloud.springboot.contacloud.app.views.ConciliacionBancariaView;
 import com.citacloud.springboot.contacloud.app.views.OperacionesCajaView;
+import com.citacloud.springboot.contacloud.app.views.SaldosCuentasView;
+import com.citacloud.springboot.contacloud.app.views.CuentasPagarView;
 import com.citacloud.springboot.contacloud.app.views.ProveedoresView;
 import com.citacloud.springboot.contacloud.app.views.OrdenesCompraView;
 import com.citacloud.springboot.contacloud.app.views.RecepcionesView;
@@ -31,11 +33,11 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(62);
+        assertThat(items).hasSize(63);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
             .contains("clientes", "ordenes-compra", "transferencias", "productos",
                 "inventario/transferencias", "catalogo-cuentas", "fiscal/606", "activos-fijos",
-                "presupuestos", "reportes/financieros");
+                "presupuestos", "reportes/financieros", "saldos-cuentas");
         assertThat(PhaseTwoNavigation.SECTIONS).extracting(PhaseTwoNavigation.Section::title)
             .containsExactly("VENTAS", "COMPRAS", "CAJA Y BANCOS", "INVENTARIO", "CONTABILIDAD",
                 "FISCAL", "ACTIVOS FIJOS", "FINANZAS", "REPORTES");
@@ -97,11 +99,13 @@ class PhaseTwoNavigationTest {
                 FacturasProveedoresView.class.getAnnotation(Route.class).value(),
                 NotasCreditoProveedoresView.class.getAnnotation(Route.class).value(),
                 PagosProveedoresView.class.getAnnotation(Route.class).value(),
+                CuentasPagarView.class.getAnnotation(Route.class).value(),
                 OperacionesCajaView.class.getAnnotation(Route.class).value(),
                 CuentasBancariasView.class.getAnnotation(Route.class).value(),
                 IngresosView.class.getAnnotation(Route.class).value(),
                 EgresosView.class.getAnnotation(Route.class).value(),
                 TransferenciasView.class.getAnnotation(Route.class).value(),
+                SaldosCuentasView.class.getAnnotation(Route.class).value(),
                 ConciliacionBancariaView.class.getAnnotation(Route.class).value())).toList();
 
         assertThat(registered).doesNotHaveDuplicates();

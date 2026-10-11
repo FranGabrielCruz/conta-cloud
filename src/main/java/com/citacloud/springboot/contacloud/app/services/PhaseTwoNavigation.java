@@ -64,6 +64,8 @@ public final class PhaseTwoNavigation {
                 "Administra los movimientos de egreso de caja y bancos."),
             item("Transferencias", "transferencias", "EXCHANGE", CAJA_BANCOS, "transferencias.ver",
                 "Administra las transferencias entre cajas y cuentas bancarias."),
+            item("Saldos de cuentas", "saldos-cuentas", "MONEY", CAJA_BANCOS, "saldos_cuentas.ver",
+                "Consulta los saldos consolidados de cajas y cuentas bancarias."),
             item("Conciliación bancaria", "conciliacion-bancaria", "SCALE", CAJA_BANCOS,
                 "conciliacion_bancaria.ver", "Administra la conciliación de las cuentas bancarias."))),
         new Section("INVENTARIO", List.of(

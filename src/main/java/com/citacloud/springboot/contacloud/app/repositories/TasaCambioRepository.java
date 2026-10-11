@@ -39,4 +39,7 @@ public interface TasaCambioRepository extends JpaRepository<TasaCambio, UUID> {
     @EntityGraph(attributePaths = {"monedaOrigen", "monedaDestino"})
     Optional<TasaCambio> findByTenantIdAndEmpresaIdAndMonedaOrigenIdAndMonedaDestinoIdAndFechaAndActivoTrue(
         UUID tenantId, UUID empresaId, UUID origenId, UUID destinoId, LocalDate fecha);
+
+    Optional<TasaCambio> findFirstByTenantIdAndEmpresaIdAndMonedaOrigenIdAndMonedaDestinoIdAndFechaLessThanEqualAndActivoTrueOrderByFechaDesc(
+        UUID tenantId, UUID empresaId, UUID origenId, UUID destinoId, LocalDate fecha);
 }
