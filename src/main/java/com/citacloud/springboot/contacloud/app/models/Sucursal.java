@@ -13,6 +13,7 @@ public class Sucursal {
     @Column(length = 40) private String telefono;
     @Column(nullable = false) private boolean principal;
     @Column(nullable = false) private boolean activo = true;
+    @Column(name = "default_warehouse_id") private UUID almacenPredeterminadoId;
     protected Sucursal() {}
     public Sucursal(UUID empresaId, String codigo, String nombre) {
         this.empresaId = empresaId; this.codigo = codigo; this.nombre = nombre;
@@ -30,4 +31,6 @@ public class Sucursal {
     public void setPrincipal(boolean value) { principal = value; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean value) { activo = value; }
+    public UUID getAlmacenPredeterminadoId() { return almacenPredeterminadoId; }
+    public void setAlmacenPredeterminadoId(UUID value) { almacenPredeterminadoId = value; }
 }

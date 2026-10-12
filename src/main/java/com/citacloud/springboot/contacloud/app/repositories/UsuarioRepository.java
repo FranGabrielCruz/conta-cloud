@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     Optional<Usuario> findByEmpresaIdAndUsuarioIgnoreCaseAndActivoTrue(UUID empresaId, String usuario);
@@ -14,6 +15,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     boolean existsByTenantIdAndUsuarioIgnoreCase(UUID tenantId, String usuario);
     boolean existsByTenantIdAndUsuarioIgnoreCaseAndIdNot(UUID tenantId, String usuario, UUID id);
     long countByEmpresaIdAndActivoTrue(UUID empresaId);
+    List<Usuario> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombreAscApellidoAsc(UUID tenantId, UUID empresaId);
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Usuario u set u.passwordHash=:passwordHash where u.id=:usuarioId and u.tenantId=:tenantId")
     int actualizarPasswordHash(@Param("usuarioId") UUID usuarioId,@Param("tenantId") UUID tenantId,
