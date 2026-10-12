@@ -207,6 +207,8 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-table-section-header .cc-section-heading { margin: 0; }
 .cc-table-section-body { display: block; width: 100%; min-width: 0; }
 .cc-table-section-body > * { width: 100%; min-width: 0; }
+.cc-quote-total { display: flex; align-items: center; justify-content: space-between; gap: var(--cc-spacing-lg); padding: 8px 12px; border-bottom: 1px solid var(--cc-border); font-weight: 600; }
+.cc-quote-total:last-child { border-bottom: 0; font-size: 1.15rem; font-weight: 800; color: var(--lumo-primary-text-color); }
 .cc-supplier-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
 .cc-dialog-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; width: 100%; }
 .cc-reconciliation-summary { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 12px; width: 100%; }
