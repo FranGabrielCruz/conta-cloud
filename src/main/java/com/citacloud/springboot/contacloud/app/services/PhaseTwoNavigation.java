@@ -76,10 +76,10 @@ public final class PhaseTwoNavigation {
                 "Administra las unidades de medida utilizadas en productos, servicios y operaciones de inventario."),
             item("Almacenes", "almacenes", "DATABASE", INVENTARIO, "almacenes.ver",
                 "Administra los almacenes, sus existencias y el historial de movimientos."),
-            item("Movimientos", "inventario/movimientos", "EXCHANGE", INVENTARIO, "inventario_movimientos.ver", placeholder()),
+            item("Movimientos", "inventario/movimientos", "EXCHANGE", INVENTARIO, "inventario_movimientos.ver",
+                "Consulta movimientos, trazabilidad y Kardex de inventario."),
             item("Transferencias", "inventario/transferencias", "ARROWS_LONG_H", INVENTARIO, "inventario_transferencias.ver", placeholder()),
             item("Ajustes", "inventario/ajustes", "SLIDERS", INVENTARIO, "inventario_ajustes.ver", placeholder()),
-            item("Kardex", "kardex", "BOOK", INVENTARIO, "kardex.ver", placeholder()),
             item("Conteo físico", "inventario/conteo-fisico", "CHECK_SQUARE_O", INVENTARIO, "conteo_fisico.ver", placeholder()))),
         new Section("CONTABILIDAD", List.of(
             item("Catálogo de cuentas", "catalogo-cuentas", "BOOK_DOLLAR", CONTABILIDAD, "catalogo_cuentas.ver", placeholder("Catálogo de cuentas")),

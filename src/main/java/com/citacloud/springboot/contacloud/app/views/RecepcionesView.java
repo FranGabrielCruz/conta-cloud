@@ -81,6 +81,14 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
             return;
         }
         load();
+        event.getLocation().getQueryParameters().getSingleParameter("id").ifPresent(value -> {
+            try {
+                UUID id = UUID.fromString(value);
+                UI.getCurrent().beforeClientResponse(this, context -> detail(id));
+            } catch (IllegalArgumentException ignored) {
+                Notification.show("La recepción solicitada no es válida.");
+            }
+        });
     }
 
     private void configureGrid() {

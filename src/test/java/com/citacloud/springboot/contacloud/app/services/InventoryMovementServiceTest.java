@@ -11,22 +11,25 @@ import static org.mockito.Mockito.*;
 
 class InventoryMovementServiceTest {
     @Test void confirmarRecepcionCreaUnaSolaEntradaAunqueSeReintente(){
-        InventoryMovementRepository repository=mock(InventoryMovementRepository.class);InventoryMovementService service=new InventoryMovementService(repository);
+        InventoryMovementRepository repository=mock(InventoryMovementRepository.class);InventoryMovementNumberService numbers=mock(InventoryMovementNumberService.class);InventoryMovementService service=new InventoryMovementService(repository,numbers);
         UUID tenant=UUID.randomUUID(),company=UUID.randomUUID(),receiptId=UUID.randomUUID(),product=UUID.randomUUID(),warehouse=UUID.randomUUID(),user=UUID.randomUUID();
         RecepcionCompra receipt=new RecepcionCompra(tenant,company,"REC-000001",UUID.randomUUID(),null,warehouse,LocalDate.now(),null,null,user);ReflectionTestUtils.setField(receipt,"id",receiptId);
         LineaRecepcionCompra line=new LineaRecepcionCompra(tenant,company,null,product,"P-1","Producto","Unidad",BigDecimal.TEN,1);
         Producto tracked=mock(Producto.class);when(tracked.isControlaExistencia()).thenReturn(true);
-        when(repository.existsByTenantIdAndEmpresaIdAndTipoReferenciaAndReferenciaIdAndProductoIdAndDirection(tenant,company,InventoryMovementService.RECEIPT,receiptId,product,"IN")).thenReturn(false,true);
+        when(numbers.siguiente(tenant,company)).thenReturn("MOV-000001");when(tracked.getUnidadMedidaId()).thenReturn(UUID.randomUUID());
+        String key=MovimientoInventario.clave(InventoryMovementService.RECEIPT,receiptId,warehouse,product,"IN",null);
+        when(repository.existsByTenantIdAndEmpresaIdAndClaveOrigen(tenant,company,key)).thenReturn(false,true);
         service.receive(receipt,line,tracked,user);service.receive(receipt,line,tracked,user);
         verify(repository,times(1)).save(any(MovimientoInventario.class));
     }
     @Test void productoSinControlDeExistenciaNoGeneraMovimiento(){
-        InventoryMovementRepository repository=mock(InventoryMovementRepository.class);InventoryMovementService service=new InventoryMovementService(repository);
+        InventoryMovementRepository repository=mock(InventoryMovementRepository.class);InventoryMovementNumberService numbers=mock(InventoryMovementNumberService.class);InventoryMovementService service=new InventoryMovementService(repository,numbers);
         UUID tenant=UUID.randomUUID(),company=UUID.randomUUID(),productId=UUID.randomUUID(),user=UUID.randomUUID();
         RecepcionCompra receipt=new RecepcionCompra(tenant,company,"REC-000002",UUID.randomUUID(),null,UUID.randomUUID(),LocalDate.now(),null,null,user);
         LineaRecepcionCompra line=new LineaRecepcionCompra(tenant,company,null,productId,"P-2","Producto","Unidad",BigDecimal.ONE,1);
         Producto product=mock(Producto.class);when(product.isControlaExistencia()).thenReturn(false);
         service.receive(receipt,line,product,user);
         verifyNoInteractions(repository);
+        verifyNoInteractions(numbers);
     }
 }

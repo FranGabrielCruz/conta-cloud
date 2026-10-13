@@ -7,6 +7,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface ProductRepository extends JpaRepository<Producto,UUID> {
+    @EntityGraph(attributePaths={"unidadMedida"})
+    List<Producto> findAllByTenantIdAndEmpresaIdAndActivoTrueAndControlaExistenciaTrueOrderByNombre(UUID tenant,UUID empresa);
     @EntityGraph(attributePaths={"categoria","unidadMedida","moneda","impuestoCompra","impuestoVenta"})
     @Query("""
       select p from Producto p left join p.categoria c where p.tenantId=:tenant and p.empresaId=:empresa

@@ -56,6 +56,7 @@ public class LineaRecepcionCompra {
         this.diferencia = diferencia;
     }
 
+    public UUID getId() { return id; }
     public UUID getLineaOrdenId() { return lineaOrdenId; }
     public UUID getLineaFacturaId() { return lineaFacturaId; }
     public UUID getProductoId() { return productoId; }

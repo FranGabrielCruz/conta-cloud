@@ -8,6 +8,7 @@ import java.util.*;
 
 public interface InventoryMovementRepository extends JpaRepository<MovimientoInventario,UUID> {
     boolean existsByTenantIdAndEmpresaIdAndTipoReferenciaAndReferenciaIdAndProductoIdAndDirection(UUID tenantId,UUID empresaId,String tipo,UUID referenciaId,UUID productoId,String direction);
+    boolean existsByTenantIdAndEmpresaIdAndClaveOrigen(UUID tenantId,UUID empresaId,String claveOrigen);
     List<MovimientoInventario> findAllByTipoReferenciaAndReferenciaIdAndTenantIdAndEmpresaId(String tipo,UUID referenciaId,UUID tenantId,UUID empresaId);
     @Query("""
       select coalesce(sum(case when m.direction='IN' then m.quantity else -m.quantity end),0)

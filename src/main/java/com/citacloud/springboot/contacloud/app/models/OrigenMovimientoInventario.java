@@ -1,0 +1,2 @@
+package com.citacloud.springboot.contacloud.app.models;
+public enum OrigenMovimientoInventario {INVENTARIO_INICIAL("Inventario inicial"),RECEPCION("Recepción"),TRANSFERENCIA("Transferencia"),VENTA("Venta"),DEVOLUCION("Devolución"),AJUSTE("Ajuste"),CONTEO_FISICO("Conteo físico"),REVERSION("Reversión");private final String etiqueta;OrigenMovimientoInventario(String etiqueta){this.etiqueta=etiqueta;}public String getEtiqueta(){return etiqueta;}}

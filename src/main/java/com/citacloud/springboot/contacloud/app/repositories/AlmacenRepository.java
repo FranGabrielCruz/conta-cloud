@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface AlmacenRepository extends JpaRepository<Almacen,UUID> {
-    List<Almacen> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(UUID tenantId,UUID empresaId);
+    @EntityGraph(attributePaths={"sucursal"}) List<Almacen> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(UUID tenantId,UUID empresaId);
     Optional<Almacen> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenantId,UUID empresaId);
     @EntityGraph(attributePaths={"sucursal","responsable"})
     @Query("""
