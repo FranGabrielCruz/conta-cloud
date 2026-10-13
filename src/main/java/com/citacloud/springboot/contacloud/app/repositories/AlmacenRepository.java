@@ -8,7 +8,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface AlmacenRepository extends JpaRepository<Almacen,UUID> {
-    @EntityGraph(attributePaths={"sucursal"}) List<Almacen> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(UUID tenantId,UUID empresaId);
+    @EntityGraph(attributePaths={"sucursal"})
+    @Query("select w from Almacen w where w.tenantId=:tenant and w.empresaId=:empresa and w.activo=true and w.administradoSistema=false order by w.nombre")
+    List<Almacen> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(@Param("tenant")UUID tenantId,@Param("empresa")UUID empresaId);
+    Optional<Almacen> findFirstByTenantIdAndEmpresaIdAndAdministradoSistemaTrueAndTipo(UUID tenantId,UUID empresaId,com.citacloud.springboot.contacloud.app.models.TipoAlmacen tipo);
     Optional<Almacen> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenantId,UUID empresaId);
     @EntityGraph(attributePaths={"sucursal","responsable"})
     @Query("""
@@ -19,7 +22,7 @@ public interface AlmacenRepository extends JpaRepository<Almacen,UUID> {
              or lower(concat(coalesce(r.nombre,''),' ',coalesce(r.apellido,''))) like concat('%',:buscar,'%'))
         and (:sucursal is null or w.sucursalId=:sucursal)
         and (:tipo is null or w.tipo=:tipo)
-        and (:activo is null or w.activo=:activo)
+        and w.administradoSistema=false and (:activo is null or w.activo=:activo)
         """)
     Page<Almacen> buscar(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,@Param("buscar")String buscar,
                          @Param("sucursal")UUID sucursal,@Param("tipo")com.citacloud.springboot.contacloud.app.models.TipoAlmacen tipo,

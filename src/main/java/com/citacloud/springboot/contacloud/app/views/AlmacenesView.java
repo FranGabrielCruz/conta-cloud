@@ -45,7 +45,7 @@ public class AlmacenesView extends VerticalLayout implements BeforeEnterObserver
             new AppPageHeader("ALMACENES","Administra los almacenes y consulta sus existencias y movimientos.",create));
         search.setPlaceholder("Nombre, código, sucursal o responsable...");search.setClearButtonVisible(true);search.setValueChangeMode(ValueChangeMode.LAZY);search.setValueChangeTimeout(400);
         branch.setClearButtonVisible(true);branch.setItemLabelGenerator(AlmacenCatalogosDto.Opcion::nombre);
-        type.setLabel("Tipo");type.setItems(TipoAlmacen.values());type.setItemLabelGenerator(AlmacenesView::etiquetaTipo);type.setEmptySelectionAllowed(true);
+        type.setLabel("Tipo");type.setItems(TipoAlmacen.GENERAL,TipoAlmacen.DEVOLUCIONES,TipoAlmacen.DANADOS);type.setItemLabelGenerator(AlmacenesView::etiquetaTipo);type.setEmptySelectionAllowed(true);
         state.setLabel("Estado");state.setItems("Activos","Inactivos","Todos");state.setValue("Activos");
         search.addValueChangeListener(e->{if(e.isFromClient())reset();});branch.addValueChangeListener(e->{if(e.isFromClient())reset();});
         type.addValueChangeListener(e->{if(e.isFromClient())reset();});state.addValueChangeListener(e->{if(e.isFromClient())reset();});

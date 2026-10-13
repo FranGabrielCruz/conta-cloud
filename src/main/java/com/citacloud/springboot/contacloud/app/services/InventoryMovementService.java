@@ -28,4 +28,14 @@ public class InventoryMovementService {
         movements.save(new MovimientoInventario(receipt.getTenantId(),receipt.getEmpresaId(),numbers.siguiente(receipt.getTenantId(),receipt.getEmpresaId()),receipt.getAlmacenId(),original.getProductoId(),LocalDate.now(),original.getCantidad(),"OUT","PURCHASE_RECEIPT_VOID",RECEIPT_VOID,receipt.getId(),receipt.getNumero(),receipt.getReferencia(),original.getLineaOrigenId(),product.getUnidadMedidaId(),original.getId(),user));
     }
     public List<MovimientoInventario> receiptEntries(RecepcionCompra receipt){return movements.findAllByTipoReferenciaAndReferenciaIdAndTenantIdAndEmpresaId(RECEIPT,receipt.getId(),receipt.getTenantId(),receipt.getEmpresaId());}
+    public void transferir(TransferenciaInventario transferencia,LineaTransferenciaInventario linea,UUID almacen,
+            String direccion,String tipoMovimiento,UUID usuario){
+        String origen="INVENTORY_TRANSFER";
+        String key=MovimientoInventario.clave(origen,transferencia.getId(),almacen,linea.getProductoId(),direccion,linea.getId());
+        if(movements.existsByTenantIdAndEmpresaIdAndClaveOrigen(transferencia.getTenantId(),transferencia.getEmpresaId(),key))return;
+        movements.save(new MovimientoInventario(transferencia.getTenantId(),transferencia.getEmpresaId(),
+            numbers.siguiente(transferencia.getTenantId(),transferencia.getEmpresaId()),almacen,linea.getProductoId(),
+            transferencia.getFecha(),linea.getCantidadBase(),direccion,tipoMovimiento,origen,transferencia.getId(),
+            transferencia.getNumero(),transferencia.getReferencia(),linea.getId(),linea.getUnidadId(),null,usuario));
+    }
 }

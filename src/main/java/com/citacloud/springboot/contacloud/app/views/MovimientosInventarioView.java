@@ -10,14 +10,15 @@ public class MovimientosInventarioView extends VerticalLayout implements BeforeE
  private static final Logger LOGGER=LoggerFactory.getLogger(MovimientosInventarioView.class);
  private static final DateTimeFormatter DATE_TIME=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");private static final DecimalFormat NUMBER=new DecimalFormat("#,##0.####");
  private final MovimientoInventarioConsultaService service;private final MovimientoInventarioReporteService reports;private final EmpresaModuloService modules;private MovimientoInventarioCatalogosDto catalogs;
+ private String busquedaInicial="";
  private final Tab generalTab=new Tab("GENERAL"),kardexTab=new Tab("KARDEX");private final Div content=new Div();
  public MovimientosInventarioView(MovimientoInventarioConsultaService service,MovimientoInventarioReporteService reports,EmpresaModuloService modules){this.service=service;this.reports=reports;this.modules=modules;addClassName("cc-page");setPadding(false);setSpacing(false);setWidthFull();add(new AppPageHeader("MOVIMIENTOS DE INVENTARIO","Consulta la trazabilidad de las entradas y salidas que modifican las existencias."));Tabs tabs=new Tabs(generalTab);if(can("inventario_movimientos.kardex"))tabs.add(kardexTab);tabs.setWidthFull();content.setWidthFull();tabs.addSelectedChangeListener(e->show(e.getSelectedTab()));add(tabs,content);}
- @Override public void beforeEnter(BeforeEnterEvent e){if(!modules.habilitado("INVENTARIO")||!can("inventario_movimientos.ver")){Notification.show("No tienes permiso para acceder a esta opción.");e.rerouteTo(DashboardView.class);return;}try{catalogs=service.catalogos();show(generalTab);}catch(RuntimeException ex){error(ex,"No fue posible cargar los movimientos de inventario.");}}
+ @Override public void beforeEnter(BeforeEnterEvent e){if(!modules.habilitado("INVENTARIO")||!can("inventario_movimientos.ver")){Notification.show("No tienes permiso para acceder a esta opción.");e.rerouteTo(DashboardView.class);return;}busquedaInicial=e.getLocation().getQueryParameters().getSingleParameter("buscar").orElse("");try{catalogs=service.catalogos();show(generalTab);}catch(RuntimeException ex){error(ex,"No fue posible cargar los movimientos de inventario.");}}
  private void show(Tab tab){if(catalogs==null)return;content.removeAll();content.add(tab==kardexTab?kardex():general());}
 
  private Component general(){
   VerticalLayout box=new VerticalLayout();box.setPadding(false);box.setWidthFull();
-  TextField search=new TextField("Buscar");search.setPlaceholder("Producto, código, documento, referencia o movimiento...");search.setClearButtonVisible(true);search.setValueChangeMode(ValueChangeMode.LAZY);
+  TextField search=new TextField("Buscar");search.setPlaceholder("Producto, código, documento, referencia o movimiento...");search.setClearButtonVisible(true);search.setValueChangeMode(ValueChangeMode.LAZY);search.setValue(busquedaInicial);
   DatePicker from=date("Desde"),to=date("Hasta");
   ComboBox<MovimientoInventarioCatalogosDto.Opcion> branch=combo("Sucursal",catalogs.sucursales());
   ComboBox<MovimientoInventarioCatalogosDto.AlmacenOpcion> warehouse=warehouseCombo("Almacén",catalogs.almacenes());

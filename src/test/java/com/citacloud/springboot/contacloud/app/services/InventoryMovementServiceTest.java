@@ -32,4 +32,14 @@ class InventoryMovementServiceTest {
         verifyNoInteractions(repository);
         verifyNoInteractions(numbers);
     }
+    @Test void movimientoDeTransferenciaEsIdempotente(){
+        InventoryMovementRepository repository=mock(InventoryMovementRepository.class);InventoryMovementNumberService numbers=mock(InventoryMovementNumberService.class);InventoryMovementService service=new InventoryMovementService(repository,numbers);
+        UUID tenant=UUID.randomUUID(),company=UUID.randomUUID(),warehouse=UUID.randomUUID(),product=UUID.randomUUID(),lineId=UUID.randomUUID(),user=UUID.randomUUID();
+        TransferenciaInventario transfer=mock(TransferenciaInventario.class);LineaTransferenciaInventario line=mock(LineaTransferenciaInventario.class);
+        when(transfer.getTenantId()).thenReturn(tenant);when(transfer.getEmpresaId()).thenReturn(company);when(transfer.getId()).thenReturn(UUID.randomUUID());when(transfer.getFecha()).thenReturn(LocalDate.now());when(transfer.getNumero()).thenReturn("TRF-000001");
+        when(line.getId()).thenReturn(lineId);when(line.getProductoId()).thenReturn(product);when(line.getUnidadId()).thenReturn(UUID.randomUUID());when(line.getCantidadBase()).thenReturn(BigDecimal.TEN);
+        String key=MovimientoInventario.clave("INVENTORY_TRANSFER",transfer.getId(),warehouse,product,"OUT",lineId);when(repository.existsByTenantIdAndEmpresaIdAndClaveOrigen(tenant,company,key)).thenReturn(false,true);when(numbers.siguiente(tenant,company)).thenReturn("MOV-000001");
+        service.transferir(transfer,line,warehouse,"OUT","TRANSFER_DISPATCH_OUT",user);service.transferir(transfer,line,warehouse,"OUT","TRANSFER_DISPATCH_OUT",user);
+        verify(repository,times(1)).save(any(MovimientoInventario.class));
+    }
 }

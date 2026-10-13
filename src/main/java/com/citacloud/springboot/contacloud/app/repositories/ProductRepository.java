@@ -1,12 +1,16 @@
 package com.citacloud.springboot.contacloud.app.repositories;
 
 import com.citacloud.springboot.contacloud.app.models.*;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface ProductRepository extends JpaRepository<Producto,UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Producto p where p.id=:id and p.tenantId=:tenant and p.empresaId=:empresa")
+    Optional<Producto> bloquear(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
     @EntityGraph(attributePaths={"unidadMedida"})
     List<Producto> findAllByTenantIdAndEmpresaIdAndActivoTrueAndControlaExistenciaTrueOrderByNombre(UUID tenant,UUID empresa);
     @EntityGraph(attributePaths={"categoria","unidadMedida","moneda","impuestoCompra","impuestoVenta"})

@@ -29,4 +29,9 @@ class AlmacenServiceTest {
         assertThat(result.nombreNormalizado()).isEqualTo("principal");
         assertThat(result.direccion()).isEqualTo("Piso 1");
     }
+
+    @Test void reservaElAlmacenDeTransitoParaElSistema(){
+        assertThatThrownBy(()->AlmacenService.validar(new AlmacenInput("Tránsito",UUID.randomUUID(),TipoAlmacen.TRANSITO,null,null,null,false,null)))
+            .hasMessage("El almacén de tránsito es administrado automáticamente por el sistema.");
+    }
 }

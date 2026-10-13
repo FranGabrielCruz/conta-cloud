@@ -1,0 +1,3 @@
+package com.citacloud.springboot.contacloud.app.services;
+import org.springframework.jdbc.core.JdbcTemplate;import org.springframework.stereotype.Service;import java.util.UUID;
+@Service public class TransferenciaInventarioNumeroService{private final JdbcTemplate jdbc;public TransferenciaInventarioNumeroService(JdbcTemplate jdbc){this.jdbc=jdbc;}public String siguiente(UUID tenant,UUID empresa){Long n=jdbc.queryForObject("INSERT INTO inventory_transfer_sequence(tenant_id,empresa_id,last_number) VALUES(?,?,1) ON CONFLICT(tenant_id,empresa_id) DO UPDATE SET last_number=inventory_transfer_sequence.last_number+1 RETURNING last_number",Long.class,tenant,empresa);return "TRF-"+String.format("%06d",n);}}

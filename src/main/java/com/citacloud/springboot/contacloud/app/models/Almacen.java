@@ -21,6 +21,7 @@ public class Almacen {
     @Column(name="address",length=500) private String direccion;
     @Column(name="observation",length=1000) private String observacion;
     @Column(name="active",nullable=false) private boolean activo;
+    @Column(name="system_managed",nullable=false) private boolean administradoSistema;
     @Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
     @Column(name="created_by") private UUID creadoPor;
     @Column(name="updated_at",nullable=false,insertable=false) private OffsetDateTime actualizadoEn;
@@ -52,6 +53,7 @@ public class Almacen {
     public Sucursal getSucursal(){return sucursal;} public TipoAlmacen getTipo(){return tipo;}
     public UUID getResponsableId(){return responsableId;} public Usuario getResponsable(){return responsable;}
     public String getDireccion(){return direccion;} public String getObservacion(){return observacion;}
+    public boolean isAdministradoSistema(){return administradoSistema;}
     public boolean isActivo(){return activo;} public OffsetDateTime getCreadoEn(){return creadoEn;}
     public OffsetDateTime getActualizadoEn(){return actualizadoEn;} public long getVersion(){return version;}
 }
