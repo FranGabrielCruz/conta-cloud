@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import com.citacloud.springboot.contacloud.app.models.*;import java.time.LocalDate;import java.util.*;public record ConteoFisicoInput(LocalDate fecha,UUID almacenId,UUID categoriaId,TipoConteoFisico tipo,ModoConteoFisico modo,String referencia,String observacion,Long version,List<UUID> productos){}

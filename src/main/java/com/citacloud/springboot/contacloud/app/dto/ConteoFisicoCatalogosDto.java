@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.util.*;public record ConteoFisicoCatalogosDto(List<Almacen> almacenes,List<Categoria> categorias,List<Producto> productos){public record Almacen(UUID id,String nombre,String sucursal){}public record Categoria(UUID id,String nombre){}public record Producto(UUID id,String codigo,String nombre,String unidad){}}

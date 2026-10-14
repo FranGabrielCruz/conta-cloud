@@ -17,7 +17,6 @@ import jakarta.annotation.security.PermitAll;
 @RouteAlias(value = "notas-debito", layout = MainLayout.class)
 @RouteAlias(value = "recibos", layout = MainLayout.class)
 @RouteAlias(value = "cuentas-por-cobrar", layout = MainLayout.class)
-@RouteAlias(value = "inventario/conteo-fisico", layout = MainLayout.class)
 @RouteAlias(value = "catalogo-cuentas", layout = MainLayout.class)
 @RouteAlias(value = "asientos", layout = MainLayout.class)
 @RouteAlias(value = "libro-diario", layout = MainLayout.class)

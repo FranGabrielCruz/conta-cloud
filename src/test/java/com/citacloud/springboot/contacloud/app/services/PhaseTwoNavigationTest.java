@@ -25,6 +25,8 @@ import com.citacloud.springboot.contacloud.app.views.AlmacenesView;
 import com.citacloud.springboot.contacloud.app.views.MovimientosInventarioView;
 import com.citacloud.springboot.contacloud.app.views.InventarioTransferenciasView;
 import com.citacloud.springboot.contacloud.app.views.InventarioAjustesView;
+import com.citacloud.springboot.contacloud.app.views.InventarioExistenciasView;
+import com.citacloud.springboot.contacloud.app.views.InventarioConteoFisicoView;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -39,9 +41,9 @@ class PhaseTwoNavigationTest {
     void defineTodasLasRutasSinDuplicados() {
         var items = PhaseTwoNavigation.SECTIONS.stream().flatMap(section -> section.items().stream()).toList();
 
-        assertThat(items).hasSize(62);
+        assertThat(items).hasSize(63);
         assertThat(items).extracting(PhaseTwoNavigation.Item::route).doesNotHaveDuplicates()
-            .contains("clientes", "ordenes-compra", "transferencias", "productos",
+            .contains("clientes", "ordenes-compra", "transferencias", "productos", "inventario/existencias",
                 "inventario/transferencias", "catalogo-cuentas", "fiscal/606", "activos-fijos",
                 "presupuestos", "reportes/financieros", "saldos-cuentas");
         assertThat(PhaseTwoNavigation.SECTIONS).extracting(PhaseTwoNavigation.Section::title)
@@ -66,7 +68,7 @@ class PhaseTwoNavigationTest {
     @Test
     void conservaElOrdenSolicitadoDentroDeCadaNuevaSeccion() {
         assertThat(section("INVENTARIO").items()).extracting(PhaseTwoNavigation.Item::title)
-            .containsExactly("Productos", "Categorías", "Unidades de medida", "Almacenes", "Movimientos", "Transferencias",
+            .containsExactly("Productos", "Categorías", "Unidades de medida", "Almacenes", "Existencias", "Movimientos", "Transferencias",
                 "Ajustes", "Conteo físico");
         assertThat(section("CONTABILIDAD").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("Catálogo de cuentas", "Asientos", "Libro diario", "Libro mayor", "Balanza",
@@ -106,6 +108,8 @@ class PhaseTwoNavigationTest {
                 MovimientosInventarioView.class.getAnnotation(Route.class).value(),
                 InventarioTransferenciasView.class.getAnnotation(Route.class).value(),
                 InventarioAjustesView.class.getAnnotation(Route.class).value(),
+                InventarioExistenciasView.class.getAnnotation(Route.class).value(),
+                InventarioConteoFisicoView.class.getAnnotation(Route.class).value(),
                 OrdenesCompraView.class.getAnnotation(Route.class).value(),
                 RecepcionesView.class.getAnnotation(Route.class).value(),
                 FacturasProveedoresView.class.getAnnotation(Route.class).value(),

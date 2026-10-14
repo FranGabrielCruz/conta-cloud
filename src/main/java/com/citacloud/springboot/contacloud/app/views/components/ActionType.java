@@ -16,6 +16,7 @@ public enum ActionType {
     VOID("Anular", VaadinIcon.BAN, "danger"),
     ISSUE("Emitir", VaadinIcon.PAPERPLANE, "success"),
     PRINT("Imprimir", VaadinIcon.PRINT, "neutral"),
+    REFRESH("Actualizar", VaadinIcon.REFRESH, "neutral"),
     DUPLICATE("Duplicar", VaadinIcon.COPY, "neutral"),
     ACCEPT("Aceptar", VaadinIcon.CHECK, "success"),
     REJECT("Rechazar", VaadinIcon.CLOSE, "danger"),
@@ -26,6 +27,7 @@ public enum ActionType {
     OPEN_CASH("Abrir caja", VaadinIcon.UNLOCK, "success"),
     CLOSE_CASH("Cerrar caja", VaadinIcon.LOCK, "danger"),
     REVIEW("Revisar", VaadinIcon.CHECK, "success"),
+    COUNT("Realizar conteo", VaadinIcon.CHECK_SQUARE_O, "success"),
     APPLY_CREDIT("Aplicar crédito", VaadinIcon.CHECK_CIRCLE, "success"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
     REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");

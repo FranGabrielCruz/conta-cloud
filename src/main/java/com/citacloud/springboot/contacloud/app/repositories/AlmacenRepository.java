@@ -11,6 +11,8 @@ public interface AlmacenRepository extends JpaRepository<Almacen,UUID> {
     @EntityGraph(attributePaths={"sucursal"})
     @Query("select w from Almacen w where w.tenantId=:tenant and w.empresaId=:empresa and w.activo=true and w.administradoSistema=false order by w.nombre")
     List<Almacen> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(@Param("tenant")UUID tenantId,@Param("empresa")UUID empresaId);
+    @EntityGraph(attributePaths={"sucursal"})
+    List<Almacen> findAllByTenantIdAndEmpresaIdOrderByNombre(UUID tenantId,UUID empresaId);
     Optional<Almacen> findFirstByTenantIdAndEmpresaIdAndAdministradoSistemaTrueAndTipo(UUID tenantId,UUID empresaId,com.citacloud.springboot.contacloud.app.models.TipoAlmacen tipo);
     Optional<Almacen> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenantId,UUID empresaId);
     @EntityGraph(attributePaths={"sucursal","responsable"})

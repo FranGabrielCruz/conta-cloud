@@ -1,0 +1,11 @@
+package com.citacloud.springboot.contacloud.app.views;
+import com.citacloud.springboot.contacloud.app.dto.ConteoFisicoDto;import com.citacloud.springboot.contacloud.app.models.*;import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;import com.vaadin.flow.component.Component;import org.junit.jupiter.api.*;import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;import org.springframework.security.core.context.SecurityContextHolder;import java.lang.reflect.Method;import java.time.LocalDate;import java.util.*;import static org.assertj.core.api.Assertions.*;
+class InventarioConteoFisicoViewTest{
+ @AfterEach void limpiar(){SecurityContextHolder.clearContext();}
+ @Test void construyePantallaConPermisos(){autenticar();assertThatCode(()->new InventarioConteoFisicoView(null,null,null)).doesNotThrowAnyException();}
+ @Test void realizarSoloApareceEnConteoYVerPermaneceIndependiente()throws Exception{autenticar();var view=new InventarioConteoFisicoView(null,null,null);assertThat(labels(actions(view,dto(EstadoConteoFisico.IN_PROGRESS)))).containsExactly("Ver conteo","Realizar conteo");assertThat(labels(actions(view,dto(EstadoConteoFisico.CONFIRMED)))).containsExactly("Ver conteo");}
+ private static Component actions(InventarioConteoFisicoView v,ConteoFisicoDto d)throws Exception{Method m=InventarioConteoFisicoView.class.getDeclaredMethod("actions",ConteoFisicoDto.class);m.setAccessible(true);return(Component)m.invoke(v,d);}
+ private static List<String> labels(Component c){return c.getChildren().map(x->x.getElement().getAttribute("aria-label")).filter(Objects::nonNull).toList();}
+ private static ConteoFisicoDto dto(EstadoConteoFisico s){return new ConteoFisicoDto(UUID.randomUUID(),"CON-000001",LocalDate.now(),UUID.randomUUID(),"Principal","Principal",null,TipoConteoFisico.COMPLETE,ModoConteoFisico.VISIBLE,"","",s,0,null,null,null,null,null,null,5,0,List.of(),List.of());}
+ private static void autenticar(){var p=new TenantPrincipal(UUID.randomUUID(),UUID.randomUUID(),"DEMO","Administrador","admin","",true,Set.of("conteo_fisico.ver","conteo_fisico.crear","conteo_fisico.contar","conteo_fisico.hoja_pdf","conteo_fisico.resultado_pdf"));SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(p,"",p.getAuthorities()));}
+}

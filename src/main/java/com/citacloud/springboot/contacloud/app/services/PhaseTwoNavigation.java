@@ -76,6 +76,8 @@ public final class PhaseTwoNavigation {
                 "Administra las unidades de medida utilizadas en productos, servicios y operaciones de inventario."),
             item("Almacenes", "almacenes", "DATABASE", INVENTARIO, "almacenes.ver",
                 "Administra los almacenes, sus existencias y el historial de movimientos."),
+            item("Existencias", "inventario/existencias", "CUBES", INVENTARIO, "inventario_existencias.ver",
+                "Consulta el stock actual de los productos por almacén."),
             item("Movimientos", "inventario/movimientos", "EXCHANGE", INVENTARIO, "inventario_movimientos.ver",
                 "Consulta movimientos, trazabilidad y Kardex de inventario."),
             item("Transferencias", "inventario/transferencias", "ARROWS_LONG_H", INVENTARIO, "inventario_transferencias.ver",

@@ -45,4 +45,8 @@ public class InventoryMovementService {
         return movements.findByTenantIdAndEmpresaIdAndClaveOrigen(ajuste.getTenantId(),ajuste.getEmpresaId(),key)
             .orElseGet(()->movements.saveAndFlush(new MovimientoInventario(ajuste.getTenantId(),ajuste.getEmpresaId(),numbers.siguiente(ajuste.getTenantId(),ajuste.getEmpresaId()),ajuste.getAlmacenId(),linea.getProductoId(),ajuste.getFecha(),linea.getCantidadBase().abs(),direccion,tipoMovimiento,origen,ajuste.getId(),ajuste.getNumero(),ajuste.getReferencia(),linea.getId(),linea.getUnidadId(),reversoDeMovimiento,usuario)));
     }
+    public MovimientoInventario conteo(ConteoFisico conteo,LineaConteoFisico linea,String direccion,UUID usuario){
+        String origen="INVENTORY_PHYSICAL_COUNT";String key=MovimientoInventario.clave(origen,conteo.getId(),conteo.getAlmacenId(),linea.getProductoId(),direccion,linea.getId());
+        return movements.findByTenantIdAndEmpresaIdAndClaveOrigen(conteo.getTenantId(),conteo.getEmpresaId(),key).orElseGet(()->movements.saveAndFlush(new MovimientoInventario(conteo.getTenantId(),conteo.getEmpresaId(),numbers.siguiente(conteo.getTenantId(),conteo.getEmpresaId()),conteo.getAlmacenId(),linea.getProductoId(),conteo.getFecha(),linea.getDiferencia().abs(),direccion,direccion.equals("IN")?"PHYSICAL_COUNT_IN":"PHYSICAL_COUNT_OUT",origen,conteo.getId(),conteo.getNumero(),conteo.getReferencia(),linea.getId(),linea.getUnidadId(),null,usuario)));
+    }
 }
