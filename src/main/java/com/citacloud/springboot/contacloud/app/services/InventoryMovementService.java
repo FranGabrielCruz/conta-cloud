@@ -38,4 +38,11 @@ public class InventoryMovementService {
             transferencia.getFecha(),linea.getCantidadBase(),direccion,tipoMovimiento,origen,transferencia.getId(),
             transferencia.getNumero(),transferencia.getReferencia(),linea.getId(),linea.getUnidadId(),null,usuario));
     }
+    public MovimientoInventario ajustar(AjusteInventario ajuste,LineaAjusteInventario linea,String direccion,
+            String tipoMovimiento,UUID usuario,UUID reversoDeMovimiento){
+        String origen="INVENTORY_ADJUSTMENT";
+        String key=MovimientoInventario.clave(origen,ajuste.getId(),ajuste.getAlmacenId(),linea.getProductoId(),direccion,linea.getId());
+        return movements.findByTenantIdAndEmpresaIdAndClaveOrigen(ajuste.getTenantId(),ajuste.getEmpresaId(),key)
+            .orElseGet(()->movements.saveAndFlush(new MovimientoInventario(ajuste.getTenantId(),ajuste.getEmpresaId(),numbers.siguiente(ajuste.getTenantId(),ajuste.getEmpresaId()),ajuste.getAlmacenId(),linea.getProductoId(),ajuste.getFecha(),linea.getCantidadBase().abs(),direccion,tipoMovimiento,origen,ajuste.getId(),ajuste.getNumero(),ajuste.getReferencia(),linea.getId(),linea.getUnidadId(),reversoDeMovimiento,usuario)));
+    }
 }

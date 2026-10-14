@@ -80,7 +80,8 @@ public final class PhaseTwoNavigation {
                 "Consulta movimientos, trazabilidad y Kardex de inventario."),
             item("Transferencias", "inventario/transferencias", "ARROWS_LONG_H", INVENTARIO, "inventario_transferencias.ver",
                 "Administra transferencias directas y en tránsito entre almacenes."),
-            item("Ajustes", "inventario/ajustes", "SLIDERS", INVENTARIO, "inventario_ajustes.ver", placeholder()),
+            item("Ajustes", "inventario/ajustes", "SLIDERS", INVENTARIO, "inventario_ajustes.ver",
+                "Corrige existencias mediante movimientos trazables y auditados."),
             item("Conteo físico", "inventario/conteo-fisico", "CHECK_SQUARE_O", INVENTARIO, "conteo_fisico.ver", placeholder()))),
         new Section("CONTABILIDAD", List.of(
             item("Catálogo de cuentas", "catalogo-cuentas", "BOOK_DOLLAR", CONTABILIDAD, "catalogo_cuentas.ver", placeholder("Catálogo de cuentas")),

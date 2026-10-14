@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.math.BigDecimal;import java.time.LocalDate;import java.util.*;public record AjusteInventarioInput(LocalDate fecha,UUID almacenId,UUID motivoId,String referencia,String observacion,Long version,List<Linea> lineas){public record Linea(UUID productoId,UUID unidadId,BigDecimal ajuste){}}
