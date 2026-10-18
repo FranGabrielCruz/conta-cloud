@@ -3,12 +3,13 @@ package com.citacloud.springboot.contacloud.app.views;
 import com.citacloud.springboot.contacloud.app.services.ContextoUsuarioService;
 import com.citacloud.springboot.contacloud.app.services.CompanyConfigurationService;
 import com.citacloud.springboot.contacloud.app.services.MenuService;
+import com.citacloud.springboot.contacloud.app.dto.TerminalPosDto;
+import com.citacloud.springboot.contacloud.app.views.components.AppTopBar;
 import com.citacloud.springboot.contacloud.app.views.components.CompanyLogoAvatar;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
-import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
@@ -21,13 +22,13 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.router.RouterLink;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Duration;
 import java.time.Year;
+import java.util.function.Consumer;
 
 @PermitAll
 public class MainLayout extends AppLayout {
@@ -35,8 +36,8 @@ public class MainLayout extends AppLayout {
     private final Div contentHost = new Div();
     private final CompanyConfigurationService companyConfiguration;
     private final ContextoUsuarioService contextoUsuario;
+    private final AppTopBar topBar;
     private CompanyLogoAvatar menuAvatar;
-    private Span companyBadge;
     private Span menuCompanyName;
     private HasElement currentContent;
 
@@ -49,7 +50,9 @@ public class MainLayout extends AppLayout {
         this.companyConfiguration = companyConfiguration;
         this.contextoUsuario = contextoUsuario;
         var contexto = contextoUsuario.obtener();
-        addToNavbar(crearHeader(contexto, authenticationContext, menuService));
+        topBar = new AppTopBar(contexto);
+        crearMenuUsuario(topBar.userMenuTarget(), contexto, authenticationContext, menuService);
+        addToNavbar(topBar);
         addToDrawer(crearDrawer(menuService));
 
         contentHost.addClassName("cc-content");
@@ -62,34 +65,6 @@ public class MainLayout extends AppLayout {
         shell.expand(contentHost);
         setContent(shell);
         setPrimarySection(Section.DRAWER);
-    }
-
-    private Component crearHeader(ContextoUsuarioService.Contexto contexto,
-                                   AuthenticationContext authenticationContext,
-                                   MenuService menuService) {
-        var marca = new RouterLink();
-        marca.setRoute(DashboardView.class);
-        marca.addClassName("cc-brand");
-        marca.add(new Span("C") {{ addClassName("cc-brand-mark"); }},
-            new Span("ContaCloud") {{ addClassName("cc-brand-name"); }});
-
-        companyBadge = new Span(contexto.empresa());
-        companyBadge.addClassName("cc-context-badge");
-        companyBadge.getElement().setAttribute("title", "Empresa activa: " + contexto.empresaCodigo());
-
-        var usuario = new Button(contexto.usuario(), VaadinIcon.USER.create());
-        usuario.addClassName("cc-user-button");
-        usuario.getElement().setAttribute("aria-label", "Abrir menú de usuario");
-        crearMenuUsuario(usuario, contexto, authenticationContext, menuService);
-
-        var header = new HorizontalLayout(new DrawerToggle(), marca, companyBadge, usuario);
-        header.addClassName("cc-header");
-        header.setWidthFull();
-        header.setPadding(false);
-        header.setSpacing(true);
-        header.setAlignItems(HorizontalLayout.Alignment.CENTER);
-        header.expand(marca);
-        return header;
     }
 
     private void crearMenuUsuario(Button target, ContextoUsuarioService.Contexto contexto,
@@ -196,16 +171,24 @@ public class MainLayout extends AppLayout {
 
     public void refreshCompanyContext() {
         var contexto = contextoUsuario.obtener();
-        companyBadge.setText(contexto.empresa());
-        companyBadge.getElement().setAttribute("title", "Empresa activa: " + contexto.empresaCodigo());
+        topBar.refreshContext(contexto);
         menuCompanyName.setText(contexto.empresa());
         menuAvatar.setInitial(contexto.inicialEmpresa());
         refreshCompanyLogo();
     }
 
+    public void showPosTopBar(TerminalPosDto terminal, String cashier, Consumer<String> pendingAction) {
+        topBar.showPosMode(terminal, cashier, pendingAction);
+    }
+
+    public void showDefaultTopBar() {
+        topBar.showDefaultMode();
+    }
+
     @Override
     public void showRouterLayoutContent(HasElement content) {
         if (currentContent != null) currentContent.getElement().removeFromParent();
+        topBar.showDefaultMode();
         contentHost.getElement().appendChild(content.getElement());
         currentContent = content;
     }

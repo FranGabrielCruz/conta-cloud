@@ -94,6 +94,21 @@ public class MovimientoFinanciero {
             cuentaId,monedaId,monto,concepto,referencia,"Pago al contado de factura de proveedor",
             TipoOrigenMovimiento.SUPPLIER_PAYMENT,pagoId,medioPago,sesionCajaId,usuarioId);
     }
+    public static MovimientoFinanciero ventaContado(UUID tenantId,UUID empresaId,LocalDate fecha,
+            UUID cajaId,UUID monedaId,BigDecimal monto,String numero,UUID facturaId,UUID sesionCajaId,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,TipoMovimientoFinanciero.INCOME,fecha,
+            TipoCuentaDinero.CASH_REGISTER,cajaId,monedaId,monto,"Venta "+numero,numero,
+            "Cobro en efectivo de factura de venta",TipoOrigenMovimiento.SALES_INVOICE,facturaId,
+            MedioPagoMovimiento.CASH,sesionCajaId,usuarioId);
+    }
+    public static MovimientoFinanciero cobroVenta(UUID tenantId,UUID empresaId,LocalDate fecha,
+            TipoCuentaDinero tipoCuenta,UUID cuentaId,UUID monedaId,BigDecimal monto,String numero,
+            UUID aplicacionId,MedioPagoMovimiento medioPago,UUID sesionCajaId,String referencia,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,TipoMovimientoFinanciero.INCOME,fecha,tipoCuenta,
+            cuentaId,monedaId,monto,"Venta "+numero,referencia,"Aplicación de cobro de factura de venta",
+            TipoOrigenMovimiento.SALES_PAYMENT,aplicacionId,medioPago,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
+    }
     private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion,

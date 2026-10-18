@@ -49,4 +49,14 @@ public class InventoryMovementService {
         String origen="INVENTORY_PHYSICAL_COUNT";String key=MovimientoInventario.clave(origen,conteo.getId(),conteo.getAlmacenId(),linea.getProductoId(),direccion,linea.getId());
         return movements.findByTenantIdAndEmpresaIdAndClaveOrigen(conteo.getTenantId(),conteo.getEmpresaId(),key).orElseGet(()->movements.saveAndFlush(new MovimientoInventario(conteo.getTenantId(),conteo.getEmpresaId(),numbers.siguiente(conteo.getTenantId(),conteo.getEmpresaId()),conteo.getAlmacenId(),linea.getProductoId(),conteo.getFecha(),linea.getDiferencia().abs(),direccion,direccion.equals("IN")?"PHYSICAL_COUNT_IN":"PHYSICAL_COUNT_OUT",origen,conteo.getId(),conteo.getNumero(),conteo.getReferencia(),linea.getId(),linea.getUnidadId(),null,usuario)));
     }
+    public void vender(FacturaVenta factura,LineaFacturaVenta linea,Producto producto,UUID usuario){
+        if(!linea.isControlaExistencia())return;
+        String origen="SALES_INVOICE";
+        String key=MovimientoInventario.clave(origen,factura.getId(),factura.getAlmacenId(),linea.getProductoId(),"OUT",linea.getId());
+        if(movements.existsByTenantIdAndEmpresaIdAndClaveOrigen(factura.getTenantId(),factura.getEmpresaId(),key))return;
+        movements.save(new MovimientoInventario(factura.getTenantId(),factura.getEmpresaId(),
+            numbers.siguiente(factura.getTenantId(),factura.getEmpresaId()),factura.getAlmacenId(),linea.getProductoId(),
+            factura.getFecha(),linea.getCantidad(),"OUT","SALE",origen,factura.getId(),factura.getNumero(),null,
+            linea.getId(),linea.getUnidadId(),null,usuario));
+    }
 }

@@ -76,6 +76,16 @@ public class CashRegisterSessionService {
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('operaciones_caja.abrir')")
     public SesionCajaDto abrir(UUID cajaId,AperturaCajaInput input){
+        return abrirInterno(cajaId,input);
+    }
+
+    @Transactional
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.abrir_caja')")
+    public SesionCajaDto abrirDesdePos(UUID cajaId,AperturaCajaInput input){
+        return abrirInterno(cajaId,input);
+    }
+
+    private SesionCajaDto abrirInterno(UUID cajaId,AperturaCajaInput input){
         BigDecimal fondo=input==null?null:input.fondoInicial();
         if(fondo==null||fondo.signum()<0) throw new ReglaNegocioException("El fondo inicial debe ser mayor o igual que cero.");
         validarImporte(fondo);String nota=nota(input.observacion());
