@@ -17,6 +17,14 @@ public interface AlmacenRepository extends JpaRepository<Almacen,UUID> {
     Optional<Almacen> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenantId,UUID empresaId);
     Optional<Almacen> findFirstByTenantIdAndEmpresaIdAndSucursalIdAndActivoTrueAndAdministradoSistemaFalseOrderByNombre(
         UUID tenantId,UUID empresaId,UUID sucursalId);
+    @Query("""
+        select w from Almacen w where w.tenantId=:tenant and w.empresaId=:empresa
+        and w.sucursalId=:sucursal and w.activo=true and w.administradoSistema=false and w.tipo=:tipo
+        order by w.nombre asc,w.id asc
+        """)
+    Optional<Almacen> findFirstForPos(@Param("tenant")UUID tenantId,@Param("empresa")UUID empresaId,
+                                     @Param("sucursal")UUID sucursalId,
+                                     @Param("tipo")com.citacloud.springboot.contacloud.app.models.TipoAlmacen tipo);
     @EntityGraph(attributePaths={"sucursal","responsable"})
     @Query("""
         select w from Almacen w join w.sucursal s left join w.responsable r

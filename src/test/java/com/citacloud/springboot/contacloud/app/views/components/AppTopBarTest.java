@@ -86,7 +86,8 @@ class AppTopBarTest {
 
     private static TerminalPosDto terminal(boolean open, String cash, String branch, LocalDate date) {
         return new TerminalPosDto(UUID.randomUUID(), "Terminal principal", UUID.randomUUID(), branch,
-                UUID.randomUUID(), cash, "DOP", open, open ? UUID.randomUUID() : null, date);
+                UUID.randomUUID(), cash, UUID.randomUUID(), "Almacén Principal", "DOP", open,
+                open ? UUID.randomUUID() : null, date);
     }
 
     private static Component buscar(Component root, String className) {

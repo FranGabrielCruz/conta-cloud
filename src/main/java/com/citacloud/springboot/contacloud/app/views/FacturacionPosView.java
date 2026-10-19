@@ -49,13 +49,19 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final Span recargo = new Span("0.00");
     private final Span impuestos = new Span("0.00");
     private final Span total = new Span("0.00");
+    private final Div resumen = new Div();
     private final TextArea observacion = new TextArea("Observación interna");
     private final DoubleEnterDetector doubleEnter = new DoubleEnterDetector();
     private String token;
     private TerminalPosDto terminal;
+    private PosPaymentDialog dialogoCobroActivo;
+    private Dialog dialogoClienteActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
+    private BigDecimal descuentoVenta = BigDecimal.ZERO;
+    private BigDecimal recargoVenta = BigDecimal.ZERO;
+    private boolean agregandoProducto;
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
                               FacturaVentaPdfService documentos, ModuleAuthorization authorization) {
@@ -117,15 +123,16 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                   const modalOpen = document.querySelector('vaadin-dialog-overlay[opened], vaadin-confirm-dialog-overlay[opened]');
                   if (modalOpen) { reset(); return; }
                   const combo = path.find(node => node?.tagName === 'VAADIN-COMBO-BOX');
-                  const productCombo = combo?.classList?.contains('cc-pos-product-search');
-                  const filter = productCombo ? String(combo.filter || '').trim() : '';
                   const textArea = path.some(node => node?.tagName === 'TEXTAREA' || node?.tagName === 'VAADIN-TEXT-AREA');
                   const editable = path.some(node => node?.isContentEditable || ['INPUT','VAADIN-BIG-DECIMAL-FIELD','VAADIN-NUMBER-FIELD','VAADIN-TEXT-FIELD','BUTTON'].includes(node?.tagName));
-                  if (textArea || (combo && (!productCombo || filter)) || (!combo && editable)) { reset(); return; }
-                  if (productCombo && !filter) {
+                  if (combo) {
+                    const productCombo = combo.classList.contains('cc-pos-product-search');
+                    const filter = productCombo ? String(combo.filter || '').trim() : '';
+                    const activeProduct = productCombo && combo.opened && Number(combo._focusedIndex) >= 0;
+                    if (!productCombo || filter || activeProduct) { reset(); return; }
                     event.preventDefault();
                     event.stopImmediatePropagation();
-                  }
+                  } else if (textArea || editable) { reset(); return; }
                   const now = performance.now();
                   if (host.__ccPosLastEnter && now - host.__ccPosLastEnter <= 450) {
                     event.preventDefault();
@@ -259,6 +266,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         clienteSlot.removeAll();
         clienteSlot.setVisible(false);
         observacion.clear();
+        descuentoVenta = BigDecimal.ZERO;
+        recargoVenta = BigDecimal.ZERO;
         idempotencia = UUID.randomUUID();
         actualizarTotales();
     }
@@ -289,7 +298,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         productoBuscar.setRenderer(new ComponentRenderer<>(this::resultadoProducto));
         productoBuscar.setItems(query -> {
             try {
-                return service.buscarProductos(token, query.getFilter().orElse(""), query.getOffset(), query.getLimit()).stream();
+                return service.buscarProductos(token, terminal.almacenId(), query.getFilter().orElse(""), query.getOffset(), query.getLimit()).stream();
             } catch (RuntimeException ex) {
                 error(ex, "No fue posible buscar productos.");
                 return Stream.empty();
@@ -329,19 +338,24 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         grid.setAllRowsVisible(false);
         grid.addColumn(f -> filas.indexOf(f) + 1).setHeader("#").setWidth("36px").setFlexGrow(0);
         grid.addColumn(new ComponentRenderer<>(f -> textoConTooltip(f.nombre(), "cc-pos-product-name")))
-                .setHeader("Producto").setWidth("190px").setFlexGrow(2);
-        grid.addColumn(new ComponentRenderer<>(f -> textoConTooltip(f.codigo(), "cc-pos-product-code")))
-                .setHeader("Código").setWidth("130px").setFlexGrow(1);
-        grid.addColumn(f -> dinero(f.precio)).setHeader("Precio").setWidth("90px").setFlexGrow(0)
-                .setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(new ComponentRenderer<>(this::campoCantidad)).setHeader("Cant.").setWidth("80px")
+                .setHeader("Producto").setWidth("280px").setFlexGrow(4);
+        grid.addColumn(new ComponentRenderer<>(this::campoCantidad)).setHeader("Cantidad").setWidth("130px")
                 .setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+        grid.addColumn(f -> dinero(f.precio)).setHeader("Precio").setWidth("110px").setFlexGrow(0)
+                .setTextAlign(ColumnTextAlign.END);
         grid.addColumn(f -> dinero(f.total())).setHeader("Total").setWidth("100px").setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(new ComponentRenderer<>(f -> iconButton(VaadinIcon.TRASH, "Eliminar producto", e -> {
-            filas.remove(f); refrescar();
-        }))).setHeader("Acciones").setWidth("72px").setFlexGrow(0);
+        grid.addColumn(new ComponentRenderer<>(this::accionesFila)).setHeader("Acc.").setWidth("48px").setFlexGrow(0);
         grid.setItems(filas);
+    }
+
+    private Component accionesFila(Fila fila) {
+        Button eliminar = iconButton(VaadinIcon.TRASH, "Eliminar producto", e -> {
+            filas.remove(fila);
+            refrescar();
+        });
+        eliminar.addClassName("cc-pos-row-action");
+        return eliminar;
     }
 
     private static Span textoConTooltip(String texto, String clase) {
@@ -351,18 +365,42 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         return span;
     }
 
-    private BigDecimalField campoCantidad(Fila fila) {
+    private Component campoCantidad(Fila fila) {
         BigDecimalField cantidad = new BigDecimalField();
         cantidad.setValue(fila.cantidad);
+        cantidad.setValueChangeMode(ValueChangeMode.EAGER);
         cantidad.addClassName("cc-pos-quantity");
         cantidad.addValueChangeListener(event -> {
-            if (event.isFromClient()) reiniciarDobleEnter();
-            if (event.getValue() != null && event.getValue().signum() > 0) {
-                fila.cantidad = event.getValue();
-                actualizarTotales();
-            } else cantidad.setValue(fila.cantidad);
+            if (!event.isFromClient()) return;
+            reiniciarDobleEnter();
+            cambiarCantidad(fila, event.getValue(), cantidad);
         });
-        return cantidad;
+        Button disminuir = iconButton(VaadinIcon.MINUS, "Disminuir cantidad",
+                e -> cambiarCantidad(fila, CantidadPosCalculo.disminuir(fila.cantidad, BigDecimal.ONE), cantidad));
+        Button aumentar = iconButton(VaadinIcon.PLUS, "Aumentar cantidad",
+                e -> cambiarCantidad(fila, CantidadPosCalculo.incrementar(fila.cantidad, BigDecimal.ONE), cantidad));
+        disminuir.addClassName("cc-pos-quantity-control");
+        aumentar.addClassName("cc-pos-quantity-control");
+        Div editor = new Div(disminuir, cantidad, aumentar);
+        editor.addClassName("cc-pos-quantity-editor");
+        return editor;
+    }
+
+    private void cambiarCantidad(Fila fila, BigDecimal nuevaCantidad, BigDecimalField campo) {
+        if (!CantidadPosCalculo.valida(nuevaCantidad)) {
+            campo.setValue(fila.cantidad);
+            Notification.show("La cantidad mínima es 1.");
+            return;
+        }
+        try {
+            service.validarCantidad(token, terminal.almacenId(), fila.id, nuevaCantidad);
+            fila.cantidad = nuevaCantidad;
+            campo.setValue(nuevaCantidad);
+            actualizarTotales();
+        } catch (RuntimeException ex) {
+            campo.setValue(fila.cantidad);
+            error(ex, "No fue posible actualizar la cantidad.");
+        }
     }
 
     private Component construirZonaInferior() {
@@ -372,12 +410,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         observacion.addClassName("cc-pos-observation");
         Div nota = new Div(observacion);
         nota.addClassName("cc-pos-bottom-card");
-        Div resumen = new Div();
         resumen.addClassNames("cc-pos-summary", "cc-pos-bottom-card");
-        Span titulo = new Span("RESUMEN DE VENTA");
-        titulo.addClassName("cc-pos-summary-title");
-        resumen.add(titulo, filaResumen("Subtotal", subtotal), filaResumen("Descuento", descuento),
-                filaResumen("Recargo", recargo), filaResumen("ITBIS", impuestos), filaResumen("TOTAL", total));
+        actualizarResumen();
         Div zona = new Div(nota, resumen);
         zona.addClassName("cc-pos-bottom");
         return zona;
@@ -404,7 +438,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         configurarMasAcciones(mas);
         Div cabecera = new Div(titulo, mas);
         cabecera.addClassName("cc-pos-actions-head");
-        Button agregar = tarjeta("+", "Agregar", "F2", "Agregar producto (F2)", e -> enfocarProducto());
+        Button agregar = tarjeta("+", "Producto", "F2", "Agregar producto (F2)", e -> enfocarProducto());
         Button descuentoRapido = tarjeta("%", "Descuento", "F3", "Aplicar descuento (F3)", e -> pendiente("Descuento"));
         Button recargoRapido = tarjeta("↑", "Recargo", "F4", "Aplicar recargo (F4)", e -> pendiente("Recargo"));
         Button retener = tarjeta("⏸", "Retener", "F5", "Retener venta (F5)", e -> pendiente("Retener venta"));
@@ -460,7 +494,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         String filtro = valorBusqueda == null ? "" : valorBusqueda.trim();
         if (filtro.isBlank()) return;
         try {
-            List<ProductoPosDto> resultados = service.buscarProductos(token, filtro, 0, 20);
+            List<ProductoPosDto> resultados = service.buscarProductos(token, terminal.almacenId(), filtro, 0, 20);
             Optional<ProductoPosDto> exacto = resultados.stream().filter(p -> coincideExactamente(p, filtro)).findFirst();
             if (exacto.isPresent() || resultados.size() == 1) {
                 seleccionarProductoPredictivo(exacto.orElse(resultados.getFirst()));
@@ -472,11 +506,22 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private void seleccionarProductoPredictivo(ProductoPosDto producto) {
+        if (producto == null || agregandoProducto) return;
+        agregandoProducto = true;
+        try {
+            agregar(producto);
+        } finally {
+            reiniciarBusquedaProducto();
+            agregandoProducto = false;
+        }
+    }
+
+    private void reiniciarBusquedaProducto() {
         reiniciarDobleEnter();
-        agregar(producto);
         productoBuscar.clear();
         productoBuscar.getElement().setProperty("filter", "");
-        productoBuscar.focus();
+        productoBuscar.getElement().setProperty("opened", false);
+        UI.getCurrent().beforeClientResponse(productoBuscar, context -> productoBuscar.focus());
     }
 
     private void dialogoProductos(boolean soloConsulta) {
@@ -499,7 +544,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         resultados.addColumn(p -> terminal.monedaCodigo() + " " + dinero(p.precio())).setHeader("Precio")
                 .setAutoWidth(true).setTextAlign(ColumnTextAlign.END);
         Runnable cargar = () -> {
-            try { resultados.setItems(service.buscarProductos(token, filtro.getValue(), 0, 30)); }
+            try { resultados.setItems(service.buscarProductos(token, terminal.almacenId(), filtro.getValue(), 0, 30)); }
             catch (RuntimeException ex) { error(ex, "No fue posible buscar productos."); }
         };
         filtro.addValueChangeListener(e -> cargar.run());
@@ -522,13 +567,14 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void seleccionarProducto(Dialog dialog, ProductoPosDto producto) {
         agregar(producto);
         dialog.close();
-        productoBuscar.clear();
-        productoBuscar.focus();
+        reiniciarBusquedaProducto();
     }
 
     private void dialogoClientes() {
         if (terminal == null) return;
+        if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
         Dialog dialog = dialogo("SELECCIONAR CLIENTE");
+        dialogoClienteActivo = dialog;
         TextField filtro = new TextField();
         filtro.setPlaceholder("Buscar por nombre, RNC/Cédula o teléfono...");
         filtro.setPrefixComponent(VaadinIcon.SEARCH.create());
@@ -542,29 +588,93 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         resultados.addColumn(ClientePosDto::nombre).setHeader("Cliente").setFlexGrow(1);
         resultados.addColumn(c -> valor(c.identificacion(), "—")).setHeader("RNC / Cédula").setAutoWidth(true);
         resultados.addColumn(c -> valor(c.telefono(), "—")).setHeader("Teléfono").setAutoWidth(true);
+        Span refinar = new Span("Escriba más para refinar la búsqueda.");
+        refinar.addClassName("cc-pos-customer-refine");
+        refinar.setVisible(false);
+        ClientePosDto[] enfocado = {null};
+        List<ClientePosDto> visibles = new ArrayList<>();
+        int[] indiceActivo = {-1};
         Runnable cargar = () -> {
-            try { resultados.setItems(service.buscarClientes(filtro.getValue(), 0, 30)); }
+            try {
+                BusquedaClientesPosDto respuesta = service.buscarClientes(filtro.getValue());
+                visibles.clear();
+                visibles.addAll(respuesta.clientes());
+                resultados.setItems(respuesta.clientes());
+                refinar.setVisible(respuesta.hayMasResultados());
+                enfocado[0] = null;
+                indiceActivo[0] = -1;
+                resultados.deselectAll();
+            }
             catch (RuntimeException ex) { error(ex, "No fue posible buscar clientes."); }
         };
         filtro.addValueChangeListener(e -> cargar.run());
         Button seleccionar = new Button("Seleccionar", VaadinIcon.CHECK.create(), e -> {
-            ClientePosDto seleccionado = resultados.asSingleSelect().getValue();
+            ClientePosDto seleccionado = clienteActivo(visibles, indiceActivo[0], enfocado[0], resultados);
             if (seleccionado == null) { Notification.show("Selecciona un cliente."); return; }
-            seleccionarCliente(seleccionado);
-            dialog.close();
-            enfocarProducto();
+            seleccionarCliente(dialog, seleccionado);
         });
         seleccionar.addClassName("cc-pos-primary");
-        resultados.addItemDoubleClickListener(e -> {
-            seleccionarCliente(e.getItem());
-            dialog.close();
-            enfocarProducto();
+        resultados.addCellFocusListener(e -> e.getItem().ifPresent(item -> {
+            enfocado[0] = item;
+            indiceActivo[0] = visibles.indexOf(item);
+            resultados.select(item);
+        }));
+        Shortcuts.addShortcutListener(resultados, () -> {
+            ClientePosDto elegido = clienteActivo(visibles, indiceActivo[0], enfocado[0], resultados);
+            if (elegido != null) seleccionarCliente(dialog, elegido);
+        }, Key.ENTER);
+        filtro.addKeyDownListener(Key.ARROW_DOWN,
+                e -> moverSeleccionCliente(resultados, visibles, indiceActivo, enfocado, 1));
+        filtro.addKeyDownListener(Key.ARROW_UP,
+                e -> moverSeleccionCliente(resultados, visibles, indiceActivo, enfocado, -1));
+        filtro.addKeyDownListener(Key.ENTER, e -> {
+            ClientePosDto elegido = clienteActivo(visibles, indiceActivo[0], enfocado[0], resultados);
+            if (elegido != null) seleccionarCliente(dialog, elegido);
         });
-        dialog.add(filtro, resultados);
+        Shortcuts.addShortcutListener(dialog, () -> cerrarSelectorClientes(dialog), Key.ESCAPE);
+        resultados.addItemClickListener(e -> seleccionarCliente(dialog, e.getItem()));
+        dialog.addOpenedChangeListener(e -> {
+            if (!e.isOpened() && dialogoClienteActivo == dialog) dialogoClienteActivo = null;
+        });
+        dialog.add(filtro, resultados, refinar);
         dialog.getFooter().add(seleccionar);
         cargar.run();
         dialog.open();
-        filtro.focus();
+        UI.getCurrent().beforeClientResponse(filtro, context -> filtro.focus());
+    }
+
+    private void seleccionarCliente(Dialog dialog, ClientePosDto cliente) {
+        reiniciarDobleEnter();
+        seleccionarCliente(cliente);
+        dialog.close();
+        enfocarProducto();
+    }
+
+    private void cerrarSelectorClientes(Dialog dialog) {
+        reiniciarDobleEnter();
+        dialog.close();
+        enfocarProducto();
+    }
+
+    private static void moverSeleccionCliente(Grid<ClientePosDto> grid, List<ClientePosDto> visibles,
+                                                int[] indiceActivo, ClientePosDto[] enfocado, int desplazamiento) {
+        if (visibles.isEmpty()) return;
+        int actual = indiceActivo[0];
+        int siguiente = actual < 0
+                ? (desplazamiento > 0 ? 0 : visibles.size() - 1)
+                : Math.max(0, Math.min(visibles.size() - 1, actual + desplazamiento));
+        ClientePosDto cliente = visibles.get(siguiente);
+        indiceActivo[0] = siguiente;
+        enfocado[0] = cliente;
+        grid.select(cliente);
+        grid.scrollToIndex(siguiente);
+    }
+
+    private static ClientePosDto clienteActivo(List<ClientePosDto> visibles, int indiceActivo,
+                                                ClientePosDto enfocado, Grid<ClientePosDto> grid) {
+        if (indiceActivo >= 0 && indiceActivo < visibles.size()) return visibles.get(indiceActivo);
+        if (enfocado != null) return enfocado;
+        return grid.asSingleSelect().getValue();
     }
 
     private void seleccionarCliente(ClientePosDto cliente) {
@@ -582,13 +692,20 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void agregar(ProductoPosDto producto) {
         for (Fila fila : filas) {
             if (fila.id.equals(producto.id())) {
-                fila.cantidad = fila.cantidad.add(BigDecimal.ONE);
-                refrescar();
+                BigDecimal nuevaCantidad = CantidadPosCalculo.incrementar(fila.cantidad, BigDecimal.ONE);
+                try {
+                    service.validarCantidad(token, terminal.almacenId(), fila.id, nuevaCantidad);
+                    fila.cantidad = nuevaCantidad;
+                    refrescar();
+                } catch (RuntimeException ex) { error(ex, "No fue posible aumentar la cantidad."); }
                 return;
             }
         }
-        filas.add(new Fila(producto));
-        refrescar();
+        try {
+            service.validarCantidad(token, terminal.almacenId(), producto.id(), BigDecimal.ONE);
+            filas.add(new Fila(producto));
+            refrescar();
+        } catch (RuntimeException ex) { error(ex, "No fue posible agregar el producto."); }
     }
 
     private void refrescar() { grid.setItems(filas); actualizarTotales(); }
@@ -601,15 +718,29 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             grand = grand.add(fila.total());
         }
         subtotal.setText(moneda(base));
-        descuento.setText(dinero(BigDecimal.ZERO));
-        recargo.setText(dinero(BigDecimal.ZERO));
-        impuestos.setText(dinero(tax));
+        descuento.setText(monedaNegativa(descuentoVenta));
+        recargo.setText(moneda(recargoVenta));
+        impuestos.setText(moneda(tax));
         total.setText(moneda(grand));
+        actualizarResumen();
         if (grid.getDataProvider() != null) grid.getDataProvider().refreshAll();
+    }
+
+    private void actualizarResumen() {
+        resumen.removeAll();
+        resumen.add(filaResumen("Subtotal", subtotal));
+        if (descuentoVenta.signum() > 0) {
+            Div filaDescuento = filaResumen("Descuento", descuento);
+            filaDescuento.addClassName("cc-pos-discount");
+            resumen.add(filaDescuento);
+        }
+        if (recargoVenta.signum() > 0) resumen.add(filaResumen("Recargo", recargo));
+        resumen.add(filaResumen("ITBIS", impuestos), filaResumen("TOTAL", total));
     }
 
     private void dialogoCobro() {
         reiniciarDobleEnter();
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (terminal == null) return;
         if (filas.isEmpty()) { Notification.show("Agregue al menos un producto para cobrar."); return; }
         BigDecimal totalVenta = filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -622,6 +753,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             PosPaymentDialog dialog = new PosPaymentDialog(totalVenta, terminal.monedaCodigo(), metodos,
                     cuentas, aplicaciones -> confirmarCobro(referencia[0], aplicaciones));
             referencia[0] = dialog;
+            dialogoCobroActivo = dialog;
+            dialog.addOpenedChangeListener(event -> {
+                if (!event.isOpened() && dialogoCobroActivo == dialog) dialogoCobroActivo = null;
+            });
             dialog.open();
         } catch (RuntimeException ex) { error(ex, "No fue posible preparar el cobro."); }
     }
@@ -629,7 +764,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
         try {
             List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.id, f.cantidad)).toList();
-            FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token,
+            FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token, terminal.almacenId(),
                     clienteSeleccionado == null ? null : clienteSeleccionado.id(), observacion.getValue(),
                     idempotencia, lineas, aplicaciones));
             dialog.close();
@@ -637,6 +772,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             abrirPdf(resultado);
             construirPos();
         } catch (RuntimeException ex) {
+            if (dialog instanceof PosPaymentDialog paymentDialog) paymentDialog.reactivarConfirmacion();
             error(ex, "No fue posible confirmar el cobro.");
         }
     }
@@ -684,6 +820,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private String moneda(BigDecimal valor) {
         return terminal == null ? dinero(valor) : terminal.monedaCodigo() + " " + dinero(valor);
+    }
+
+    private String monedaNegativa(BigDecimal valor) {
+        BigDecimal importe = valor == null ? BigDecimal.ZERO : valor.abs();
+        return terminal == null ? "-" + dinero(importe) : "-" + terminal.monedaCodigo() + " " + dinero(importe);
     }
 
     private static boolean coincideExactamente(ProductoPosDto producto, String filtro) {

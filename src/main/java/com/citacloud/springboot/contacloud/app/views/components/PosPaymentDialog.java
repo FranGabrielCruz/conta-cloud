@@ -32,6 +32,8 @@ public class PosPaymentDialog extends Dialog {
     private final ComboBox<CuentaBancariaPosDto> cuentaSimple = new ComboBox<>("Cuenta destino");
     private final TextField bancoSimple = new TextField("Banco");
     private final Span cambioSimple = new Span();
+    private final Div cambioSimpleFila = new Div();
+    private final Div recibidoSimpleFila = new Div();
     private final Div importesRapidos = new Div();
     private final Button exacto = new Button();
 
@@ -47,9 +49,10 @@ public class PosPaymentDialog extends Dialog {
     private final Span pendienteValor = new Span();
     private final Span completo = new Span("✓ Cobro completo");
     private final Button aplicar = new Button("Aplicar", VaadinIcon.CHECK.create());
-    private final Button confirmar = new Button("Confirmar cobro", VaadinIcon.CHECK_CIRCLE.create());
-    private final Button cancelar = new Button("Cancelar", VaadinIcon.CLOSE.create(), e -> close());
+    private final Button confirmar = new Button(VaadinIcon.MONEY.create());
+    private final Button cancelar = new Button(VaadinIcon.CLOSE.create(), e -> cerrar());
     private final Button alternarModo = new Button();
+    private final DoubleSpaceDetector doubleSpace = new DoubleSpaceDetector();
 
     private MetodoPagoPosDto metodoSimple;
     private MetodoPagoPosDto metodoActual;
@@ -73,26 +76,78 @@ public class PosPaymentDialog extends Dialog {
         contenido.setSpacing(false);
         contenido.addClassName("cc-pos-payment-content");
         add(contenido);
-        cancelar.addClassName("cc-pos-payment-cancel");
-        confirmar.addClassName("cc-pos-charge-confirm");
+        cancelar.addClassNames("cc-pos-payment-cancel", "cc-pos-payment-footer-action");
+        cancelar.setTooltipText("Cancelar cobro");
+        cancelar.getElement().setAttribute("aria-label", "Cancelar cobro");
+        confirmar.addClassNames("cc-pos-charge-confirm", "cc-pos-payment-footer-action");
+        confirmar.setTooltipText("Confirmar cobro");
+        confirmar.getElement().setAttribute("aria-label", "Confirmar cobro");
         confirmar.addClickListener(e -> confirmar());
         alternarModo.addClickListener(e -> alternarModo());
-        alternarModo.addClassName("cc-pos-payment-mode");
+        alternarModo.addClassNames("cc-pos-payment-mode", "cc-pos-payment-method");
         exacto.addClassNames("cc-pos-cash-exact", "cc-pos-cash-option");
-        exacto.setTooltipText("Usar monto exacto");
-        exacto.addClickListener(e -> recibidoSimple.setValue(this.total));
-        Shortcuts.addShortcutListener(this, this::close, Key.ESCAPE);
+        exacto.setTooltipText("Usar monto exacto (doble espacio)");
+        exacto.addClickListener(e -> usarMontoExacto());
+        registrarDobleEspacio();
+        Shortcuts.addShortcutListener(this, this::cerrar, Key.ESCAPE);
         addOpenedChangeListener(e -> {
             if (e.isOpened()) mostrarSimple();
+            else reiniciarDobleEspacio();
         });
     }
 
+    private void registrarDobleEspacio() {
+        getElement().addEventListener("cc-pos-space", event -> {
+            long timestamp = Math.round(event.getEventData().get("event.detail.timestamp").asDouble());
+            if (doubleSpace.register(timestamp, atajoExactoDisponible())) usarMontoExacto();
+        }).addEventData("event.detail.timestamp");
+        getElement().addEventListener("cc-pos-space-reset", event -> doubleSpace.reset());
+        addAttachListener(event -> event.getUI().getPage().executeJs("""
+                const host = $0;
+                if (host.__ccPosSpaceHandler) document.removeEventListener('keydown', host.__ccPosSpaceHandler, true);
+                const reset = () => {
+                  host.dispatchEvent(new CustomEvent('cc-pos-space-reset'));
+                };
+                host.__ccPosSpaceHandler = event => {
+                  if (event.code !== 'Space' || event.repeat) return;
+                  if (!host.opened || !host.ccCashExactEnabled) { reset(); return; }
+                  const overlays = document.querySelectorAll('vaadin-dialog-overlay[opened], vaadin-confirm-dialog-overlay[opened]');
+                  if (overlays.length > 1) { reset(); return; }
+                  const path = event.composedPath ? event.composedPath() : [event.target];
+                  const decimalField = path.some(node => node?.tagName === 'VAADIN-BIG-DECIMAL-FIELD');
+                  const incompatible = path.some(node => {
+                    const tag = node?.tagName;
+                    return node?.isContentEditable
+                      || tag === 'BUTTON'
+                      || tag === 'TEXTAREA'
+                      || tag === 'VAADIN-TEXT-AREA'
+                      || tag === 'VAADIN-TEXT-FIELD'
+                      || tag === 'VAADIN-COMBO-BOX'
+                      || (tag === 'INPUT' && !decimalField);
+                  });
+                  if (incompatible) { reset(); return; }
+                  event.preventDefault();
+                  event.stopImmediatePropagation();
+                  host.dispatchEvent(new CustomEvent('cc-pos-space', {detail: {timestamp: performance.now()}}));
+                };
+                document.addEventListener('keydown', host.__ccPosSpaceHandler, true);
+                """, getElement()));
+        addDetachListener(event -> event.getUI().getPage().executeJs("""
+                const host = $0;
+                if (host.__ccPosSpaceHandler) document.removeEventListener('keydown', host.__ccPosSpaceHandler, true);
+                host.__ccPosSpaceHandler = null;
+                """, getElement()));
+    }
+
     private void mostrarSimple() {
+        reiniciarDobleEspacio();
+        setHeaderTitle("COBRAR");
         modoMultiple = false;
         contenido.removeAll();
-        contenido.add(totalBox(), titulo("MÉTODO DE PAGO"), accesosMetodos(this::seleccionarSimple), construirSimple());
+        contenido.add(totalBox(true), titulo("MÉTODO DE PAGO"), accesosMetodos(this::seleccionarSimple), construirSimple());
         alternarModo.setText("Pago múltiple");
-        alternarModo.setIcon(VaadinIcon.WALLET.create());
+        alternarModo.setIcon(VaadinIcon.CREDIT_CARD.create());
+        alternarModo.setTooltipText("Dividir el cobro entre varios métodos de pago");
         actualizarFooter();
         MetodoPagoPosDto efectivo = metodos.stream().filter(MetodoPagoPosDto::efectivo).findFirst()
                 .orElseGet(() -> metodos.stream().filter(MetodoPagoPosDto::predeterminado).findFirst()
@@ -103,6 +158,8 @@ public class PosPaymentDialog extends Dialog {
     private Component construirSimple() {
         cuentaSimple.setItems(cuentas);
         cuentaSimple.setItemLabelGenerator(CuentaBancariaPosDto::nombre);
+        recibidoSimple.setLabel("");
+        recibidoSimple.getElement().setAttribute("aria-label", "Recibido");
         recibidoSimple.setPrefixComponent(new Span(moneda));
         recibidoSimple.setWidthFull();
         referenciaSimple.setWidthFull();
@@ -112,24 +169,30 @@ public class PosPaymentDialog extends Dialog {
             recibidoSimple.addValueChangeListener(e -> actualizarSimple());
             referenciaSimple.addValueChangeListener(e -> actualizarSimple());
             cuentaSimple.addValueChangeListener(e -> actualizarSimple());
-            recibidoSimple.addKeyPressListener(Key.ENTER, e -> exacto.focus());
+            recibidoSimple.addKeyPressListener(Key.ENTER, e -> confirmar.focus());
             simpleConfigurado = true;
         }
-        cambioSimple.addClassName("cc-pos-payment-change");
         importesRapidos.removeAll();
         importesRapidos.addClassName("cc-pos-cash-quick");
         exacto.setText(String.format(Locale.US, "%,.2f Exacto", total));
         importesRapidos.add(exacto);
         for (String valor : List.of("20", "50", "100", "200", "500", "1000")) {
             BigDecimal importe = new BigDecimal(valor);
-            Button rapido = new Button(String.format(Locale.US, "%,.0f", importe),
-                    e -> recibidoSimple.setValue(importe));
+            Button rapido = new Button(String.format(Locale.US, "%,.0f", importe), e -> {
+                recibidoSimple.setValue(importe);
+                recibidoSimple.focus();
+            });
             rapido.addClassName("cc-pos-cash-option");
             rapido.setTooltipText("Recibido " + dinero(importe));
             importesRapidos.add(rapido);
         }
-        VerticalLayout panel = new VerticalLayout(recibidoSimple, importesRapidos, referenciaSimple,
-                cuentaSimple, bancoSimple, cambioSimple);
+        Span recibidoEtiqueta = new Span("Recibido");
+        recibidoEtiqueta.addClassName("cc-pos-received-label");
+        recibidoSimpleFila.removeAll();
+        recibidoSimpleFila.add(recibidoEtiqueta, recibidoSimple);
+        recibidoSimpleFila.addClassName("cc-pos-received-row");
+        VerticalLayout panel = new VerticalLayout(recibidoSimpleFila, importesRapidos, referenciaSimple,
+                cuentaSimple, bancoSimple);
         panel.setPadding(false);
         panel.setSpacing(false);
         panel.addClassName("cc-pos-simple-payment");
@@ -138,13 +201,14 @@ public class PosPaymentDialog extends Dialog {
 
     private void seleccionarSimple(MetodoPagoPosDto metodo) {
         if (metodo == null) return;
+        reiniciarDobleEspacio();
         metodoSimple = metodo;
         recibidoSimple.clear();
         referenciaSimple.clear();
         cuentaSimple.clear();
         bancoSimple.clear();
-        recibidoSimple.setVisible(metodo.efectivo());
-        cambioSimple.setVisible(metodo.efectivo());
+        recibidoSimpleFila.setVisible(metodo.efectivo());
+        cambioSimpleFila.setVisible(metodo.efectivo());
         importesRapidos.setVisible(metodo.efectivo());
         referenciaSimple.setVisible(metodo.requiereReferencia() || metodo.electronico()
                 || metodo.tipo() == TipoMetodoPagoVenta.BANK_TRANSFER);
@@ -159,10 +223,13 @@ public class PosPaymentDialog extends Dialog {
 
     private void actualizarSimple() {
         BigDecimal cambioValor = metodoSimple != null && metodoSimple.efectivo()
-                ? CobroVentaCalculo.cambio(total, escala(recibidoSimple.getValue())).max(BigDecimal.ZERO)
+                ? CobroVentaCalculo.cambioNoNegativo(total, escala(recibidoSimple.getValue()))
                 : BigDecimal.ZERO;
-        cambioSimple.setText("Cambio  " + dinero(cambioValor));
+        cambioSimple.setText(dinero(cambioValor));
+        cambioSimple.removeClassName("cc-pos-payment-change-positive");
+        if (cambioValor.signum() > 0) cambioSimple.addClassName("cc-pos-payment-change-positive");
         confirmar.setEnabled(simpleValido());
+        actualizarDisponibilidadAtajoExacto();
     }
 
     private boolean simpleValido() {
@@ -173,12 +240,16 @@ public class PosPaymentDialog extends Dialog {
     }
 
     private void mostrarMultiple() {
+        reiniciarDobleEspacio();
+        setHeaderTitle("COBRAR · PAGO MÚLTIPLE");
         modoMultiple = true;
+        actualizarDisponibilidadAtajoExacto();
         contenido.removeAll();
-        contenido.add(totalBox(), titulo("DISTRIBUIR PAGO"), accesosMetodos(this::seleccionarMultiple),
+        contenido.add(totalBox(false), titulo("DISTRIBUIR PAGO"), accesosMetodos(this::seleccionarMultiple),
                 construirEditorMultiple(), titulo("PAGOS APLICADOS"), grid, construirResumenMultiple());
         alternarModo.setText("Volver a pago simple");
         alternarModo.setIcon(VaadinIcon.ARROW_BACKWARD.create());
+        alternarModo.setTooltipText("Volver a pago simple");
         configurarGrid();
         actualizarFooter();
         seleccionarMultiple(metodos.stream().filter(MetodoPagoPosDto::efectivo).findFirst()
@@ -220,10 +291,23 @@ public class PosPaymentDialog extends Dialog {
         return resumen;
     }
 
-    private Component totalBox() {
+    private Component totalBox(boolean incluirCambio) {
         Span totalImporte = new Span(dinero(total));
         totalImporte.addClassName("cc-pos-payment-total-value");
-        Div totalBox = new Div(new Span("TOTAL A COBRAR"), totalImporte);
+        Span totalEtiqueta = new Span("TOTAL A COBRAR");
+        totalEtiqueta.addClassName("cc-pos-payment-metric-label");
+        Div totalFila = new Div(totalEtiqueta, totalImporte);
+        totalFila.addClassName("cc-pos-payment-total-row");
+        Div totalBox = new Div(totalFila);
+        if (incluirCambio) {
+            Span cambioEtiqueta = new Span("CAMBIO");
+            cambioEtiqueta.addClassName("cc-pos-payment-metric-label");
+            cambioSimple.addClassName("cc-pos-payment-change-value");
+            cambioSimpleFila.removeAll();
+            cambioSimpleFila.add(cambioEtiqueta, cambioSimple);
+            cambioSimpleFila.addClassName("cc-pos-payment-change-row");
+            totalBox.add(cambioSimpleFila);
+        }
         totalBox.addClassName("cc-pos-payment-total");
         return totalBox;
     }
@@ -239,28 +323,24 @@ public class PosPaymentDialog extends Dialog {
         accesos.addClassName("cc-pos-payment-methods");
         accesos.setPadding(false);
         accesos.setSpacing(true);
-        metodos.stream().limit(4).forEach(m -> {
+        List<MetodoPagoPosDto> principales = metodosPrincipales(metodos);
+        principales.forEach(m -> {
             Button boton = new Button(etiquetaCorta(m), icono(m), e -> seleccionar.accept(m));
             boton.addClassName("cc-pos-payment-method");
             boton.setTooltipText(m.nombre());
             accesos.add(boton);
         });
-        List<MetodoPagoPosDto> otros = metodos.stream().skip(4).toList();
-        if (!otros.isEmpty()) {
-            ComboBox<MetodoPagoPosDto> mas = new ComboBox<>();
-            mas.setPlaceholder("Más métodos");
-            mas.setItems(otros);
-            mas.setItemLabelGenerator(MetodoPagoPosDto::nombre);
-            mas.addValueChangeListener(e -> {
-                if (e.getValue() != null) {
-                    seleccionar.accept(e.getValue());
-                    mas.clear();
-                }
-            });
-            mas.addClassName("cc-pos-more-methods");
-            accesos.add(mas);
-        }
+        accesos.add(alternarModo);
         return accesos;
+    }
+
+    static List<MetodoPagoPosDto> metodosPrincipales(List<MetodoPagoPosDto> metodos) {
+        List<MetodoPagoPosDto> resultado = new ArrayList<>();
+        for (TipoMetodoPagoVenta tipo : List.of(TipoMetodoPagoVenta.CASH, TipoMetodoPagoVenta.CREDIT_CARD,
+                TipoMetodoPagoVenta.DEBIT_CARD, TipoMetodoPagoVenta.BANK_TRANSFER)) {
+            metodos.stream().filter(m -> m.tipo() == tipo).findFirst().ifPresent(resultado::add);
+        }
+        return List.copyOf(resultado);
     }
 
     private void configurarGrid() {
@@ -354,6 +434,7 @@ public class PosPaymentDialog extends Dialog {
     }
 
     private void alternarModo() {
+        reiniciarDobleEspacio();
         if (!modoMultiple) {
             mostrarMultiple();
             return;
@@ -377,26 +458,63 @@ public class PosPaymentDialog extends Dialog {
 
     private void actualizarFooter() {
         getFooter().removeAll();
-        getFooter().add(alternarModo, cancelar, confirmar);
+        getFooter().add(confirmar, cancelar);
         if (modoMultiple) actualizarResumen(); else actualizarSimple();
     }
 
     private void confirmar() {
+        reiniciarDobleEspacio();
+        confirmar.setEnabled(false);
         if (modoMultiple) {
-            if (pendiente().compareTo(BigDecimal.ZERO) != 0 || aplicaciones.size() < 2) return;
+            if (pendiente().compareTo(BigDecimal.ZERO) != 0 || aplicaciones.size() < 2) {
+                actualizarResumen();
+                return;
+            }
             onConfirmar.accept(aplicaciones.stream().map(AplicacionTemporal::input).toList());
             return;
         }
-        if (!simpleValido()) return;
+        if (!simpleValido()) {
+            actualizarSimple();
+            return;
+        }
         BigDecimal recibidoValor = metodoSimple.efectivo() ? escala(recibidoSimple.getValue()) : null;
         onConfirmar.accept(List.of(new AplicacionCobroInput(metodoSimple.id(), total, recibidoValor,
                 cuentaSimple.getValue() == null ? null : cuentaSimple.getValue().id(),
                 referenciaSimple.getValue().trim(), bancoSimple.getValue().trim())));
     }
 
+    public void reactivarConfirmacion() {
+        if (modoMultiple) actualizarResumen(); else actualizarSimple();
+    }
+
+    private void usarMontoExacto() {
+        if (!atajoExactoDisponible()) return;
+        reiniciarDobleEspacio();
+        recibidoSimple.setValue(total);
+        actualizarSimple();
+        confirmar.focus();
+    }
+
+    private boolean atajoExactoDisponible() {
+        return isOpened() && !modoMultiple && metodoSimple != null && metodoSimple.efectivo();
+    }
+
+    private void actualizarDisponibilidadAtajoExacto() {
+        getElement().setProperty("ccCashExactEnabled", atajoExactoDisponible());
+    }
+
+    private void reiniciarDobleEspacio() {
+        doubleSpace.reset();
+    }
+
+    private void cerrar() {
+        reiniciarDobleEspacio();
+        close();
+    }
+
     private void actualizarCambio() {
         BigDecimal valor = metodoActual != null && metodoActual.efectivo()
-                ? CobroVentaCalculo.cambio(escala(monto.getValue()), escala(recibido.getValue())).max(BigDecimal.ZERO)
+                ? CobroVentaCalculo.cambioNoNegativo(escala(monto.getValue()), escala(recibido.getValue()))
                 : BigDecimal.ZERO;
         cambio.setText("Cambio  " + dinero(valor));
     }
@@ -426,6 +544,10 @@ public class PosPaymentDialog extends Dialog {
     }
 
     private String dinero(BigDecimal valor) {
+        return formatearDinero(moneda, valor);
+    }
+
+    static String formatearDinero(String moneda, BigDecimal valor) {
         return moneda + " " + String.format(Locale.US, "%,.2f", valor == null ? BigDecimal.ZERO : valor);
     }
 

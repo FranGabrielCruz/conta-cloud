@@ -15,6 +15,17 @@ class CobroVentaCalculoTest {
     @Test void calculaCambioSoloSobreLaPorcionEfectiva(){
         assertEquals(new BigDecimal("500.0000"),CobroVentaCalculo.cambio(new BigDecimal("2000"),new BigDecimal("2500")));
     }
+    @Test void cambioVisibleEsCeroSinRecibidoOSiEsInsuficiente(){
+        assertEquals(new BigDecimal("0.0000"), CobroVentaCalculo.cambioNoNegativo(new BigDecimal("14.16"), BigDecimal.ZERO));
+        assertEquals(new BigDecimal("0.0000"), CobroVentaCalculo.cambioNoNegativo(new BigDecimal("14.16"), new BigDecimal("10")));
+    }
+    @Test void cambioVisibleEsCeroParaPagoExacto(){
+        assertEquals(new BigDecimal("0.0000"), CobroVentaCalculo.cambioNoNegativo(new BigDecimal("14.16"), new BigDecimal("14.16")));
+    }
+    @Test void cambioVisibleCalculaExcedenteEfectivo(){
+        assertEquals(new BigDecimal("5.8400"), CobroVentaCalculo.cambioNoNegativo(new BigDecimal("14.16"), new BigDecimal("20")));
+        assertEquals(new BigDecimal("74549.2500"), CobroVentaCalculo.cambioNoNegativo(new BigDecimal("125450.75"), new BigDecimal("200000")));
+    }
     @Test void calculaCobroMixtoConTresAplicaciones(){
         BigDecimal aplicado=CobroVentaCalculo.totalAplicado(List.of(new BigDecimal("2000"),new BigDecimal("5000"),new BigDecimal("3000")));
         assertEquals(new BigDecimal("10000.0000"),aplicado);

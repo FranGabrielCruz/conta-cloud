@@ -18,9 +18,10 @@ import java.util.*;
 @Service
 public class FacturacionPosService {
     private static final int SCALE=4;
+    private static final int LIMITE_CLIENTES_POS=5;
     private final TerminalPosRepository terminales; private final CashRegisterRepository cajas;
     private final CashRegisterSessionRepository sesiones; private final SucursalRepository sucursales;
-    private final AlmacenRepository almacenes; private final ProductRepository productos; private final ClienteRepository clientes;
+    private final PosWarehouseResolver almacenesPos; private final ProductRepository productos; private final ClienteRepository clientes;
     private final InventoryMovementRepository existencias; private final FacturaVentaRepository facturas;
     private final LineaFacturaVentaRepository lineas; private final PagoVentaRepository pagos;
     private final MetodoPagoVentaRepository metodosPago; private final AplicacionPagoVentaRepository aplicacionesPago;
@@ -29,12 +30,12 @@ public class FacturacionPosService {
     private final AuditoriaService auditoria; private final JdbcTemplate jdbc;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
-            CashRegisterSessionRepository sesiones,SucursalRepository sucursales,AlmacenRepository almacenes,
+            CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
             ProductRepository productos,ClienteRepository clientes,InventoryMovementRepository existencias,
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
             FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,JdbcTemplate jdbc){
-        this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenes=almacenes;
+        this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
         this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.jdbc=jdbc;
@@ -62,7 +63,9 @@ public class FacturacionPosService {
         String token=nuevoToken();TerminalPos terminal=terminales.saveAndFlush(new TerminalPos(p.tenantId(),empresa,
             caja.getSucursalId(),caja.getId(),hash(token),nombre,p.usuarioId()));
         auditoria.registrar("POS_TERMINAL_CONFIGURED","TerminalPos",terminal.getId(),"{\"cajaId\":\""+caja.getId()+"\"}");
-        return new TerminalPosConfiguradaDto(token,toDto(terminal,caja));
+        Sucursal sucursal=sucursales.findByIdAndEmpresaId(caja.getSucursalId(),empresa)
+            .orElseThrow(()->new ReglaNegocioException("La sucursal configurada para esta caja no está disponible."));
+        return new TerminalPosConfiguradaDto(token,toDto(terminal,caja,almacenesPos.resolver(p.tenantId(),empresa,sucursal)));
     }
 
     @Transactional(readOnly=true)
@@ -74,30 +77,51 @@ public class FacturacionPosService {
             .filter(t->EmpresaContext.permiteSucursal(t.getSucursalId())).map(t->{
                 Caja caja=cajas.findByIdAndTenantIdAndEmpresaId(t.getCajaId(),p.tenantId(),empresa)
                     .orElseThrow(()->new RecursoNoEncontradoException("La caja configurada ya no existe."));
-                return toDto(t,caja);
+                Sucursal sucursal=sucursales.findByIdAndEmpresaId(caja.getSucursalId(),empresa)
+                    .orElseThrow(()->new ReglaNegocioException("La sucursal configurada para esta caja no está disponible."));
+                Almacen almacen=almacenesPos.resolver(p.tenantId(),empresa,sucursal);
+                return toDto(t,caja,almacen);
             });
     }
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.crear')")
-    public List<ClientePosDto> buscarClientes(String texto,int offset,int limite){
+    public BusquedaClientesPosDto buscarClientes(String texto){
         var p=TenantContext.principalActual();String q=limpiar(texto);
-        int size=Math.max(1,Math.min(limite,100));int page=Math.max(0,offset)/size;
-        return clientes.buscar(p.tenantId(),EmpresaContext.requerirEmpresaId(),q,soloDigitos(q),soloDigitos(q),true,
-            PageRequest.of(page,size)).stream().map(c->new ClientePosDto(c.getId(),c.getCodigo(),nombreCliente(c),
-                c.getTipoIdentificacion(),c.getIdentificacion(),c.getTelefono())).toList();
+        var resultado=clientes.buscarParaPos(p.tenantId(),EmpresaContext.requerirEmpresaId(),q,soloDigitos(q),soloDigitos(q),
+            PageRequest.of(0,LIMITE_CLIENTES_POS));
+        List<ClientePosDto> encontrados=resultado.getContent().stream().map(c->new ClientePosDto(c.getId(),c.getCodigo(),nombreCliente(c),
+            c.getTipoIdentificacion(),c.getIdentificacion(),c.getTelefono())).toList();
+        return new BusquedaClientesPosDto(encontrados,resultado.hasNext());
     }
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.crear')")
-    public List<ProductoPosDto> buscarProductos(String token,String texto,int offset,int limite){
-        ContextoPos ctx=contexto(token,false);String q=limpiar(texto);
+    public List<ProductoPosDto> buscarProductos(String token,UUID almacenId,String texto,int offset,int limite){
+        ContextoPos ctx=contexto(token,false,almacenId);String q=limpiar(texto);
         int size=Math.max(1,Math.min(limite,100));int page=Math.max(0,offset)/size;
         return productos.buscarParaVenta(ctx.principal.tenantId(),ctx.empresa,ctx.caja.getMonedaId(),q,PageRequest.of(page,size)).stream()
             .map(p->new ProductoPosDto(p.getId(),p.getCodigo(),p.getNombre(),p.getCodigoBarras(),p.getUnidadMedida().getAbreviatura(),
                 p.getPrecioVenta(),p.getImpuestoVenta()!=null&&p.getImpuestoVenta().isActivo()?p.getImpuestoVenta().getPorcentaje():BigDecimal.ZERO,
                 p.isControlaExistencia()?existencias.saldo(ctx.principal.tenantId(),ctx.empresa,ctx.almacen.getId(),p.getId()):BigDecimal.ZERO,
                 p.isControlaExistencia(),p.isPermiteExistenciaNegativa())).toList();
+    }
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.crear')")
+    public void validarCantidad(String token,UUID almacenId,UUID productoId,BigDecimal cantidad){
+        if(productoId==null||cantidad==null||cantidad.signum()<=0)
+            throw new ReglaNegocioException("La cantidad debe ser mayor que cero.");
+        ContextoPos ctx=contexto(token,false,almacenId);
+        Producto producto=productos.findByIdAndTenantIdAndEmpresaId(productoId,ctx.principal.tenantId(),ctx.empresa)
+            .filter(Producto::isActivo).orElseThrow(()->new RecursoNoEncontradoException("Producto no encontrado."));
+        if(!ctx.caja.getMonedaId().equals(producto.getMonedaId()))
+            throw new ReglaNegocioException("El producto utiliza una moneda distinta a la caja.");
+        if(producto.isControlaExistencia()&&!producto.isPermiteExistenciaNegativa()){
+            BigDecimal disponible=existencias.saldo(ctx.principal.tenantId(),ctx.empresa,ctx.almacen.getId(),producto.getId());
+            if(disponible.compareTo(escala(cantidad))<0)
+                throw new ReglaNegocioException("Existencia insuficiente para "+producto.getNombre()+".");
+        }
     }
 
     @Transactional(readOnly=true)
@@ -127,7 +151,8 @@ public class FacturacionPosService {
         var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();
         Optional<FacturaVenta> existente=facturas.findByTenantIdAndEmpresaIdAndClaveIdempotencia(p.tenantId(),empresa,input.idempotencia());
         if(existente.isPresent())return resultado(existente.get());
-        ContextoPos ctx=contexto(input.token(),true);
+        if(input.almacenId()==null)throw new ReglaNegocioException("No fue posible identificar el almacén de la venta.");
+        ContextoPos ctx=contexto(input.token(),true,input.almacenId());
         existente=facturas.findByTenantIdAndEmpresaIdAndClaveIdempotencia(p.tenantId(),empresa,input.idempotencia());
         if(existente.isPresent())return resultado(existente.get());
         if(input.lineas()==null||input.lineas().isEmpty())throw new ReglaNegocioException("Agrega al menos un producto o servicio.");
@@ -237,7 +262,7 @@ public class FacturacionPosService {
     private static BigDecimal escala(BigDecimal valor){return (valor==null?BigDecimal.ZERO:valor).setScale(SCALE,RoundingMode.HALF_UP);}
     private static String texto(String valor,int max){String s=limpiar(valor);if(s.length()>max)throw new ReglaNegocioException("El dato ingresado excede el máximo permitido.");return s.isEmpty()?null:s;}
 
-    private ContextoPos contexto(String token,boolean bloquear){
+    private ContextoPos contexto(String token,boolean bloquear,UUID almacenEsperado){
         if(token==null||token.isBlank())throw new ReglaNegocioException("Esta terminal no está configurada.");
         var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();
         TerminalPos terminal=terminales.findByTokenHashAndTenantIdAndEmpresaIdAndActivoTrue(hash(token),p.tenantId(),empresa)
@@ -253,18 +278,18 @@ public class FacturacionPosService {
             sesion=sesiones.bloquear(sesion.getId(),p.tenantId(),empresa).orElseThrow();
             if(!p.usuarioId().equals(sesion.getAbiertoPor()))throw new ReglaNegocioException("La caja está abierta por otro usuario.");
         }
-        Sucursal sucursal=sucursales.findByIdAndEmpresaId(caja.getSucursalId(),empresa).orElseThrow();
-        Almacen almacen=sucursal.getAlmacenPredeterminadoId()==null?null:
-            almacenes.findByIdAndTenantIdAndEmpresaId(sucursal.getAlmacenPredeterminadoId(),p.tenantId(),empresa).filter(Almacen::isActivo).orElse(null);
-        if(almacen==null)almacen=almacenes.findFirstByTenantIdAndEmpresaIdAndSucursalIdAndActivoTrueAndAdministradoSistemaFalseOrderByNombre(
-            p.tenantId(),empresa,sucursal.getId()).orElseThrow(()->new ReglaNegocioException("La sucursal no tiene un almacén activo configurado."));
+        Sucursal sucursal=sucursales.findByIdAndEmpresaId(caja.getSucursalId(),empresa)
+            .orElseThrow(()->new ReglaNegocioException("La sucursal configurada para esta caja no está disponible."));
+        Almacen almacen=almacenesPos.resolver(p.tenantId(),empresa,sucursal);
+        if(almacenEsperado!=null&&!almacenEsperado.equals(almacen.getId()))
+            throw new ReglaNegocioException("La configuración del almacén cambió. Reinicia la venta antes de continuar.");
         return new ContextoPos(p,empresa,terminal,caja,sesion,almacen);
     }
 
-    private TerminalPosDto toDto(TerminalPos t,Caja c){
+    private TerminalPosDto toDto(TerminalPos t,Caja c,Almacen almacen){
         SesionCaja s=sesiones.findByTenantIdAndEmpresaIdAndCajaIdAndStatus(t.getTenantId(),t.getEmpresaId(),c.getId(),EstadoSesionCaja.OPEN).orElse(null);
         return new TerminalPosDto(t.getId(),t.getNombre(),c.getSucursalId(),c.getSucursal().getNombre(),c.getId(),c.getNombre(),
-            c.getMoneda().getCodigoIso(),s!=null,s==null?null:s.getId(),s==null?null:s.getFechaOperativa());
+            almacen.getId(),almacen.getNombre(),c.getMoneda().getCodigoIso(),s!=null,s==null?null:s.getId(),s==null?null:s.getFechaOperativa());
     }
     private String siguienteNumero(UUID tenant,UUID empresa){
         Long n=jdbc.queryForObject("INSERT INTO sales_invoice_sequence(tenant_id,empresa_id,last_number) VALUES(?,?,1) "+
