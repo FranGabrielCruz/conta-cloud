@@ -332,29 +332,33 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-suggestion-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .cc-pos-suggestion-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lumo-secondary-text-color); font-size: var(--lumo-font-size-xs); }
 .cc-pos-grid { width: 100%; min-width: 0; min-height: 160px; height: auto; flex: 1 1 220px; border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); overflow: hidden; }
-.cc-pos-grid::part(header-row) { height: 38px; min-height: 38px; max-height: 38px; }
-.cc-pos-grid::part(row) { height: 38px; min-height: 38px; max-height: 40px; }
+.cc-pos-grid::part(header-row) { height: 32px; min-height: 32px; max-height: 32px; }
+.cc-pos-grid::part(row) { height: 30px; min-height: 30px; max-height: 30px; }
 .cc-pos-grid::part(header-cell), .cc-pos-grid::part(cell) {
   min-width: 0;
   box-sizing: border-box;
   align-items: center;
-  padding: 1px 5px;
+  padding: 1px 4px;
+  font-size: 15px;
 }
 .cc-pos-grid::part(header-cell) {
-  height: 38px;
-  min-height: 38px;
-  max-height: 38px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
   white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
-  font-size: var(--lumo-font-size-xs);
+  font-size: 15px;
+  font-weight: 600;
 }
-.cc-pos-product-name, .cc-pos-product-code { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
-.cc-pos-quantity-editor { display: flex; align-items: center; justify-content: flex-end; gap: 2px; width: 100%; min-width: 0; height: 28px; overflow: visible; }
-.cc-pos-quantity { width: 52px; min-width: 48px; height: 28px; margin: 0; padding: 0; }
-.cc-pos-quantity::part(input-field) { min-height: 28px; height: 28px; padding-inline: 3px; }
-.cc-pos-icon-button { min-width: 28px; width: 28px; height: 28px; min-height: 28px; margin: 0; padding: 0; overflow: visible; background: transparent; border: 0; box-shadow: none; color: var(--lumo-primary-text-color); }
-.cc-pos-icon-button vaadin-icon { width: 18px; height: 18px; }
+.cc-pos-product-name, .cc-pos-product-code { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.1; }
+.cc-pos-money-value { display: block; width: 100%; min-width: max-content; overflow: visible; text-overflow: clip; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.cc-pos-quantity-editor { display: flex; align-items: center; justify-content: flex-end; gap: 2px; width: 100%; min-width: 0; height: 26px; overflow: visible; }
+.cc-pos-quantity { width: 46px; min-width: 46px; height: 26px; margin: 0; padding: 0; font-size: 15px; }
+.cc-pos-quantity::part(input-field) { min-height: 26px; height: 26px; padding-inline: 3px; font-size: 15px; }
+.cc-pos-quantity input { font-size: 15px; text-align: center; }
+.cc-pos-icon-button { min-width: 26px; width: 26px; height: 26px; min-height: 26px; margin: 0; padding: 0; overflow: visible; background: transparent; border: 0; box-shadow: none; color: var(--lumo-primary-text-color); }
+.cc-pos-icon-button vaadin-icon { width: 16px; height: 16px; }
 .cc-pos-icon-button.cc-pos-quantity-control { color: var(--lumo-primary-text-color); }
 .cc-pos-icon-button.cc-pos-quantity-control vaadin-icon { width: 14px; height: 14px; }
 .cc-pos-grid .cc-pos-row-action { color: var(--lumo-error-text-color); }
@@ -390,7 +394,8 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-charge-icon { width: 30px; height: 30px; flex: 0 0 30px; }
 .cc-pos-charge-confirm { --vaadin-button-background: var(--lumo-success-color); background: var(--lumo-success-color); color: #fff; font-weight: 800; }
 .cc-pos-charge-confirm vaadin-icon { color: #fff; }
-.cc-pos-charge-confirm[disabled] { background: var(--lumo-contrast-20pct); color: var(--lumo-disabled-text-color); opacity: .72; cursor: not-allowed; }
+.cc-pos-charge-confirm:hover:not([disabled]) { --vaadin-button-background: color-mix(in srgb, var(--lumo-success-color) 86%, #000); background: color-mix(in srgb, var(--lumo-success-color) 86%, #000); }
+.cc-pos-charge-confirm[disabled] { --vaadin-button-background: var(--lumo-contrast-20pct); background: var(--lumo-contrast-20pct); color: var(--lumo-disabled-text-color); opacity: .72; cursor: not-allowed; }
 .cc-pos-charge-confirm[disabled] vaadin-icon { color: var(--lumo-disabled-text-color); }
 .cc-pos-empty { margin: auto; max-width: 560px; text-align: center; padding: var(--lumo-space-xl); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-l); }
 .cc-pos-cash-label { display: block; color: var(--lumo-secondary-text-color); font-weight: 800; text-align: center; }
@@ -422,12 +427,15 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-payment-summary-row { display: flex; justify-content: space-between; gap: var(--lumo-space-xl); padding: 3px 0; }
 .cc-pos-payment-summary-row span:last-child { font-weight: 800; font-variant-numeric: tabular-nums; }
 .cc-pos-payment-summary > span:last-child { align-self: flex-end; margin-top: var(--lumo-space-xs); color: var(--lumo-success-text-color); font-weight: 800; }
-.cc-pos-payment-dialog::part(footer) { min-height: 0; padding: var(--lumo-space-s) var(--lumo-space-m); gap: 8px; justify-content: flex-end; }
-.cc-pos-payment-footer-action { width: 40px; min-width: 40px; max-width: 40px; height: 40px; min-height: 40px; max-height: 40px; margin: 0; padding: 0; border-radius: var(--cc-radius); }
-.cc-pos-payment-footer-action vaadin-icon { width: 22px; height: 22px; }
-.cc-pos-payment-cancel { --vaadin-button-background: var(--cc-action-neutral); background: var(--cc-action-neutral); color: #fff; border: 0; }
+.cc-pos-payment-dialog::part(footer) { min-height: 0; padding: 10px 26px; gap: 0; justify-content: flex-end; }
+.cc-pos-payment-action-group { display: flex; align-items: center; justify-content: flex-end; gap: 0; margin: 0; padding: 0; }
+.cc-pos-payment-footer-action { box-sizing: border-box; height: 44px; min-height: 44px; max-height: 44px; margin: 0; padding: 0 var(--lumo-space-m); gap: 9px; font-size: 16.5px; font-weight: 800; }
+.cc-pos-payment-footer-action vaadin-icon { width: 24px; height: 24px; }
+.cc-pos-charge-confirm.cc-pos-payment-footer-action { width: 195px; min-width: 190px; max-width: 200px; border-radius: 12px 0 0 12px; }
+.cc-pos-payment-cancel.cc-pos-payment-footer-action { width: 130px; min-width: 125px; max-width: 135px; border-radius: 0 12px 12px 0; }
+.cc-pos-payment-cancel { --vaadin-button-background: #667085; background: #667085; color: #fff; border: 0; border-left: 1px solid rgba(255,255,255,.22); }
 .cc-pos-payment-cancel vaadin-icon { color: #fff; }
-.cc-pos-payment-cancel:hover:not([disabled]) { background: color-mix(in srgb, var(--cc-action-neutral) 84%, #000); }
+.cc-pos-payment-cancel:hover:not([disabled]) { --vaadin-button-background: #556070; background: #556070; }
 .cc-pos-simple-payment { gap: var(--lumo-space-xs); }
 .cc-pos-received-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: var(--lumo-space-s); width: 100%; }
 .cc-pos-received-label { font-weight: 700; }

@@ -49,8 +49,9 @@ public class PosPaymentDialog extends Dialog {
     private final Span pendienteValor = new Span();
     private final Span completo = new Span("✓ Cobro completo");
     private final Button aplicar = new Button("Aplicar", VaadinIcon.CHECK.create());
-    private final Button confirmar = new Button(VaadinIcon.MONEY.create());
-    private final Button cancelar = new Button(VaadinIcon.CLOSE.create(), e -> cerrar());
+    private final Button confirmar = new Button("Confirmar cobro", VaadinIcon.MONEY.create());
+    private final Button cancelar = new Button("Cancelar", VaadinIcon.CLOSE.create(), e -> cerrar());
+    private final Div accionesFooter = new Div();
     private final Button alternarModo = new Button();
     private final DoubleSpaceDetector doubleSpace = new DoubleSpaceDetector();
 
@@ -458,7 +459,10 @@ public class PosPaymentDialog extends Dialog {
 
     private void actualizarFooter() {
         getFooter().removeAll();
-        getFooter().add(confirmar, cancelar);
+        accionesFooter.removeAll();
+        accionesFooter.add(confirmar, cancelar);
+        accionesFooter.addClassName("cc-pos-payment-action-group");
+        getFooter().add(accionesFooter);
         if (modoMultiple) actualizarResumen(); else actualizarSimple();
     }
 

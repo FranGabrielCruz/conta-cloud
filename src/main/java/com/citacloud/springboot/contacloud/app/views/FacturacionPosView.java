@@ -336,16 +336,18 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         grid.addClassName("cc-pos-grid");
         grid.setEmptyStateText("No hay productos agregados a la venta");
         grid.setAllRowsVisible(false);
-        grid.addColumn(f -> filas.indexOf(f) + 1).setHeader("#").setWidth("36px").setFlexGrow(0);
+        grid.addColumn(f -> filas.indexOf(f) + 1).setHeader("#").setWidth("50px").setFlexGrow(0);
         grid.addColumn(new ComponentRenderer<>(f -> textoConTooltip(f.nombre(), "cc-pos-product-name")))
-                .setHeader("Producto").setWidth("280px").setFlexGrow(4);
-        grid.addColumn(new ComponentRenderer<>(this::campoCantidad)).setHeader("Cantidad").setWidth("130px")
+                .setHeader("Producto").setWidth("160px").setFlexGrow(1);
+        grid.addColumn(new ComponentRenderer<>(this::campoCantidad)).setHeader("Cantidad").setWidth("150px")
                 .setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(f -> dinero(f.precio)).setHeader("Precio").setWidth("110px").setFlexGrow(0)
+        grid.addColumn(new ComponentRenderer<>(f -> importeCompleto(f.precio))).setHeader("Precio")
+                .setWidth("132px").setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(f -> dinero(f.total())).setHeader("Total").setWidth("100px").setFlexGrow(0)
+        grid.addColumn(new ComponentRenderer<>(f -> importeCompleto(f.total()))).setHeader("Total")
+                .setWidth("145px").setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(new ComponentRenderer<>(this::accionesFila)).setHeader("Acc.").setWidth("48px").setFlexGrow(0);
+        grid.addColumn(new ComponentRenderer<>(this::accionesFila)).setHeader("Acc.").setWidth("44px").setFlexGrow(0);
         grid.setItems(filas);
     }
 
@@ -362,6 +364,12 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Span span = new Span(valor(texto, "—"));
         span.addClassName(clase);
         span.getElement().setAttribute("title", span.getText());
+        return span;
+    }
+
+    private static Span importeCompleto(BigDecimal importe) {
+        Span span = new Span(dinero(importe));
+        span.addClassName("cc-pos-money-value");
         return span;
     }
 
@@ -839,7 +847,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         return dialog;
     }
 
-    private static String dinero(BigDecimal valor) {
+    static String dinero(BigDecimal valor) {
         return String.format(Locale.US, "%,.2f", valor == null ? BigDecimal.ZERO : valor);
     }
 
