@@ -21,8 +21,10 @@ public class AppDetailSection extends Div {
         item.addClassName("cc-detail-field");
         var fieldLabel = new Span(label);
         fieldLabel.addClassName("cc-detail-label");
-        var fieldValue = new Span(value == null || value.isBlank() ? "No especificado" : value);
+        String displayValue = value == null || value.isBlank() ? "No especificado" : value;
+        var fieldValue = new Span(displayValue);
         fieldValue.addClassName("cc-detail-value");
+        fieldValue.getElement().setAttribute("title", displayValue);
         item.add(fieldLabel, fieldValue);
         fields.add(item);
         return this;

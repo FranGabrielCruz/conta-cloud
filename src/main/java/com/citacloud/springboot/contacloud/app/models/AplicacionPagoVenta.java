@@ -30,5 +30,8 @@ public class AplicacionPagoVenta {
         codigoMetodo=metodo.getCode();nombreMetodo=metodo.getName();tipoMetodo=metodo.getType();amount=monto;
         this.recibido=recibido;this.cambio=cambio;this.cuentaBancariaId=cuentaBancariaId;reference=referencia;this.banco=banco;lineOrder=orden;
     }
-    public UUID getId(){return id;}
+    public UUID getId(){return id;} public UUID getPagoId(){return pagoId;} public String getNombreMetodo(){return nombreMetodo;}
+    public TipoMetodoPagoVenta getTipoMetodo(){return tipoMetodo;} public BigDecimal getMonto(){return amount;}
+    public BigDecimal getRecibido(){return recibido;} public BigDecimal getCambio(){return cambio;}
+    public String getReferencia(){return reference;} public String getBanco(){return banco;} public int getLineOrder(){return lineOrder;}
 }

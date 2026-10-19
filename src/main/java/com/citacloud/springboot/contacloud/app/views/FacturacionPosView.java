@@ -8,6 +8,7 @@ import com.citacloud.springboot.contacloud.app.views.components.PosChargeButton;
 import com.citacloud.springboot.contacloud.app.views.components.PosCustomerLine;
 import com.citacloud.springboot.contacloud.app.views.components.DoubleEnterDetector;
 import com.citacloud.springboot.contacloud.app.views.components.PosPaymentDialog;
+import com.citacloud.springboot.contacloud.app.views.components.UltimasFacturasDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -39,6 +40,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final FacturacionPosService service;
     private final CashRegisterSessionService cajaService;
     private final FacturaVentaPdfService documentos;
+    private final UltimasFacturasService ultimasFacturas;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -56,6 +58,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private TerminalPosDto terminal;
     private PosPaymentDialog dialogoCobroActivo;
     private Dialog dialogoClienteActivo;
+    private UltimasFacturasDialog dialogoUltimasActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -64,10 +67,12 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private boolean agregandoProducto;
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
-                              FacturaVentaPdfService documentos, ModuleAuthorization authorization) {
+                              FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas,
+                              ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
         this.documentos = documentos;
+        this.ultimasFacturas = ultimasFacturas;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -100,7 +105,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Shortcuts.addShortcutListener(this, () -> pendiente("Recargo"), Key.F4);
         Shortcuts.addShortcutListener(this, () -> pendiente("Retener venta"), Key.F5);
         Shortcuts.addShortcutListener(this, this::dialogoClientes, Key.F6);
-        Shortcuts.addShortcutListener(this, () -> pendiente("Últimas ventas"), Key.F7);
+        Shortcuts.addShortcutListener(this, this::dialogoUltimasFacturas, Key.F7);
         Shortcuts.addShortcutListener(this, this::dialogoCobro, Key.F9);
     }
 
@@ -455,7 +460,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Div tarjetas = new Div(
                 agregar, descuentoRapido, recargoRapido, retener, limpiar,
                 tarjeta("👥", "Clientes", "F6", "Seleccionar cliente (F6)", e -> dialogoClientes()),
-                tarjeta("🧾", "Últimas", "F7", "Ver últimas ventas (F7)", e -> pendiente("Últimas ventas")),
+                tarjeta("🧾", "Últimas", "F7", "Ver últimas facturas (F7)", e -> dialogoUltimasFacturas()),
                 tarjeta("↩", "Devoluciones", "", "Devoluciones", e -> pendiente("Devoluciones")));
         tarjetas.addClassName("cc-pos-quick-grid");
         Div bloque = new Div(cabecera, tarjetas);
@@ -769,6 +774,19 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         } catch (RuntimeException ex) { error(ex, "No fue posible preparar el cobro."); }
     }
 
+    private void dialogoUltimasFacturas() {
+        reiniciarDobleEnter();
+        if (dialogoUltimasActivo != null && dialogoUltimasActivo.isOpened()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
+        UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, this::enfocarProducto);
+        dialogoUltimasActivo = dialog;
+        dialog.addOpenedChangeListener(event -> {
+            if (!event.isOpened() && dialogoUltimasActivo == dialog) dialogoUltimasActivo = null;
+        });
+        dialog.open();
+    }
+
     private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
         try {
             List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.id, f.cantidad)).toList();
@@ -786,8 +804,12 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private void abrirPdf(FacturaVentaResultadoDto factura) {
+        abrirPdf(factura.id());
+    }
+
+    private void abrirPdf(UUID facturaId) {
         try {
-            ArchivoPdfDto archivo = documentos.generar(factura.id());
+            ArchivoPdfDto archivo = documentos.generar(facturaId);
             StreamResource recurso = new StreamResource(archivo.nombreArchivo(),
                     () -> new ByteArrayInputStream(archivo.contenido()));
             recurso.setContentType("application/pdf");
@@ -795,7 +817,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
             UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
         } catch (RuntimeException ex) {
-            Notification.show("La factura fue confirmada, pero no fue posible abrir el PDF. Puede generarlo nuevamente.");
+            Notification.show("No fue posible abrir el PDF de la factura. Intente nuevamente.");
         }
     }
 

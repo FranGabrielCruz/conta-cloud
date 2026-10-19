@@ -23,6 +23,7 @@ public class FacturaVenta {
     @Column(name="customer_id") private UUID clienteId;
     @Column(name="customer_name",nullable=false,length=180) private String clienteNombre;
     @Column(name="customer_identification",length=50) private String clienteIdentificacion;
+    @Column(name="customer_identification_normalized",length=50) private String clienteIdentificacionNormalizada;
     @Column(name="seller_name",nullable=false,length=180) private String vendedorNombre;
     @Column(name="currency_id",nullable=false) private UUID monedaId;
     @Column(name="currency_code",nullable=false,length=3) private String monedaCodigo;
@@ -46,7 +47,8 @@ public class FacturaVenta {
         this.tenantId=tenant;this.empresaId=empresa;this.numero=numero;this.status=EstadoFacturaVenta.CONFIRMED;
         this.fecha=fecha;this.confirmadaEn=OffsetDateTime.now();this.confirmadaPor=usuario;this.terminalId=terminal;
         this.cajaId=caja;this.sesionCajaId=sesion;this.sucursalId=sucursal;this.almacenId=almacen;this.clienteId=cliente;
-        this.clienteNombre=clienteNombre;this.clienteIdentificacion=clienteIdentificacion;this.vendedorNombre=vendedor;
+        this.clienteNombre=clienteNombre;this.clienteIdentificacion=clienteIdentificacion;
+        this.clienteIdentificacionNormalizada=normalizarIdentificacion(clienteIdentificacion);this.vendedorNombre=vendedor;
         this.monedaId=moneda;this.monedaCodigo=monedaCodigo;this.monedaSimbolo=monedaSimbolo;this.condicionPago="Contado";
         this.note=nota;this.subtotal=subtotal;this.descuentoTotal=BigDecimal.ZERO;this.recargoTotal=BigDecimal.ZERO;
         this.impuestoTotal=impuesto;this.total=total;this.recibido=recibido;this.cambio=recibido.subtract(total);this.claveIdempotencia=idempotencia;
@@ -59,4 +61,7 @@ public class FacturaVenta {
     public String getMonedaSimbolo(){return monedaSimbolo;} public String getNota(){return note;} public BigDecimal getSubtotal(){return subtotal;}
     public BigDecimal getImpuestoTotal(){return impuestoTotal;} public BigDecimal getTotal(){return total;} public BigDecimal getRecibido(){return recibido;}
     public BigDecimal getCambio(){return cambio;} public EstadoFacturaVenta getStatus(){return status;}
+    public BigDecimal getDescuentoTotal(){return descuentoTotal;} public BigDecimal getRecargoTotal(){return recargoTotal;}
+    public String getCondicionPago(){return condicionPago;} public UUID getConfirmadaPor(){return confirmadaPor;}
+    private static String normalizarIdentificacion(String valor){return valor==null?null:valor.replaceAll("\\D","");}
 }

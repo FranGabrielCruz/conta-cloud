@@ -4,4 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.*;
 public interface LineaFacturaVentaRepository extends JpaRepository<LineaFacturaVenta,UUID>{
     List<LineaFacturaVenta> findAllByFacturaIdOrderByOrden(UUID facturaId);
+    List<LineaFacturaVenta> findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(UUID facturaId,UUID tenantId,UUID empresaId);
 }

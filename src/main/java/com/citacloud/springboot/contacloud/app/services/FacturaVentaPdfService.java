@@ -35,7 +35,7 @@ public class FacturaVentaPdfService {
         String sucursal=sucursales.findByIdAndEmpresaId(f.getSucursalId(),p.empresaId()).map(Sucursal::getNombre).orElse("—");
         byte[] logo=e.getLogoObjectKey()==null?null:storage.load(e.getLogoObjectKey(),5L*1024*1024).orElse(null);
         List<FacturaVentaReporteLinea> detalle=new ArrayList<>();int n=1;
-        for(LineaFacturaVenta l:lineas.findAllByFacturaIdOrderByOrden(f.getId()))detalle.add(new FacturaVentaReporteLinea(n++,l.getCodigoProducto(),
+        for(LineaFacturaVenta l:lineas.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(f.getId(),p.tenantId(),p.empresaId()))detalle.add(new FacturaVentaReporteLinea(n++,l.getCodigoProducto(),
             l.getDescripcion(),l.getUnidadNombre(),l.getCantidad(),l.getPrecioUnitario(),l.getImpuesto(),l.getTotal()));
         Map<String,Object> x=new HashMap<>();
         x.put("companyName",d==null?e.getNombre():primero(d.getNombreComercial(),e.getNombre()));x.put("companyLegalName",d==null?null:d.getRazonSocial());
@@ -44,7 +44,8 @@ public class FacturaVentaPdfService {
         x.put("companyLogo",logo==null?null:new ByteArrayInputStream(logo));x.put("number",f.getNumero());x.put("date",DATE.format(f.getFecha()));
         x.put("confirmedAt",DATE_TIME.format(f.getConfirmadaEn()));x.put("customerName",f.getClienteNombre());
         x.put("customerId",valor(f.getClienteIdentificacion()));x.put("seller",f.getVendedorNombre());x.put("branch",sucursal);
-        x.put("currency",f.getMonedaCodigo());x.put("paymentCondition","Contado");x.put("notes",f.getNota());
+        x.put("currency",f.getMonedaCodigo());x.put("paymentCondition",f.getCondicionPago());x.put("notes",f.getNota());
+        x.put("status",f.getStatus().name());
         x.put("subtotal",f.getSubtotal());x.put("tax",f.getImpuestoTotal());x.put("total",f.getTotal());x.put("received",f.getRecibido());x.put("change",f.getCambio());
         try{return new ArchivoPdfDto("Factura_"+f.getNumero()+".pdf",JasperExportManager.exportReportToPdf(
             JasperFillManager.fillReport(reporte(),x,new JRBeanCollectionDataSource(detalle))));}
