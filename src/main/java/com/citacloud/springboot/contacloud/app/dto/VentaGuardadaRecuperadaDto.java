@@ -1,0 +1,2 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.math.BigDecimal;import java.util.*;
+public record VentaGuardadaRecuperadaDto(UUID id,String numero,String referencia,String observacion,ClientePosDto cliente,String moneda,BigDecimal descuento,BigDecimal recargo,List<Producto> productos){public record Producto(UUID id,String codigo,String nombre,String unidad,BigDecimal precio,BigDecimal tasaImpuesto,BigDecimal existencia,boolean controlaExistencia,boolean permiteNegativo,BigDecimal cantidad){}}

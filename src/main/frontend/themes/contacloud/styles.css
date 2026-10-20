@@ -693,6 +693,87 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
     gap: 0.35rem;
 }
 
+.cc-pos-save-sale {
+    position: relative;
+}
+
+.cc-pos-save-sale[data-saved-count]::after {
+    content: attr(data-saved-count);
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--lumo-primary-color);
+    color: var(--lumo-primary-contrast-color);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.cc-save-sale-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: 10px;
+    font-weight: 700;
+}
+
+.cc-saved-sales-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+}
+
+.cc-saved-sales-tools {
+    gap: 12px;
+    align-items: end;
+}
+
+.cc-saved-sales-tools > vaadin-text-field {
+    width: 100%;
+}
+
+.cc-saved-sales-body > vaadin-grid {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+}
+
+vaadin-dialog-overlay.cc-saved-sales-dialog::part(content) {
+    max-height: calc(94vh - 132px);
+    overflow: auto;
+}
+
+.cc-saved-sales-customer {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-saved-sales-total {
+    display: block;
+    overflow: visible;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+vaadin-dialog-overlay.cc-save-sale-dialog::part(footer),
+vaadin-dialog-overlay.cc-saved-sales-dialog::part(footer),
+vaadin-dialog-overlay.cc-discard-saved-sale-dialog::part(footer) {
+    gap: 8px;
+}
+
 @media (max-width: 820px) {
     .cc-latest-invoices-filters {
         grid-template-columns: 1fr 1fr;

@@ -27,18 +27,19 @@ public class FacturacionPosService {
     private final MetodoPagoVentaRepository metodosPago; private final AplicacionPagoVentaRepository aplicacionesPago;
     private final BankAccountRepository cuentasBancarias;
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
-    private final AuditoriaService auditoria; private final JdbcTemplate jdbc;
+    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas; private final JdbcTemplate jdbc;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
             ProductRepository productos,ClienteRepository clientes,InventoryMovementRepository existencias,
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
-            FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,JdbcTemplate jdbc){
+            FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,
+            VentaGuardadaService ventasGuardadas,JdbcTemplate jdbc){
         this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
-        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.jdbc=jdbc;
+        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.jdbc=jdbc;
     }
 
     @Transactional(readOnly=true)
@@ -169,6 +170,8 @@ public class FacturacionPosService {
             if(!producto.isActivo()||producto.getPrecioVenta()==null)throw new ReglaNegocioException("El producto "+producto.getNombre()+" no está disponible para venta.");
             if(!ctx.caja.getMonedaId().equals(producto.getMonedaId()))throw new ReglaNegocioException("El producto "+producto.getNombre()+" utiliza una moneda distinta a la caja.");
             BigDecimal precio=producto.getPrecioVenta().setScale(SCALE,RoundingMode.HALF_UP);
+            if(entrada.precioEsperado()==null||precio.compareTo(entrada.precioEsperado().setScale(SCALE,RoundingMode.HALF_UP))!=0)
+                throw new ReglaNegocioException("El precio de "+producto.getNombre()+" cambió. Actualiza la venta antes de cobrar.");
             Impuesto tax=producto.getImpuestoVenta()!=null&&producto.getImpuestoVenta().isActivo()?producto.getImpuestoVenta():null;
             VentaCalculo.Resultado calculo=VentaCalculo.linea(precio,cantidad,tax==null?BigDecimal.ZERO:tax.getPorcentaje());
             BigDecimal base=calculo.subtotal(),impuesto=calculo.impuesto(),lineaTotal=calculo.total();
@@ -206,6 +209,7 @@ public class FacturacionPosService {
         }
         auditoria.registrar("SALES_INVOICE_CONFIRMED","FacturaVenta",factura.getId(),"{\"numero\":\""+numero+"\",\"total\":"+total+
             ",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
+        ventasGuardadas.completarDesdeFactura(input.ventaGuardadaId(),factura.getId(),p.usuarioId(),ctx.terminal.getId(),p.tenantId(),empresa);
         return resultado(factura);
     }
 

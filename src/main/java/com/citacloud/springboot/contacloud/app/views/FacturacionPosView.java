@@ -9,6 +9,10 @@ import com.citacloud.springboot.contacloud.app.views.components.PosCustomerLine;
 import com.citacloud.springboot.contacloud.app.views.components.DoubleEnterDetector;
 import com.citacloud.springboot.contacloud.app.views.components.PosPaymentDialog;
 import com.citacloud.springboot.contacloud.app.views.components.UltimasFacturasDialog;
+import com.citacloud.springboot.contacloud.app.views.components.VentasGuardadasDialog;
+import com.citacloud.springboot.contacloud.app.views.components.ActionType;
+import com.citacloud.springboot.contacloud.app.views.components.AppActionButton;
+import com.citacloud.springboot.contacloud.app.views.components.ButtonSize;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -41,6 +45,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final CashRegisterSessionService cajaService;
     private final FacturaVentaPdfService documentos;
     private final UltimasFacturasService ultimasFacturas;
+    private final VentaGuardadaService ventasGuardadas;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -57,22 +62,29 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private String token;
     private TerminalPosDto terminal;
     private PosPaymentDialog dialogoCobroActivo;
+    private Dialog dialogoGuardarVentaActivo;
     private Dialog dialogoClienteActivo;
     private UltimasFacturasDialog dialogoUltimasActivo;
+    private VentasGuardadasDialog dialogoVentasGuardadasActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
     private BigDecimal descuentoVenta = BigDecimal.ZERO;
     private BigDecimal recargoVenta = BigDecimal.ZERO;
     private boolean agregandoProducto;
+    private UUID ventaGuardadaActivaId;
+    private String ventaGuardadaActivaNumero;
+    private String referenciaVentaGuardada;
+    private Button guardarVentaRapida;
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
-                              FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas,
+                              FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
         this.documentos = documentos;
         this.ultimasFacturas = ultimasFacturas;
+        this.ventasGuardadas = ventasGuardadas;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -103,7 +115,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Shortcuts.addShortcutListener(this, this::enfocarProducto, Key.F2);
         Shortcuts.addShortcutListener(this, () -> pendiente("Descuento"), Key.F3);
         Shortcuts.addShortcutListener(this, () -> pendiente("Recargo"), Key.F4);
-        Shortcuts.addShortcutListener(this, () -> pendiente("Retener venta"), Key.F5);
+        Shortcuts.addShortcutListener(this, this::dialogoVentasGuardadas, Key.F5);
         Shortcuts.addShortcutListener(this, this::dialogoClientes, Key.F6);
         Shortcuts.addShortcutListener(this, this::dialogoUltimasFacturas, Key.F7);
         Shortcuts.addShortcutListener(this, this::dialogoCobro, Key.F9);
@@ -273,6 +285,9 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         observacion.clear();
         descuentoVenta = BigDecimal.ZERO;
         recargoVenta = BigDecimal.ZERO;
+        ventaGuardadaActivaId = null;
+        ventaGuardadaActivaNumero = null;
+        referenciaVentaGuardada = null;
         idempotencia = UUID.randomUUID();
         actualizarTotales();
     }
@@ -454,7 +469,9 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Button agregar = tarjeta("+", "Producto", "F2", "Agregar producto (F2)", e -> enfocarProducto());
         Button descuentoRapido = tarjeta("%", "Descuento", "F3", "Aplicar descuento (F3)", e -> pendiente("Descuento"));
         Button recargoRapido = tarjeta("↑", "Recargo", "F4", "Aplicar recargo (F4)", e -> pendiente("Recargo"));
-        Button retener = tarjeta("⏸", "Retener", "F5", "Retener venta (F5)", e -> pendiente("Retener venta"));
+        Button retener = tarjeta("💾", "Guardar", "F5", "Guardar venta (F5)", e -> dialogoVentasGuardadas());
+        retener.addClassName("cc-pos-save-sale");
+        guardarVentaRapida = retener;
         Button limpiar = tarjeta("🗑", "Limpiar", "", "Limpiar venta", e -> pendiente("Limpiar venta"));
         limpiar.addClassName("cc-pos-quick-clear");
         Div tarjetas = new Div(
@@ -465,6 +482,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         tarjetas.addClassName("cc-pos-quick-grid");
         Div bloque = new Div(cabecera, tarjetas);
         bloque.addClassName("cc-pos-quick-actions");
+        actualizarIndicadorVentasGuardadas();
         return bloque;
     }
 
@@ -486,7 +504,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         menu.addItem("Cargar cotización", e -> pendiente("Cargar cotización"));
         menu.addItem("Apartados", e -> pendiente("Apartados"));
         menu.addItem("Recibos / Cobros", e -> pendiente("Recibos / Cobros"));
-        menu.addItem("Ventas retenidas", e -> pendiente("Ventas retenidas"));
+        if (puede("ventas_guardadas.consultar")) menu.addItem("Ventas guardadas", e -> dialogoVentasGuardadas());
         menu.addItem("Consultar precio", e -> dialogoProductos(true));
         menu.addItem("Cerrar", e -> menu.close());
     }
@@ -774,6 +792,132 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         } catch (RuntimeException ex) { error(ex, "No fue posible preparar el cobro."); }
     }
 
+    private void dialogoGuardarVenta() {
+        reiniciarDobleEnter();
+        if (dialogoGuardarVentaActivo != null && dialogoGuardarVentaActivo.isOpened()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (filas.isEmpty()) { Notification.show("No hay una venta para guardar."); return; }
+        if (!puede("ventas_guardadas.guardar")) { Notification.show("No tienes permiso para guardar ventas."); return; }
+        Dialog dialog = dialogo("GUARDAR VENTA");
+        dialog.addClassName("cc-save-sale-dialog");
+        dialogoGuardarVentaActivo = dialog;
+        Paragraph ayuda = new Paragraph(ventaGuardadaActivaNumero == null
+                ? "Guarda esta venta para continuarla posteriormente."
+                : "Actualiza la venta " + ventaGuardadaActivaNumero + " para continuarla posteriormente.");
+        TextField referencia = new TextField("Referencia");
+        referencia.setPlaceholder("Cliente regresa / Pedido mostrador...");
+        referencia.setMaxLength(150);
+        referencia.setWidthFull();
+        referencia.setValue(valor(referenciaVentaGuardada, ""));
+        TextArea nota = new TextArea("Observación");
+        nota.setMaxLength(1000);
+        nota.setWidthFull();
+        nota.setValue(observacion.getValue());
+        BigDecimal totalActual = filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add)
+                .subtract(descuentoVenta).add(recargoVenta);
+        Div resumenGuardado = new Div(new Span(filas.size() + (filas.size() == 1 ? " producto" : " productos")),
+                new Span(terminal.monedaCodigo() + " " + dinero(totalActual)));
+        resumenGuardado.addClassName("cc-save-sale-summary");
+        dialog.add(ayuda, referencia, nota, resumenGuardado);
+        AppActionButton guardar = new AppActionButton(ActionType.SAVE, ButtonSize.MAIN,
+                "Guardar venta", null);
+        AppActionButton cancelar = new AppActionButton(ActionType.CANCEL, ButtonSize.MAIN,
+                "Cancelar", e -> dialog.close());
+        Runnable accion = () -> {
+            guardar.setEnabled(false);
+            try {
+                List<LineaVentaGuardadaInput> detalle = filas.stream().map(f ->
+                        new LineaVentaGuardadaInput(f.id, f.cantidad, f.precio, f.tasa)).toList();
+                VentaGuardadaResultadoDto resultado = ventasGuardadas.guardar(new GuardarVentaInput(ventaGuardadaActivaId,
+                        token, terminal.almacenId(), clienteSeleccionado == null ? null : clienteSeleccionado.id(),
+                        referencia.getValue(), nota.getValue(), descuentoVenta, recargoVenta, detalle));
+                dialog.close();
+                Notification.show("Venta " + resultado.numero() + " guardada.");
+                prepararNuevaVenta();
+                refrescar();
+                if (dialogoVentasGuardadasActivo != null && dialogoVentasGuardadasActivo.isOpened()) {
+                    dialogoVentasGuardadasActivo.ventaActualGuardada();
+                } else {
+                    actualizarIndicadorVentasGuardadas();
+                    enfocarProducto();
+                }
+            } catch (RuntimeException ex) {
+                guardar.setEnabled(true);
+                error(ex, "No fue posible guardar la venta.");
+            }
+        };
+        guardar.addClickListener(e -> accion.run());
+        Shortcuts.addShortcutListener(dialog, () -> accion.run(), Key.ENTER);
+        dialog.getFooter().add(guardar, cancelar);
+        dialog.addOpenedChangeListener(e -> { if (e.isOpened()) referencia.focus(); });
+        dialog.addClosedListener(e -> {
+            if (dialogoGuardarVentaActivo == dialog) dialogoGuardarVentaActivo = null;
+        });
+        dialog.open();
+    }
+
+    private void dialogoVentasGuardadas() {
+        reiniciarDobleEnter();
+        if (!puede("ventas_guardadas.consultar") && !puede("ventas_guardadas.guardar")) {
+            Notification.show("No tienes permiso para administrar ventas guardadas.");
+            return;
+        }
+        if (dialogoVentasGuardadasActivo != null && dialogoVentasGuardadasActivo.isOpened()) return;
+        VentasGuardadasDialog dialog = new VentasGuardadasDialog(ventasGuardadas, token, !filas.isEmpty(),
+                this::dialogoGuardarVenta, id -> recuperarVentaGuardada(id, dialogoVentasGuardadasActivo),
+                this::actualizarIndicadorVentasGuardadas, () -> {
+                    dialogoVentasGuardadasActivo = null;
+                    actualizarIndicadorVentasGuardadas();
+                    enfocarProducto();
+                });
+        dialogoVentasGuardadasActivo = dialog;
+        dialog.open();
+    }
+
+    private void recuperarVentaGuardada(UUID id, Dialog listado) {
+        if (!filas.isEmpty()) {
+            Notification.show("Hay una venta en curso. Guárdela o límpiela antes de recuperar otra venta.");
+            return;
+        }
+        try {
+            VentaGuardadaRecuperadaDto venta = ventasGuardadas.recuperar(id, token, terminal.almacenId());
+            filas.clear();
+            for (VentaGuardadaRecuperadaDto.Producto p : venta.productos()) {
+                Fila fila = new Fila(new ProductoPosDto(p.id(), p.codigo(), p.nombre(), null, p.unidad(), p.precio(),
+                        p.tasaImpuesto(), p.existencia(), p.controlaExistencia(), p.permiteNegativo()));
+                fila.cantidad = p.cantidad();
+                filas.add(fila);
+            }
+            ventaGuardadaActivaId = venta.id();
+            ventaGuardadaActivaNumero = venta.numero();
+            referenciaVentaGuardada = venta.referencia();
+            descuentoVenta = venta.descuento();
+            recargoVenta = venta.recargo();
+            idempotencia = UUID.randomUUID();
+            observacion.setValue(valor(venta.observacion(), ""));
+            seleccionarCliente(venta.cliente());
+            refrescar();
+            listado.close();
+            Notification.show("Venta " + venta.numero() + " recuperada.");
+        } catch (RuntimeException ex) {
+            if (dialogoVentasGuardadasActivo != null && dialogoVentasGuardadasActivo.isOpened()) {
+                dialogoVentasGuardadasActivo.refrescarListado();
+            }
+            error(ex, "No fue posible recuperar la venta.");
+        }
+    }
+
+    private void actualizarIndicadorVentasGuardadas() {
+        if (guardarVentaRapida == null) return;
+        guardarVentaRapida.getElement().removeAttribute("data-saved-count");
+        if (!puede("ventas_guardadas.consultar") || terminal == null) return;
+        try {
+            long cantidad = ventasGuardadas.contar(token);
+            if (cantidad > 0) guardarVentaRapida.getElement().setAttribute("data-saved-count",
+                    cantidad > 99 ? "99+" : Long.toString(cantidad));
+        } catch (RuntimeException ignored) { }
+    }
+
     private void dialogoUltimasFacturas() {
         reiniciarDobleEnter();
         if (dialogoUltimasActivo != null && dialogoUltimasActivo.isOpened()) return;
@@ -789,10 +933,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
         try {
-            List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.id, f.cantidad)).toList();
+            List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.id, f.cantidad, f.precio)).toList();
             FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token, terminal.almacenId(),
                     clienteSeleccionado == null ? null : clienteSeleccionado.id(), observacion.getValue(),
-                    idempotencia, lineas, aplicaciones));
+                    idempotencia, ventaGuardadaActivaId, lineas, aplicaciones));
             dialog.close();
             Notification.show("Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
             abrirPdf(resultado);
@@ -831,6 +975,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void enfocarProducto() { if (productoBuscar != null) productoBuscar.focus(); }
 
     private void pendiente(String funcion) { Notification.show(funcion + " estará disponible próximamente."); }
+
+    private static boolean puede(String permiso) {
+        return TenantContext.principalActual().permisos().contains(permiso);
+    }
 
     private static Button iconButton(VaadinIcon icono, String tooltip,
                                      ComponentEventListener<ClickEvent<Button>> listener) {
