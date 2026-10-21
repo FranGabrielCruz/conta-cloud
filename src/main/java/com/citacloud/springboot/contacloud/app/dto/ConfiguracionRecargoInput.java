@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;public record ConfiguracionRecargoInput(boolean habilitado,boolean permiteVenta,boolean permiteLinea,boolean permitePorcentaje,boolean permiteMonto,boolean requiereMotivo,boolean permiteAutorizacion,long version){}

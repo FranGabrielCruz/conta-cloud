@@ -46,7 +46,7 @@ public class FacturaVentaPdfService {
         x.put("customerId",valor(f.getClienteIdentificacion()));x.put("seller",f.getVendedorNombre());x.put("branch",sucursal);
         x.put("currency",f.getMonedaCodigo());x.put("paymentCondition",f.getCondicionPago());x.put("notes",f.getNota());
         x.put("status",f.getStatus().name());
-        x.put("subtotal",f.getSubtotal());x.put("discount",f.getDescuentoTotal());x.put("tax",f.getImpuestoTotal());x.put("total",f.getTotal());x.put("received",f.getRecibido());x.put("change",f.getCambio());
+        x.put("subtotal",f.getSubtotal());x.put("discount",f.getDescuentoTotal());x.put("surcharge",f.getRecargoTotal());x.put("tax",f.getImpuestoTotal());x.put("total",f.getTotal());x.put("received",f.getRecibido());x.put("change",f.getCambio());
         try{return new ArchivoPdfDto("Factura_"+f.getNumero()+".pdf",JasperExportManager.exportReportToPdf(
             JasperFillManager.fillReport(reporte(),x,new JRBeanCollectionDataSource(detalle))));}
         catch(JRException ex){throw new ReglaNegocioException("No fue posible generar el PDF de la factura.",ex);}

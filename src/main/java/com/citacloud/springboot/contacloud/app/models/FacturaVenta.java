@@ -69,6 +69,7 @@ public class FacturaVenta {
     public BigDecimal getImpuestoTotal(){return impuestoTotal;} public BigDecimal getTotal(){return total;} public BigDecimal getRecibido(){return recibido;}
     public BigDecimal getCambio(){return cambio;} public EstadoFacturaVenta getStatus(){return status;}
     public BigDecimal getDescuentoTotal(){return descuentoTotal;} public BigDecimal getRecargoTotal(){return recargoTotal;}
+    public void aplicarRecargo(BigDecimal recargo){this.recargoTotal=recargo==null?BigDecimal.ZERO:recargo;}
     public String getCondicionPago(){return condicionPago;} public UUID getConfirmadaPor(){return confirmadaPor;}
     private static String normalizarIdentificacion(String valor){return valor==null?null:valor.replaceAll("\\D","");}
 }

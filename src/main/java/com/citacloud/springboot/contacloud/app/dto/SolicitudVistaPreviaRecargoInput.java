@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.util.*;public record SolicitudVistaPreviaRecargoInput(UUID operacionId,RecargoVentaInput recargo,List<LineaVistaPreviaRecargoInput> lineas){}

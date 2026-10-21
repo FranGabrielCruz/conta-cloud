@@ -70,7 +70,7 @@ public class ProductService {
         Validated v=validate(input,product.getTenantId(),product.getEmpresaId(),product.getId(),product.getCategoriaId(),product.getImpuestoCompraId(),product.getImpuestoVentaId());
         if(v.input().activo()!=product.isActivo())throw new ReglaNegocioException("Utiliza la acción correspondiente para cambiar el estado del producto.");
         product.actualizar(v.name(),v.input().tipo(),v.input().categoriaId(),v.input().unidadMedidaId(),v.barcode(),v.description(),
-            v.input().costoCompra(),v.input().precioVenta(),v.input().monedaId(),v.input().impuestoCompraId(),v.input().impuestoVentaId(),v.input().permiteDescuentos(),
+            v.input().costoCompra(),v.input().precioVenta(),v.input().monedaId(),v.input().impuestoCompraId(),v.input().impuestoVentaId(),v.input().permiteDescuentos(),v.input().permiteRecargos(),
             v.track(),v.negative(),v.minimum(),TenantContext.principalActual().usuarioId());
         try{product=products.saveAndFlush(product);}catch(OptimisticLockingFailureException ex){throw concurrency(ex);}catch(DataIntegrityViolationException ex){throw duplicate(ex);}
         audit.registrar("PRODUCT_UPDATED","Producto",product.getId(),detail(product));return mapper.toDto(product);}

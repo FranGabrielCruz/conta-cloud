@@ -774,12 +774,34 @@ vaadin-dialog-overlay.cc-discard-saved-sale-dialog::part(footer) {
     gap: 8px;
 }
 
-.cc-discount-config-page .cc-form-section {
+.cc-discount-config-page .cc-form-section,
+.cc-surcharge-config-page .cc-form-section {
     width: 100%;
     box-sizing: border-box;
 }
 
-.cc-discount-policy-grid {
+.cc-adjustments-tabs {
+    width: 100%;
+    border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-adjustments-tabs vaadin-tab {
+    font-weight: 700;
+    letter-spacing: .025em;
+}
+
+.cc-adjustments-tab-pages {
+    width: 100%;
+    min-width: 0;
+}
+
+.cc-adjustments-tab-pages > * {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cc-discount-policy-grid,
+.cc-surcharge-policy-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     column-gap: clamp(24px, 3vw, 32px);
@@ -788,13 +810,15 @@ vaadin-dialog-overlay.cc-discard-saved-sale-dialog::part(footer) {
     min-width: 0;
 }
 
-.cc-discount-policy-grid vaadin-checkbox {
+.cc-discount-policy-grid vaadin-checkbox,
+.cc-surcharge-policy-grid vaadin-checkbox {
     align-self: start;
     min-width: 0;
     width: 100%;
 }
 
-.cc-discount-policy-grid vaadin-checkbox::part(label) {
+.cc-discount-policy-grid vaadin-checkbox::part(label),
+.cc-surcharge-policy-grid vaadin-checkbox::part(label) {
     overflow: visible;
     white-space: normal;
     text-overflow: clip;
@@ -802,13 +826,15 @@ vaadin-dialog-overlay.cc-discard-saved-sale-dialog::part(footer) {
 }
 
 @media (max-width: 1000px) {
-    .cc-discount-policy-grid {
+    .cc-discount-policy-grid,
+    .cc-surcharge-policy-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 620px) {
-    .cc-discount-policy-grid {
+    .cc-discount-policy-grid,
+    .cc-surcharge-policy-grid {
         grid-template-columns: minmax(0, 1fr);
         row-gap: 14px;
     }
@@ -855,6 +881,15 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(content) {
     overflow: auto;
 }
 
+vaadin-dialog-overlay.cc-sales-adjustment-dialog::part(header) {
+    padding-bottom: var(--lumo-space-s);
+}
+
+vaadin-dialog-overlay.cc-sales-adjustment-dialog::part(content) {
+    padding-top: var(--lumo-space-s);
+    padding-bottom: var(--lumo-space-s);
+}
+
 vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
     gap: 8px;
 }
@@ -880,9 +915,90 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
     text-align: right;
 }
 
+.cc-adjustment-fields {
+    display: grid;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-width: 0;
+    margin-top: 12px;
+}
+
+.cc-discount-inline-fields {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.cc-surcharge-inline-fields {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr) minmax(0, 9fr);
+}
+
+.cc-adjustment-field-group {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.cc-adjustment-field-group > vaadin-big-decimal-field,
+.cc-adjustment-field-group > vaadin-combo-box {
+    width: 100%;
+    min-width: 0;
+}
+
+.cc-adjustment-inline-label {
+    color: var(--lumo-body-text-color);
+    font-size: var(--lumo-font-size-s);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cc-discount-preview.cc-adjustment-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+    padding: 12px 16px;
+}
+
+.cc-discount-preview.cc-adjustment-summary.cc-summary-sale {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cc-adjustment-summary-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    text-align: center;
+}
+
+.cc-adjustment-summary-label {
+    color: var(--lumo-secondary-text-color);
+    font-size: var(--lumo-font-size-xs);
+    font-weight: 600;
+    letter-spacing: .035em;
+    white-space: nowrap;
+}
+
+.cc-adjustment-summary-metric > :last-child {
+    max-width: 100%;
+    overflow: visible;
+    color: var(--lumo-body-text-color);
+    font-size: var(--lumo-font-size-m);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cc-adjustment-summary-metric:last-child > :last-child {
+    font-weight: 800;
+}
+
 .cc-discount-products {
     gap: 6px;
-    margin-top: var(--lumo-space-s);
+    margin-top: 12px;
 }
 
 .cc-discount-products h4 {
@@ -894,6 +1010,11 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 .cc-discount-products-grid {
     width: 100%;
     max-height: 300px;
+}
+
+.cc-adjustment-products-grid {
+    min-width: 0;
+    overflow: hidden;
 }
 
 .cc-discount-products-grid::part(cell) {
@@ -923,6 +1044,20 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 .cc-discount-selection-message {
     color: var(--lumo-error-text-color);
     font-size: var(--lumo-font-size-s);
+}
+
+@media (max-width: 720px) {
+    .cc-adjustment-fields,
+    .cc-discount-inline-fields,
+    .cc-surcharge-inline-fields {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .cc-discount-preview.cc-adjustment-summary,
+    .cc-discount-preview.cc-adjustment-summary.cc-summary-sale {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 820px) {

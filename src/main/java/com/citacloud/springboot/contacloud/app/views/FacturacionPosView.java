@@ -14,6 +14,7 @@ import com.citacloud.springboot.contacloud.app.views.components.ActionType;
 import com.citacloud.springboot.contacloud.app.views.components.AppActionButton;
 import com.citacloud.springboot.contacloud.app.views.components.ButtonSize;
 import com.citacloud.springboot.contacloud.app.views.components.DescuentoVentaDialog;
+import com.citacloud.springboot.contacloud.app.views.components.RecargoVentaDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -48,6 +49,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final UltimasFacturasService ultimasFacturas;
     private final VentaGuardadaService ventasGuardadas;
     private final DescuentoVentaService descuentosService;
+    private final RecargoVentaService recargosService;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -69,12 +71,14 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private UltimasFacturasDialog dialogoUltimasActivo;
     private VentasGuardadasDialog dialogoVentasGuardadasActivo;
     private DescuentoVentaDialog dialogoDescuentoActivo;
+    private RecargoVentaDialog dialogoRecargoActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
     private BigDecimal descuentoVenta = BigDecimal.ZERO;
     private BigDecimal recargoVenta = BigDecimal.ZERO;
     private DescuentoVentaInput descuentoActual;
+    private RecargoVentaInput recargoActual;
     private boolean agregandoProducto;
     private UUID ventaGuardadaActivaId;
     private String ventaGuardadaActivaNumero;
@@ -83,7 +87,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
                               FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
-                              DescuentoVentaService descuentosService,
+                              DescuentoVentaService descuentosService, RecargoVentaService recargosService,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -91,6 +95,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.ultimasFacturas = ultimasFacturas;
         this.ventasGuardadas = ventasGuardadas;
         this.descuentosService = descuentosService;
+        this.recargosService = recargosService;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -120,7 +125,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void registrarAtajos() {
         Shortcuts.addShortcutListener(this, this::enfocarProducto, Key.F2);
         Shortcuts.addShortcutListener(this, this::dialogoDescuento, Key.F3);
-        Shortcuts.addShortcutListener(this, () -> pendiente("Recargo"), Key.F4);
+        Shortcuts.addShortcutListener(this, this::dialogoRecargo, Key.F4);
         Shortcuts.addShortcutListener(this, this::dialogoVentasGuardadas, Key.F5);
         Shortcuts.addShortcutListener(this, this::dialogoClientes, Key.F6);
         Shortcuts.addShortcutListener(this, this::dialogoUltimasFacturas, Key.F7);
@@ -292,6 +297,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         descuentoVenta = BigDecimal.ZERO;
         descuentoActual = null;
         recargoVenta = BigDecimal.ZERO;
+        recargoActual = null;
         ventaGuardadaActivaId = null;
         ventaGuardadaActivaNumero = null;
         referenciaVentaGuardada = null;
@@ -390,13 +396,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private Component productoConDescuento(Fila fila) {
         Span nombre = textoConTooltip(fila.nombre(), "cc-pos-product-name");
-        if (fila.descuento.signum() <= 0) return nombre;
-        Span indicador = new Span("🏷");
-        indicador.addClassName("cc-pos-discount-indicator");
-        String motivo = descuentoActual == null || descuentoActual.detalle() == null ? "" : "\nDetalle: " + descuentoActual.detalle();
-        indicador.getElement().setAttribute("title", "Descuento aplicado\n" + terminal.monedaCodigo() + " "
-                + dinero(fila.descuento) + motivo);
-        Div contenido = new Div(nombre, indicador);
+        if (fila.descuento.signum() <= 0 && fila.recargo.signum() <= 0) return nombre;
+        Div contenido = new Div(nombre);
+        if(fila.descuento.signum()>0){Span indicador=new Span("🏷");indicador.addClassName("cc-pos-discount-indicator");String motivo=descuentoActual==null||descuentoActual.detalle()==null?"":"\nDetalle: "+descuentoActual.detalle();indicador.getElement().setAttribute("title","Descuento aplicado\n"+terminal.monedaCodigo()+" "+dinero(fila.descuento)+motivo);contenido.add(indicador);}
+        if(fila.recargo.signum()>0){Span indicador=new Span("⬆");indicador.addClassName("cc-pos-discount-indicator");String concepto=recargoActual==null?"":"\nConcepto configurado";String motivo=recargoActual==null||recargoActual.detalle()==null?"":"\nDetalle: "+recargoActual.detalle();indicador.getElement().setAttribute("title","Recargo aplicado\n+"+terminal.monedaCodigo()+" "+dinero(fila.recargo)+concepto+motivo);contenido.add(indicador);}
         contenido.addClassName("cc-pos-product-with-discount");
         return contenido;
     }
@@ -489,7 +492,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         cabecera.addClassName("cc-pos-actions-head");
         Button agregar = tarjeta("+", "Producto", "F2", "Agregar producto (F2)", e -> enfocarProducto());
         Button descuentoRapido = tarjeta("%", "Descuento", "F3", "Aplicar descuento (F3)", e -> dialogoDescuento());
-        Button recargoRapido = tarjeta("↑", "Recargo", "F4", "Aplicar recargo (F4)", e -> pendiente("Recargo"));
+        Button recargoRapido = tarjeta("↑", "Recargo", "F4", "Aplicar recargo (F4)", e -> dialogoRecargo());
         Button retener = tarjeta("💾", "Guardar", "F5", "Guardar venta (F5)", e -> dialogoVentasGuardadas());
         retener.addClassName("cc-pos-save-sale");
         guardarVentaRapida = retener;
@@ -789,9 +792,36 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                 f.cantidad, f.precio, f.tasa, f.permiteDescuentos)).toList();
     }
 
-    private void ventaModificada() {
-        if (descuentoActual == null) { refrescar(); return; }
+    private void dialogoRecargo() {
+        reiniciarDobleEnter();
+        if (dialogoRecargoActivo != null && dialogoRecargoActivo.isOpened()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (filas.isEmpty()) { Notification.show("No hay productos en la venta para aplicar un recargo."); return; }
+        if (!puede("facturas.recargos.aplicar")) { Notification.show("No tienes permiso para aplicar recargos."); return; }
         try {
+            RecargoVentaDialog dialog = new RecargoVentaDialog(recargosService, idempotencia, lineasRecargo(), recargoActual,
+                    aplicado -> { recargoActual=aplicado.recargo(); aplicarVistaRecargo(aplicado.vista()); refrescar(); },
+                    () -> { quitarRecargo(); refrescar(); },
+                    () -> { dialogoRecargoActivo=null; enfocarProducto(); });
+            dialogoRecargoActivo=dialog; dialog.open();
+        } catch (RuntimeException ex) { error(ex,"No fue posible preparar el recargo."); }
+    }
+
+    private List<LineaVistaPreviaRecargoInput> lineasRecargo() {
+        return filas.stream().map(f -> new LineaVistaPreviaRecargoInput(f.lineaId,f.id,f.nombre,f.cantidad,f.precio,f.tasa,f.descuento,f.permiteRecargos)).toList();
+    }
+
+    private void aplicarVistaRecargo(VistaPreviaRecargoDto vista) {
+        Map<UUID,VistaPreviaRecargoDto.Asignacion> asignaciones=new HashMap<>();
+        vista.asignaciones().forEach(x->asignaciones.put(x.lineaId(),x));
+        for(Fila fila:filas)fila.recargo=Optional.ofNullable(asignaciones.get(fila.lineaId)).map(VistaPreviaRecargoDto.Asignacion::recargo).orElse(BigDecimal.ZERO);
+        recargoVenta=vista.montoRecargo();
+    }
+
+    private void quitarRecargo(){recargoActual=null;recargoVenta=BigDecimal.ZERO;filas.forEach(f->f.recargo=BigDecimal.ZERO);}
+
+    private void ventaModificada() {
+        if (descuentoActual != null) try {
             DescuentoVentaInput sinAutorizacion = new DescuentoVentaInput(descuentoActual.alcance(), descuentoActual.tipo(),
                     descuentoActual.valor(), descuentoActual.lineaIds(), descuentoActual.motivoId(), descuentoActual.detalle(), null);
             VistaPreviaDescuentoDto vista = descuentosService.previsualizar(
@@ -803,6 +833,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             quitarDescuento();
             error(ex, "El descuento fue retirado porque la venta cambió.");
         }
+        if(recargoActual!=null)try{RecargoVentaInput sinAutorizacion=new RecargoVentaInput(recargoActual.alcance(),recargoActual.tipo(),recargoActual.valor(),recargoActual.lineaIds(),recargoActual.conceptoId(),recargoActual.motivoId(),recargoActual.detalle(),null);VistaPreviaRecargoDto vista=recargosService.previsualizar(new SolicitudVistaPreviaRecargoInput(idempotencia,sinAutorizacion,lineasRecargo()));recargoActual=sinAutorizacion;aplicarVistaRecargo(vista);if(vista.requiereAutorizacion())Notification.show("La venta cambió. El recargo requiere una nueva autorización.");}catch(RuntimeException ex){quitarRecargo();error(ex,"El recargo fue retirado porque la venta cambió.");}
         refrescar();
     }
 
@@ -913,7 +944,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                         new LineaVentaGuardadaInput(f.lineaId, f.id, f.cantidad, f.precio, f.tasa)).toList();
                 VentaGuardadaResultadoDto resultado = ventasGuardadas.guardar(new GuardarVentaInput(ventaGuardadaActivaId,
                         token, terminal.almacenId(), clienteSeleccionado == null ? null : clienteSeleccionado.id(),
-                        referencia.getValue(), nota.getValue(), descuentoVenta, recargoVenta, descuentoActual, detalle));
+                        referencia.getValue(), nota.getValue(), descuentoVenta, recargoVenta, descuentoActual, recargoActual, detalle));
                 dialog.close();
                 Notification.show("Venta " + resultado.numero() + " guardada.");
                 prepararNuevaVenta();
@@ -967,7 +998,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             filas.clear();
             for (VentaGuardadaRecuperadaDto.Producto p : venta.productos()) {
                 Fila fila = new Fila(p.lineaId(), new ProductoPosDto(p.id(), p.codigo(), p.nombre(), null, p.unidad(), p.precio(),
-                        p.tasaImpuesto(), p.existencia(), p.controlaExistencia(), p.permiteNegativo(), p.permiteDescuentos()));
+                        p.tasaImpuesto(), p.existencia(), p.controlaExistencia(), p.permiteNegativo(), p.permiteDescuentos(), p.permiteRecargos()));
                 fila.cantidad = p.cantidad();
                 filas.add(fila);
             }
@@ -983,6 +1014,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                 if (vista.requiereAutorizacion()) Notification.show("El descuento recuperado requiere una nueva autorización antes de cobrar.");
             } else descuentoVenta = BigDecimal.ZERO;
             recargoVenta = venta.recargo();
+            recargoActual = venta.detalleRecargo();
+            if(recargoActual!=null)aplicarVistaRecargo(recargosService.previsualizar(new SolicitudVistaPreviaRecargoInput(idempotencia,recargoActual,lineasRecargo())));
             observacion.setValue(valor(venta.observacion(), ""));
             seleccionarCliente(venta.cliente());
             refrescar();
@@ -1025,7 +1058,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.lineaId, f.id, f.cantidad, f.precio)).toList();
             FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token, terminal.almacenId(),
                     clienteSeleccionado == null ? null : clienteSeleccionado.id(), observacion.getValue(),
-                    idempotencia, ventaGuardadaActivaId, descuentoActual, lineas, aplicaciones));
+                    idempotencia, ventaGuardadaActivaId, descuentoActual, recargoActual, lineas, aplicaciones));
             dialog.close();
             Notification.show("Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
             abrirPdf(resultado);
@@ -1134,8 +1167,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         private final BigDecimal existencia;
         private final boolean controlaExistencia;
         private final boolean permiteDescuentos;
+        private final boolean permiteRecargos;
         private BigDecimal cantidad = BigDecimal.ONE;
         private BigDecimal descuento = BigDecimal.ZERO;
+        private BigDecimal recargo = BigDecimal.ZERO;
 
         private Fila(ProductoPosDto producto) {
             this(UUID.randomUUID(), producto);
@@ -1152,13 +1187,14 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             existencia = producto.existencia();
             controlaExistencia = producto.controlaExistencia();
             permiteDescuentos = producto.permiteDescuentos();
+            permiteRecargos = producto.permiteRecargos();
         }
 
         private String codigo() { return codigo; }
         private String nombre() { return nombre; }
         private String unidad() { return unidad; }
         private BigDecimal base() { return precio.multiply(cantidad).setScale(4, RoundingMode.HALF_UP); }
-        private BigDecimal baseImponible() { return base().subtract(descuento).setScale(4, RoundingMode.HALF_UP); }
+        private BigDecimal baseImponible() { return base().subtract(descuento).add(recargo).setScale(4, RoundingMode.HALF_UP); }
         private BigDecimal impuesto() { return baseImponible().multiply(tasa).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP); }
         private BigDecimal total() { return baseImponible().add(impuesto()); }
     }

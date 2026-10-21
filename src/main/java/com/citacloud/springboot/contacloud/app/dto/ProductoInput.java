@@ -6,11 +6,11 @@ import java.util.UUID;
 
 public record ProductoInput(String nombre,TipoProducto tipo,UUID categoriaId,UUID unidadMedidaId,String codigoBarras,
     String descripcion,BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,
-    UUID impuestoVentaId,boolean permiteDescuentos,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,
+    UUID impuestoVentaId,boolean permiteDescuentos,boolean permiteRecargos,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,
     boolean activo,Long version) {
     public ProductoInput(String nombre,TipoProducto tipo,UUID categoriaId,UUID unidadMedidaId,String codigoBarras,
         String descripcion,BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,
         UUID impuestoVentaId,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,
         boolean activo,Long version){this(nombre,tipo,categoriaId,unidadMedidaId,codigoBarras,descripcion,costoCompra,precioVenta,
-        monedaId,impuestoCompraId,impuestoVentaId,true,controlaExistencia,permiteExistenciaNegativa,stockMinimo,activo,version);}
+        monedaId,impuestoCompraId,impuestoVentaId,true,true,controlaExistencia,permiteExistenciaNegativa,stockMinimo,activo,version);}
 }

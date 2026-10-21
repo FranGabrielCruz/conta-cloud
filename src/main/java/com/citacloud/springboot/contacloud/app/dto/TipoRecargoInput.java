@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import com.citacloud.springboot.contacloud.app.models.*;import java.math.BigDecimal;public record TipoRecargoInput(String nombre,TipoRecargoVenta tipoPredeterminado,BigDecimal valorPredeterminado,TratamientoFiscalRecargo tratamientoFiscal,boolean valorEditable,boolean activo,Long version){}

@@ -20,6 +20,7 @@ public class Producto {
     @Column(name="purchase_cost",precision=19,scale=4) private BigDecimal costoCompra;
     @Column(name="sale_price",precision=19,scale=4) private BigDecimal precioVenta;
     @Column(name="allow_discounts",nullable=false) private boolean permiteDescuentos=true;
+    @Column(name="allow_surcharges",nullable=false) private boolean permiteRecargos=true;
     @Column(name="currency_id") private UUID monedaId;
     @Column(name="purchase_tax_id") private UUID impuestoCompraId;
     @Column(name="sales_tax_id") private UUID impuestoVentaId;
@@ -42,23 +43,28 @@ public class Producto {
             String codigoBarras,String descripcion,BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,
             UUID impuestoVentaId,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,boolean activo,UUID usuarioId){
         this(tenantId,empresaId,codigo,nombre,tipo,categoriaId,unidadMedidaId,codigoBarras,descripcion,costoCompra,precioVenta,
-                monedaId,impuestoCompraId,impuestoVentaId,true,controlaExistencia,permiteExistenciaNegativa,stockMinimo,activo,usuarioId);
+                monedaId,impuestoCompraId,impuestoVentaId,true,true,controlaExistencia,permiteExistenciaNegativa,stockMinimo,activo,usuarioId);
     }
     public Producto(UUID tenantId,UUID empresaId,String codigo,String nombre,TipoProducto tipo,UUID categoriaId,UUID unidadMedidaId,
             String codigoBarras,String descripcion,BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,
             UUID impuestoVentaId,boolean permiteDescuentos,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,boolean activo,UUID usuarioId){
+        this(tenantId,empresaId,codigo,nombre,tipo,categoriaId,unidadMedidaId,codigoBarras,descripcion,costoCompra,precioVenta,monedaId,impuestoCompraId,impuestoVentaId,permiteDescuentos,true,controlaExistencia,permiteExistenciaNegativa,stockMinimo,activo,usuarioId);
+    }
+    public Producto(UUID tenantId,UUID empresaId,String codigo,String nombre,TipoProducto tipo,UUID categoriaId,UUID unidadMedidaId,
+            String codigoBarras,String descripcion,BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,
+            UUID impuestoVentaId,boolean permiteDescuentos,boolean permiteRecargos,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,boolean activo,UUID usuarioId){
         this.tenantId=tenantId;this.empresaId=empresaId;this.codigo=codigo;this.nombre=nombre;this.tipo=tipo;this.categoriaId=categoriaId;
         this.unidadMedidaId=unidadMedidaId;this.codigoBarras=codigoBarras;this.descripcion=descripcion;this.costoCompra=costoCompra;
-        this.precioVenta=precioVenta;this.permiteDescuentos=permiteDescuentos;this.monedaId=monedaId;this.impuestoCompraId=impuestoCompraId;this.impuestoVentaId=impuestoVentaId;
+        this.precioVenta=precioVenta;this.permiteDescuentos=permiteDescuentos;this.permiteRecargos=permiteRecargos;this.monedaId=monedaId;this.impuestoCompraId=impuestoCompraId;this.impuestoVentaId=impuestoVentaId;
         this.controlaExistencia=controlaExistencia;this.permiteExistenciaNegativa=permiteExistenciaNegativa;this.stockMinimo=stockMinimo;
         this.activo=activo;this.creadoPor=usuarioId;this.actualizadoPor=usuarioId;this.actualizadoEn=OffsetDateTime.now();
     }
     public void actualizar(String nombre,TipoProducto tipo,UUID categoriaId,UUID unidadMedidaId,String codigoBarras,String descripcion,
-            BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,UUID impuestoVentaId,boolean permiteDescuentos,
+            BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,UUID impuestoCompraId,UUID impuestoVentaId,boolean permiteDescuentos,boolean permiteRecargos,
             boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,UUID usuarioId){
         this.nombre=nombre;this.tipo=tipo;this.categoriaId=categoriaId;this.unidadMedidaId=unidadMedidaId;this.codigoBarras=codigoBarras;
         this.descripcion=descripcion;this.costoCompra=costoCompra;this.precioVenta=precioVenta;this.monedaId=monedaId;
-        this.impuestoCompraId=impuestoCompraId;this.impuestoVentaId=impuestoVentaId;this.permiteDescuentos=permiteDescuentos;this.controlaExistencia=controlaExistencia;
+        this.impuestoCompraId=impuestoCompraId;this.impuestoVentaId=impuestoVentaId;this.permiteDescuentos=permiteDescuentos;this.permiteRecargos=permiteRecargos;this.controlaExistencia=controlaExistencia;
         this.permiteExistenciaNegativa=permiteExistenciaNegativa;this.stockMinimo=stockMinimo;this.actualizadoPor=usuarioId;
     }
     public void cambiarEstado(boolean activo,UUID usuarioId){this.activo=activo;this.actualizadoPor=usuarioId;}
@@ -68,6 +74,7 @@ public class Producto {
     public UUID getCategoriaId(){return categoriaId;} public UUID getUnidadMedidaId(){return unidadMedidaId;} public String getCodigoBarras(){return codigoBarras;}
     public String getDescripcion(){return descripcion;} public BigDecimal getCostoCompra(){return costoCompra;} public BigDecimal getPrecioVenta(){return precioVenta;}
     public boolean isPermiteDescuentos(){return permiteDescuentos;}
+    public boolean isPermiteRecargos(){return permiteRecargos;}
     public UUID getMonedaId(){return monedaId;} public UUID getImpuestoCompraId(){return impuestoCompraId;} public UUID getImpuestoVentaId(){return impuestoVentaId;}
     public boolean isControlaExistencia(){return controlaExistencia;} public boolean isPermiteExistenciaNegativa(){return permiteExistenciaNegativa;}
     public BigDecimal getStockMinimo(){return stockMinimo;} public boolean isActivo(){return activo;} public long getVersion(){return version;}

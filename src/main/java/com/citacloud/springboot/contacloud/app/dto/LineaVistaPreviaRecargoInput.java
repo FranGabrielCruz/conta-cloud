@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.math.BigDecimal;import java.util.UUID;public record LineaVistaPreviaRecargoInput(UUID lineaId,UUID productoId,String productoNombre,BigDecimal cantidad,BigDecimal precioEsperado,BigDecimal tasaImpuestoEsperada,BigDecimal descuentoAplicado,boolean permiteRecargos){}

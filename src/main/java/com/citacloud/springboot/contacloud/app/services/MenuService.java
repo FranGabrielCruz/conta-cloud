@@ -45,7 +45,8 @@ public class MenuService {
             ||(habilitados.contains("SECUENCIAS")&&(permisos.contains("secuencias.ver")||permisos.contains("SECUENCIA_VER")));
         if(fiscal)configuracion.add(new OpcionMenu("Configuración fiscal","configuracion-fiscal","FILE_TEXT_O"));
         agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER","condiciones_pago.ver","CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
-        agregarSiModulo(permisos,habilitados,configuracion,"descuentos_configuracion.ver",null,"VENTAS","Descuentos","configuracion/facturacion/descuentos","PERCENT");
+        if(habilitados.contains("VENTAS")&&(permisos.contains("descuentos_configuracion.ver")||permisos.contains("recargos_configuracion.ver")))
+            configuracion.add(new OpcionMenu("Descuentos y recargos","configuracion/facturacion/descuentos-recargos","PERCENT"));
         boolean contabilidad = habilitados.contains("CONFIGURACION_CONTABLE")
             && (permisos.contains("configuracion_contable.ver")
                 || permisos.contains("CONFIGURACION_CONTABLE_VER")

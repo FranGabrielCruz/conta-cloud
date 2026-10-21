@@ -1,0 +1,1 @@
+package com.citacloud.springboot.contacloud.app.dto;import java.util.*;public record OpcionesRecargoPosDto(boolean permiteVenta,boolean permiteLinea,boolean permitePorcentaje,boolean permiteMonto,boolean requiereMotivo,boolean permiteAutorizacion,String moneda,List<ConfiguracionRecargoDto.Tipo> tipos,List<ConfiguracionRecargoDto.Motivo> motivos){}
