@@ -8,5 +8,5 @@ public record ProductoDto(UUID id,String codigo,String nombre,TipoProducto tipo,
     UUID unidadMedidaId,String unidadMedidaNombre,String unidadMedidaAbreviatura,String codigoBarras,String descripcion,
     BigDecimal costoCompra,BigDecimal precioVenta,UUID monedaId,String monedaCodigo,UUID impuestoCompraId,
     String impuestoCompraNombre,BigDecimal impuestoCompraTasa,UUID impuestoVentaId,String impuestoVentaNombre,
-    BigDecimal impuestoVentaTasa,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,
+    BigDecimal impuestoVentaTasa,boolean permiteDescuentos,boolean controlaExistencia,boolean permiteExistenciaNegativa,BigDecimal stockMinimo,
     boolean activo,long version) {}

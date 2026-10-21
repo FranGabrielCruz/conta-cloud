@@ -27,7 +27,7 @@ public class FacturacionPosService {
     private final MetodoPagoVentaRepository metodosPago; private final AplicacionPagoVentaRepository aplicacionesPago;
     private final BankAccountRepository cuentasBancarias;
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
-    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas; private final JdbcTemplate jdbc;
+    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos; private final JdbcTemplate jdbc;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
@@ -35,11 +35,11 @@ public class FacturacionPosService {
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
             FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,
-            VentaGuardadaService ventasGuardadas,JdbcTemplate jdbc){
+            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,JdbcTemplate jdbc){
         this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
-        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.jdbc=jdbc;
+        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.jdbc=jdbc;
     }
 
     @Transactional(readOnly=true)
@@ -105,7 +105,7 @@ public class FacturacionPosService {
             .map(p->new ProductoPosDto(p.getId(),p.getCodigo(),p.getNombre(),p.getCodigoBarras(),p.getUnidadMedida().getAbreviatura(),
                 p.getPrecioVenta(),p.getImpuestoVenta()!=null&&p.getImpuestoVenta().isActivo()?p.getImpuestoVenta().getPorcentaje():BigDecimal.ZERO,
                 p.isControlaExistencia()?existencias.saldo(ctx.principal.tenantId(),ctx.empresa,ctx.almacen.getId(),p.getId()):BigDecimal.ZERO,
-                p.isControlaExistencia(),p.isPermiteExistenciaNegativa())).toList();
+                p.isControlaExistencia(),p.isPermiteExistenciaNegativa(),p.isPermiteDescuentos())).toList();
     }
 
     @Transactional(readOnly=true)
@@ -158,8 +158,7 @@ public class FacturacionPosService {
         if(existente.isPresent())return resultado(existente.get());
         if(input.lineas()==null||input.lineas().isEmpty())throw new ReglaNegocioException("Agrega al menos un producto o servicio.");
         if(input.lineas().size()>200)throw new ReglaNegocioException("La factura excede el máximo de 200 líneas.");
-        Set<UUID> ids=new HashSet<>();List<CalculoLinea> calculos=new ArrayList<>();
-        BigDecimal subtotal=BigDecimal.ZERO,impuestos=BigDecimal.ZERO,total=BigDecimal.ZERO;
+        Set<UUID> ids=new HashSet<>();List<CalculoLinea> calculosBase=new ArrayList<>();List<LineaVistaPreviaDescuentoInput> lineasDescuento=new ArrayList<>();
         for(LineaVentaInput entrada:input.lineas()){
             if(entrada==null||entrada.productoId()==null||entrada.cantidad()==null||entrada.cantidad().signum()<=0)
                 throw new ReglaNegocioException("Todas las cantidades deben ser mayores que cero.");
@@ -173,15 +172,21 @@ public class FacturacionPosService {
             if(entrada.precioEsperado()==null||precio.compareTo(entrada.precioEsperado().setScale(SCALE,RoundingMode.HALF_UP))!=0)
                 throw new ReglaNegocioException("El precio de "+producto.getNombre()+" cambió. Actualiza la venta antes de cobrar.");
             Impuesto tax=producto.getImpuestoVenta()!=null&&producto.getImpuestoVenta().isActivo()?producto.getImpuestoVenta():null;
-            VentaCalculo.Resultado calculo=VentaCalculo.linea(precio,cantidad,tax==null?BigDecimal.ZERO:tax.getPorcentaje());
-            BigDecimal base=calculo.subtotal(),impuesto=calculo.impuesto(),lineaTotal=calculo.total();
+            BigDecimal tasa=tax==null?BigDecimal.ZERO:tax.getPorcentaje();
+            BigDecimal bruto=precio.multiply(cantidad).setScale(SCALE,RoundingMode.HALF_UP);
             if(producto.isControlaExistencia()&&!producto.isPermiteExistenciaNegativa()){
                 BigDecimal disponible=existencias.saldo(p.tenantId(),empresa,ctx.almacen.getId(),producto.getId());
                 if(disponible.compareTo(cantidad)<0)throw new ReglaNegocioException("Existencia insuficiente para "+producto.getNombre()+".");
             }
-            calculos.add(new CalculoLinea(producto,cantidad,precio,base,tax,impuesto,lineaTotal));
-            subtotal=subtotal.add(base);impuestos=impuestos.add(impuesto);total=total.add(lineaTotal);
+            UUID lineaId=entrada.lineaId()==null?producto.getId():entrada.lineaId();
+            calculosBase.add(new CalculoLinea(lineaId,producto,cantidad,precio,bruto,BigDecimal.ZERO,bruto,tax,BigDecimal.ZERO,BigDecimal.ZERO));
+            lineasDescuento.add(new LineaVistaPreviaDescuentoInput(lineaId,producto.getId(),producto.getNombre(),cantidad,precio,tasa,producto.isPermiteDescuentos()));
         }
+        DescuentoVentaService.ValidacionConfirmacion descuentoValidado=descuentos.validarConfirmacion(input.idempotencia(),input.descuento(),lineasDescuento);
+        Map<UUID,VistaPreviaDescuentoDto.Asignacion> asignaciones=new HashMap<>();
+        descuentoValidado.vista().asignaciones().forEach(x->asignaciones.put(x.lineaId(),x));
+        List<CalculoLinea> calculos=new ArrayList<>();BigDecimal subtotal=BigDecimal.ZERO,descuentoTotal=BigDecimal.ZERO,impuestos=BigDecimal.ZERO,total=BigDecimal.ZERO;
+        for(CalculoLinea base:calculosBase){VistaPreviaDescuentoDto.Asignacion a=asignaciones.get(base.lineaId);if(a==null)throw new ReglaNegocioException("No fue posible reconciliar el descuento de la venta.");CalculoLinea c=new CalculoLinea(base.lineaId,base.producto,base.cantidad,base.precio,a.subtotalBruto(),a.descuento(),a.baseImponible(),base.impuesto,a.impuesto(),a.total());calculos.add(c);subtotal=subtotal.add(c.subtotalBruto);descuentoTotal=descuentoTotal.add(c.descuento);impuestos=impuestos.add(c.impuestoMonto);total=total.add(c.total);}
         List<AplicacionValidada> cobros=validarAplicaciones(input.aplicaciones(),total,ctx,p.permisos());
         BigDecimal aplicado=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::monto).toList());
         BigDecimal cambio=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::cambio).toList());
@@ -193,11 +198,17 @@ public class FacturacionPosService {
             ctx.terminal.getId(),ctx.caja.getId(),ctx.sesion.getId(),ctx.caja.getSucursalId(),ctx.almacen.getId(),
             cliente==null?null:cliente.getId(),cliente==null?"Consumidor Final":nombreCliente(cliente),cliente==null?null:cliente.getIdentificacion(),
             p.nombre(),ctx.caja.getMonedaId(),ctx.caja.getMoneda().getCodigoIso(),ctx.caja.getMoneda().getSimbolo(),nota(input.nota()),
-            subtotal,impuestos,total,recibido,input.idempotencia()));
+            subtotal,descuentoTotal,impuestos,total,recibido,input.idempotencia()));
         int orden=1;
         for(CalculoLinea c:calculos){
+            DescuentoVentaInput descriptor=descuentoValidado.descuento();
             LineaFacturaVenta linea=lineas.saveAndFlush(new LineaFacturaVenta(factura,c.producto,ctx.almacen.getId(),orden++,c.cantidad,
-                c.precio,c.subtotal,c.impuesto,c.impuestoMonto,c.total));
+                c.precio,c.subtotalBruto,c.descuento,c.baseImponible,c.impuesto,c.impuestoMonto,c.total,
+                c.descuento.signum()>0&&descriptor!=null?descriptor.tipo():null,c.descuento.signum()>0&&descriptor!=null?descriptor.valor():null,
+                c.descuento.signum()>0&&descuentoValidado.motivo()!=null?descuentoValidado.motivo().getId():null,
+                c.descuento.signum()>0&&descuentoValidado.motivo()!=null?descuentoValidado.motivo().getNombre():null,
+                c.descuento.signum()>0&&descriptor!=null?descriptor.detalle():null,c.descuento.signum()>0?descuentoValidado.autorizacionId():null,
+                c.descuento.signum()>0?descuentoValidado.autorizadaPor():null,c.descuento.signum()>0?descuentoValidado.autorizadaEn():null));
             inventario.vender(factura,linea,c.producto,p.usuarioId());
         }
         PagoVenta pago=pagos.saveAndFlush(new PagoVenta(factura,aplicado,cambio,p.usuarioId()));
@@ -208,7 +219,8 @@ public class FacturacionPosService {
             registrarMovimientoCobro(ctx,factura,aplicacion,cobro,p.usuarioId());
         }
         auditoria.registrar("SALES_INVOICE_CONFIRMED","FacturaVenta",factura.getId(),"{\"numero\":\""+numero+"\",\"total\":"+total+
-            ",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
+            ",\"descuento\":"+descuentoTotal+",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
+        descuentos.consumirAutorizacion(descuentoValidado.autorizacionId(),factura.getId());
         ventasGuardadas.completarDesdeFactura(input.ventaGuardadaId(),factura.getId(),p.usuarioId(),ctx.terminal.getId(),p.tenantId(),empresa);
         return resultado(factura);
     }
@@ -309,7 +321,7 @@ public class FacturacionPosService {
     private static String nuevoToken(){byte[] bytes=new byte[32];new SecureRandom().nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     private static String hash(String value){try{byte[] b=MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));return HexFormat.of().formatHex(b);}catch(NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}}
     private record ContextoPos(com.citacloud.springboot.contacloud.app.security.TenantPrincipal principal,UUID empresa,TerminalPos terminal,Caja caja,SesionCaja sesion,Almacen almacen){}
-    private record CalculoLinea(Producto producto,BigDecimal cantidad,BigDecimal precio,BigDecimal subtotal,Impuesto impuesto,BigDecimal impuestoMonto,BigDecimal total){}
+    private record CalculoLinea(UUID lineaId,Producto producto,BigDecimal cantidad,BigDecimal precio,BigDecimal subtotalBruto,BigDecimal descuento,BigDecimal baseImponible,Impuesto impuesto,BigDecimal impuestoMonto,BigDecimal total){}
     private record AplicacionValidada(MetodoPagoVenta metodo,BigDecimal monto,BigDecimal recibido,BigDecimal cambio,
                                       CuentaBancaria cuenta,String referencia,String banco){}
 }

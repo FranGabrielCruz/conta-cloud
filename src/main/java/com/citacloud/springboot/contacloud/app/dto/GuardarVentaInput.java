@@ -1,2 +1,4 @@
 package com.citacloud.springboot.contacloud.app.dto;import java.math.BigDecimal;import java.util.*;
-public record GuardarVentaInput(UUID ventaGuardadaId,String token,UUID almacenId,UUID clienteId,String referencia,String observacion,BigDecimal descuento,BigDecimal recargo,List<LineaVentaGuardadaInput> lineas){}
+public record GuardarVentaInput(UUID ventaGuardadaId,String token,UUID almacenId,UUID clienteId,String referencia,String observacion,BigDecimal descuento,BigDecimal recargo,DescuentoVentaInput detalleDescuento,List<LineaVentaGuardadaInput> lineas){
+ public GuardarVentaInput(UUID ventaGuardadaId,String token,UUID almacenId,UUID clienteId,String referencia,String observacion,BigDecimal descuento,BigDecimal recargo,List<LineaVentaGuardadaInput> lineas){this(ventaGuardadaId,token,almacenId,clienteId,referencia,observacion,descuento,recargo,null,lineas);}
+}

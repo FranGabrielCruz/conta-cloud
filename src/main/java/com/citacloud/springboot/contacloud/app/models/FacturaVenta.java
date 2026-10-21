@@ -44,13 +44,20 @@ public class FacturaVenta {
             UUID sucursal,UUID almacen,UUID cliente,String clienteNombre,String clienteIdentificacion,String vendedor,
             UUID moneda,String monedaCodigo,String monedaSimbolo,String nota,BigDecimal subtotal,BigDecimal impuesto,
             BigDecimal total,BigDecimal recibido,UUID idempotencia){
+        this(tenant,empresa,numero,fecha,usuario,terminal,caja,sesion,sucursal,almacen,cliente,clienteNombre,clienteIdentificacion,
+                vendedor,moneda,monedaCodigo,monedaSimbolo,nota,subtotal,BigDecimal.ZERO,impuesto,total,recibido,idempotencia);
+    }
+    public FacturaVenta(UUID tenant,UUID empresa,String numero,LocalDate fecha,UUID usuario,UUID terminal,UUID caja,UUID sesion,
+            UUID sucursal,UUID almacen,UUID cliente,String clienteNombre,String clienteIdentificacion,String vendedor,
+            UUID moneda,String monedaCodigo,String monedaSimbolo,String nota,BigDecimal subtotal,BigDecimal descuento,BigDecimal impuesto,
+            BigDecimal total,BigDecimal recibido,UUID idempotencia){
         this.tenantId=tenant;this.empresaId=empresa;this.numero=numero;this.status=EstadoFacturaVenta.CONFIRMED;
         this.fecha=fecha;this.confirmadaEn=OffsetDateTime.now();this.confirmadaPor=usuario;this.terminalId=terminal;
         this.cajaId=caja;this.sesionCajaId=sesion;this.sucursalId=sucursal;this.almacenId=almacen;this.clienteId=cliente;
         this.clienteNombre=clienteNombre;this.clienteIdentificacion=clienteIdentificacion;
         this.clienteIdentificacionNormalizada=normalizarIdentificacion(clienteIdentificacion);this.vendedorNombre=vendedor;
         this.monedaId=moneda;this.monedaCodigo=monedaCodigo;this.monedaSimbolo=monedaSimbolo;this.condicionPago="Contado";
-        this.note=nota;this.subtotal=subtotal;this.descuentoTotal=BigDecimal.ZERO;this.recargoTotal=BigDecimal.ZERO;
+        this.note=nota;this.subtotal=subtotal;this.descuentoTotal=descuento;this.recargoTotal=BigDecimal.ZERO;
         this.impuestoTotal=impuesto;this.total=total;this.recibido=recibido;this.cambio=recibido.subtract(total);this.claveIdempotencia=idempotencia;
     }
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}

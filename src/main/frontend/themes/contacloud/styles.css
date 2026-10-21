@@ -774,6 +774,157 @@ vaadin-dialog-overlay.cc-discard-saved-sale-dialog::part(footer) {
     gap: 8px;
 }
 
+.cc-discount-config-page .cc-form-section {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cc-discount-policy-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: clamp(24px, 3vw, 32px);
+    row-gap: 18px;
+    width: 100%;
+    min-width: 0;
+}
+
+.cc-discount-policy-grid vaadin-checkbox {
+    align-self: start;
+    min-width: 0;
+    width: 100%;
+}
+
+.cc-discount-policy-grid vaadin-checkbox::part(label) {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    line-height: 1.35;
+}
+
+@media (max-width: 1000px) {
+    .cc-discount-policy-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 620px) {
+    .cc-discount-policy-grid {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 14px;
+    }
+}
+
+.cc-section-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lumo-space-m);
+}
+
+.cc-section-header-actions h3 {
+    margin: 0;
+}
+
+.cc-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--lumo-space-m);
+}
+
+.cc-pos-product-with-discount {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    height: 100%;
+}
+
+.cc-pos-product-with-discount .cc-pos-product-name {
+    flex: 1 1 auto;
+}
+
+.cc-pos-discount-indicator {
+    flex: 0 0 auto;
+    font-size: 14px;
+    line-height: 1;
+    cursor: help;
+}
+
+vaadin-dialog-overlay.cc-sales-discount-dialog::part(content) {
+    max-height: calc(94vh - 132px);
+    overflow: auto;
+}
+
+vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
+    gap: 8px;
+}
+
+.cc-discount-preview {
+    display: grid;
+    gap: 8px;
+    margin-top: var(--lumo-space-m);
+    padding: var(--lumo-space-m);
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
+}
+
+.cc-discount-preview-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--lumo-space-m);
+}
+
+.cc-discount-preview-row > :last-child {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cc-discount-products {
+    gap: 6px;
+    margin-top: var(--lumo-space-s);
+}
+
+.cc-discount-products h4 {
+    margin: var(--lumo-space-s) 0 0;
+    font-size: var(--lumo-font-size-s);
+    letter-spacing: .04em;
+}
+
+.cc-discount-products-grid {
+    width: 100%;
+    max-height: 300px;
+}
+
+.cc-discount-products-grid::part(cell) {
+    min-height: 38px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.cc-discount-product-name {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-discount-product-disabled {
+    min-width: 0;
+    opacity: .68;
+}
+
+.cc-discount-selected-count {
+    color: var(--lumo-secondary-text-color);
+    font-size: var(--lumo-font-size-s);
+}
+
+.cc-discount-selection-message {
+    color: var(--lumo-error-text-color);
+    font-size: var(--lumo-font-size-s);
+}
+
 @media (max-width: 820px) {
     .cc-latest-invoices-filters {
         grid-template-columns: 1fr 1fr;

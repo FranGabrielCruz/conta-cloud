@@ -14,10 +14,10 @@ public class ProductoMapper {
         p.getMoneda()==null?null:p.getMoneda().getCodigoIso(),p.getImpuestoCompraId(),
         p.getImpuestoCompra()==null?null:p.getImpuestoCompra().getNombre(),p.getImpuestoCompra()==null?null:p.getImpuestoCompra().getPorcentaje(),
         p.getImpuestoVentaId(),p.getImpuestoVenta()==null?null:p.getImpuestoVenta().getNombre(),
-        p.getImpuestoVenta()==null?null:p.getImpuestoVenta().getPorcentaje(),p.isControlaExistencia(),
+        p.getImpuestoVenta()==null?null:p.getImpuestoVenta().getPorcentaje(),p.isPermiteDescuentos(),p.isControlaExistencia(),
         p.isPermiteExistenciaNegativa(),p.getStockMinimo(),p.isActivo(),p.getVersion());}
     public Producto toEntity(ProductoInput i,UUID tenant,UUID empresa,String codigo,String nombre,String barcode,String descripcion,
             boolean track,boolean negative,java.math.BigDecimal minimum,UUID usuario){return new Producto(tenant,empresa,codigo,nombre,i.tipo(),
         i.categoriaId(),i.unidadMedidaId(),barcode,descripcion,i.costoCompra(),i.precioVenta(),i.monedaId(),i.impuestoCompraId(),
-        i.impuestoVentaId(),track,negative,minimum,i.activo(),usuario);}
+        i.impuestoVentaId(),i.permiteDescuentos(),track,negative,minimum,i.activo(),usuario);}
 }

@@ -18,6 +18,16 @@ public class LineaFacturaVenta {
     @Column(name="quantity",nullable=false,precision=19,scale=4) private BigDecimal cantidad;
     @Column(name="unit_price",nullable=false,precision=19,scale=4) private BigDecimal precioUnitario;
     @Column(name="discount_amount",nullable=false,precision=19,scale=4) private BigDecimal descuento;
+    @Column(name="gross_subtotal",nullable=false,precision=19,scale=4) private BigDecimal subtotalBruto;
+    @Column(name="taxable_base_amount",nullable=false,precision=19,scale=4) private BigDecimal baseImponible;
+    @Enumerated(EnumType.STRING) @Column(name="discount_type",length=20) private TipoDescuentoVenta tipoDescuento;
+    @Column(name="discount_value",precision=19,scale=6) private BigDecimal valorDescuento;
+    @Column(name="discount_reason_id") private UUID motivoDescuentoId;
+    @Column(name="discount_reason_name",length=120) private String motivoDescuentoNombre;
+    @Column(name="discount_reason_detail",length=500) private String motivoDescuentoDetalle;
+    @Column(name="discount_authorization_id") private UUID autorizacionDescuentoId;
+    @Column(name="discount_authorized_by") private UUID descuentoAutorizadoPor;
+    @Column(name="discount_authorized_at") private java.time.OffsetDateTime descuentoAutorizadoEn;
     @Column(name="tax_id") private UUID impuestoId;
     @Column(name="tax_name",length=120) private String impuestoNombre;
     @Column(name="tax_rate",nullable=false,precision=9,scale=6) private BigDecimal tasaImpuesto;
@@ -30,14 +40,24 @@ public class LineaFacturaVenta {
     protected LineaFacturaVenta(){}
     public LineaFacturaVenta(FacturaVenta f,Producto p,UUID almacen,int orden,BigDecimal cantidad,BigDecimal precio,
             BigDecimal subtotal,Impuesto tax,BigDecimal impuesto,BigDecimal total){
+        this(f,p,almacen,orden,cantidad,precio,subtotal,BigDecimal.ZERO,subtotal,tax,impuesto,total,null,null,null,null,null,null,null,null);
+    }
+    public LineaFacturaVenta(FacturaVenta f,Producto p,UUID almacen,int orden,BigDecimal cantidad,BigDecimal precio,
+            BigDecimal subtotalBruto,BigDecimal descuento,BigDecimal baseImponible,Impuesto tax,BigDecimal impuesto,BigDecimal total,
+            TipoDescuentoVenta tipoDescuento,BigDecimal valorDescuento,UUID motivoId,String motivoNombre,String motivoDetalle,
+            UUID autorizacionId,UUID autorizadoPor,java.time.OffsetDateTime autorizadoEn){
         tenantId=f.getTenantId();empresaId=f.getEmpresaId();facturaId=f.getId();productoId=p.getId();codigoProducto=p.getCodigo();
         descripcion=p.getNombre();unidadId=p.getUnidadMedidaId();unidadNombre=p.getUnidadMedida().getNombre();this.cantidad=cantidad;
-        precioUnitario=precio;descuento=BigDecimal.ZERO;impuestoId=tax==null?null:tax.getId();impuestoNombre=tax==null?null:tax.getNombre();
-        tasaImpuesto=tax==null?BigDecimal.ZERO:tax.getPorcentaje();this.impuesto=impuesto;this.subtotal=subtotal;this.total=total;
+        precioUnitario=precio;this.subtotalBruto=subtotalBruto;this.descuento=descuento;this.baseImponible=baseImponible;
+        this.tipoDescuento=tipoDescuento;this.valorDescuento=valorDescuento;motivoDescuentoId=motivoId;motivoDescuentoNombre=motivoNombre;
+        motivoDescuentoDetalle=motivoDetalle;autorizacionDescuentoId=autorizacionId;descuentoAutorizadoPor=autorizadoPor;descuentoAutorizadoEn=autorizadoEn;
+        impuestoId=tax==null?null:tax.getId();impuestoNombre=tax==null?null:tax.getNombre();
+        tasaImpuesto=tax==null?BigDecimal.ZERO:tax.getPorcentaje();this.impuesto=impuesto;this.subtotal=baseImponible;this.total=total;
         controlaExistencia=p.isControlaExistencia();almacenId=almacen;this.orden=orden;
     }
     public UUID getId(){return id;} public UUID getProductoId(){return productoId;} public String getCodigoProducto(){return codigoProducto;}
     public String getDescripcion(){return descripcion;} public String getUnidadNombre(){return unidadNombre;} public BigDecimal getCantidad(){return cantidad;}
     public BigDecimal getPrecioUnitario(){return precioUnitario;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getImpuesto(){return impuesto;}
+    public BigDecimal getSubtotalBruto(){return subtotalBruto;}public BigDecimal getDescuento(){return descuento;}public BigDecimal getBaseImponible(){return baseImponible;}public TipoDescuentoVenta getTipoDescuento(){return tipoDescuento;}public BigDecimal getValorDescuento(){return valorDescuento;}public String getMotivoDescuentoNombre(){return motivoDescuentoNombre;}public String getMotivoDescuentoDetalle(){return motivoDescuentoDetalle;}
     public BigDecimal getTotal(){return total;} public boolean isControlaExistencia(){return controlaExistencia;} public UUID getUnidadId(){return unidadId;}
 }
