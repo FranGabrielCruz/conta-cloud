@@ -28,6 +28,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
     private final TextField usuario = new TextField("Usuario");
     private final PasswordField password = new PasswordField("Contraseña");
     private final AuthenticationManager authenticationManager;
+    private final Button ingresar = new Button("Ingresar");
 
     public LoginView(AuthenticationManager authenticationManager) {
         this.authenticationManager = authenticationManager;
@@ -38,7 +39,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         usuario.getElement().setProperty("autocomplete", "username");
         password.getElement().setProperty("autocomplete", "current-password");
         empresa.setWidthFull(); usuario.setWidthFull(); password.setWidthFull();
-        var ingresar = new Button("Ingresar", e -> ingresar()); ingresar.addThemeName("primary"); ingresar.setWidthFull();
+        ingresar.addClickListener(e -> ingresar()); ingresar.addThemeName("primary"); ingresar.setWidthFull();
         password.addKeyPressListener(com.vaadin.flow.component.Key.ENTER, e -> ingresar());
         var tarjeta = new VerticalLayout(marca, subtitulo, empresa, usuario, password, ingresar);
         tarjeta.addClassName("login-card");
@@ -48,6 +49,8 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         addAttachListener(event -> restaurarDatosRecordados());
     }
     private void ingresar() {
+        if (!ingresar.isEnabled()) return;
+        ingresar.setEnabled(false);
         try {
             var authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(empresa.getValue() + "|" + usuario.getValue(), password.getValue()));
@@ -64,8 +67,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 USUARIO_STORAGE_KEY, usuario.getValue().trim())
                 .then(Boolean.class, guardado -> ui.navigate("dashboard"));
         } catch (AuthenticationException ex) {
+            ingresar.setEnabled(true);
             var n = Notification.show("Empresa, usuario o contraseña incorrectos"); n.addThemeVariants(NotificationVariant.LUMO_ERROR);
         } catch (RuntimeException ex) {
+            ingresar.setEnabled(true);
             log.error("No fue posible completar el inicio de sesion", ex);
             var n = Notification.show("No fue posible iniciar sesion. Intente nuevamente");
             n.addThemeVariants(NotificationVariant.LUMO_ERROR);

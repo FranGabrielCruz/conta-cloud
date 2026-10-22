@@ -266,7 +266,6 @@ public class VentasGuardadasDialog extends Dialog {
     }
 
     private static void error(RuntimeException error, String fallback) {
-        Notification.show(error.getMessage() == null || error.getMessage().isBlank()
-                ? fallback : error.getMessage());
+        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(error, fallback);
     }
 }

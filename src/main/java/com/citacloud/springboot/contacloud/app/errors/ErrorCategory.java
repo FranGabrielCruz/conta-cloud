@@ -1,0 +1,15 @@
+package com.citacloud.springboot.contacloud.app.errors;
+
+public enum ErrorCategory {
+    VALIDATION_ERROR,
+    BUSINESS_RULE_ERROR,
+    NOT_FOUND,
+    AUTHENTICATION_ERROR,
+    AUTHORIZATION_ERROR,
+    CONFLICT,
+    CONCURRENCY_ERROR,
+    IDEMPOTENCY_CONFLICT,
+    INFRASTRUCTURE_ERROR,
+    EXTERNAL_SERVICE_ERROR,
+    UNEXPECTED_ERROR
+}

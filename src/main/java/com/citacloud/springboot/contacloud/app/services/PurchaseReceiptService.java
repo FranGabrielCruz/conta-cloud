@@ -191,6 +191,7 @@ public class PurchaseReceiptService {
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('recepciones.crear')")
     public RecepcionCompraDto create(RecepcionCompraInput input) {
         var principal = TenantContext.principalActual();
+        if(input!=null)IdempotencyGuard.acquire(principal.tenantId(),principal.empresaId(),input.claveIdempotencia());
         RecepcionCompra existing = existing(input, principal);
         if (existing != null) return fullDto(existing);
         Validated validated = validate(input, principal);
@@ -207,6 +208,7 @@ public class PurchaseReceiptService {
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('recepciones.crear') and hasAuthority('recepciones.confirmar')")
     public RecepcionCompraDto createAndConfirm(RecepcionCompraInput input) {
         var principal = TenantContext.principalActual();
+        if(input!=null)IdempotencyGuard.acquire(principal.tenantId(),principal.empresaId(),input.claveIdempotencia());
         RecepcionCompra existing = existing(input, principal);
         if (existing != null) {
             if (existing.getEstado() == EstadoRecepcionCompra.CONFIRMED) return fullDto(existing);
@@ -279,8 +281,13 @@ public class PurchaseReceiptService {
         var principal = TenantContext.principalActual();
         OrdenCompra order = receipt.getOrdenCompraId() == null ? null : lockOrder(receipt, principal);
         if (receipt.getEstado() == EstadoRecepcionCompra.CONFIRMED) {
-            for (var movement : inventory.receiptEntries(receipt))
-                inventory.reverse(receipt, product(movement.getProductoId(), principal), movement, principal.usuarioId());
+            var movements=inventory.receiptEntries(receipt);
+            Map<UUID,Producto> lockedProducts=new HashMap<>();
+            movements.stream().map(MovimientoInventario::getProductoId).distinct().sorted(Comparator.comparing(UUID::toString))
+                .forEach(productId->lockedProducts.put(productId,products.bloquear(productId,principal.tenantId(),principal.empresaId())
+                    .orElseThrow(()->new RecursoNoEncontradoException("Producto no encontrado."))));
+            for (var movement : movements)
+                inventory.reverse(receipt,lockedProducts.get(movement.getProductoId()),movement,principal.usuarioId());
         }
         receipt.anular(motive, principal.usuarioId());
         receipt = receipts.saveAndFlush(receipt);

@@ -277,7 +277,7 @@ public class RecargoVentaDialog extends Dialog {
             aplicar.accept(new Aplicado(solicitud.recargo(), vista));
             close();
         } catch (RuntimeException ex) {
-            Notification.show(ex.getMessage() == null ? "No fue posible aplicar el recargo." : ex.getMessage());
+            com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, "No fue posible aplicar el recargo.");
         }
     }
 
@@ -309,8 +309,7 @@ public class RecargoVentaDialog extends Dialog {
                         close();
                         Notification.show("Recargo autorizado por " + autorizada.autorizadaPor() + ".");
                     } catch (RuntimeException ex) {
-                        Notification.show(ex.getMessage() == null
-                                ? "No fue posible autorizar el recargo." : ex.getMessage());
+                        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, "No fue posible autorizar el recargo.");
                     }
                 });
         dialogo.getFooter().add(autorizar, new AppActionButton(ActionType.CANCEL,

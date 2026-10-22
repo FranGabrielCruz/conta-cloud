@@ -52,5 +52,5 @@ public class ConfiguracionDescuentosView extends VerticalLayout implements Befor
     private static String decimal(BigDecimal v,String vacio,String sufijo){return v==null?vacio:v.stripTrailingZeros().toPlainString()+sufijo;}
     private static String money(BigDecimal v){return String.format(Locale.US,"%,.2f",v);}
     private static boolean can(String permiso){return TenantContext.principalActual().permisos().contains(permiso);}
-    private static void error(RuntimeException ex,String fallback){Notification.show(ex.getMessage()==null||ex.getMessage().isBlank()?fallback:ex.getMessage());}
+    private static void error(RuntimeException ex,String fallback){com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex,fallback);}
 }

@@ -9,6 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.AccessDeniedException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,15 +44,25 @@ public class LocalFileStorageService {
             throw new IllegalArgumentException("Contenido PDF inválido");
         }
         Path target = resolveSafePath(key);
+        Path temporary = target.resolveSibling("." + target.getFileName() + "." + UUID.randomUUID() + ".tmp");
         try {
             Files.createDirectories(target.getParent());
             rejectSymlinks(target.getParent());
-            Files.write(target, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            if(Files.exists(target,LinkOption.NOFOLLOW_LINKS))throw new java.nio.file.FileAlreadyExistsException(target.toString());
+            Files.write(temporary, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            try {
+                Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException | AccessDeniedException ex) {
+                Files.copy(temporary,target);
+                Files.delete(temporary);
+            }
             return key;
         } catch (java.nio.file.FileAlreadyExistsException ex) {
             throw new IllegalStateException("El PDF oficial de la orden ya existe", ex);
         } catch (IOException ex) {
             throw new UncheckedIOException("No fue posible guardar el PDF oficial", ex);
+        } finally {
+            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
         }
     }
 

@@ -43,8 +43,8 @@ class SaldosCuentasServiceTest {
 
     @Test void convierteResumenUsandoTasaDeLaFechaDeCorte(){
         Moneda dop=moneda(dopId,"DOP",true);when(monedas.findByIdAndEmpresaId(dopId,empresa)).thenReturn(Optional.of(dop));
-        when(movimientos.totalesBancarios(eq(tenant),eq(empresa),any(),anyString(),isNull(),isNull()))
-            .thenReturn(List.of(total(usdId,"USD",new BigDecimal("10"))));
+        TotalSaldoMonedaProjection totalUsd=total(usdId,"USD",new BigDecimal("10"));
+        when(movimientos.totalesBancarios(eq(tenant),eq(empresa),any(),anyString(),isNull(),isNull())).thenReturn(List.of(totalUsd));
         when(movimientos.totalesCajas(eq(tenant),eq(empresa),any(),anyString(),isNull(),isNull(),isNull(),eq(true),anySet()))
             .thenReturn(List.of());
         TasaCambio rate=mock(TasaCambio.class);when(rate.getTasa()).thenReturn(new BigDecimal("60"));
@@ -56,8 +56,8 @@ class SaldosCuentasServiceTest {
 
     @Test void noMezclaMonedasCuandoFaltaLaTasa(){
         Moneda dop=moneda(dopId,"DOP",true);when(monedas.findByIdAndEmpresaId(dopId,empresa)).thenReturn(Optional.of(dop));
-        when(movimientos.totalesBancarios(any(),any(),any(),anyString(),isNull(),isNull()))
-            .thenReturn(List.of(total(usdId,"USD",new BigDecimal("10"))));
+        TotalSaldoMonedaProjection totalUsd=total(usdId,"USD",new BigDecimal("10"));
+        when(movimientos.totalesBancarios(any(),any(),any(),anyString(),isNull(),isNull())).thenReturn(List.of(totalUsd));
         var result=service.resumen(LocalDate.of(2026,10,10),"",null,null,null,dopId,true,false);
         assertThat(result.equivalente()).isFalse();assertThat(result.general()).isNull();
         assertThat(result.totalesPorMoneda()).containsEntry("USD",new BigDecimal("10"));
@@ -66,10 +66,11 @@ class SaldosCuentasServiceTest {
 
     @Test void calculaElTotalGeneralConCajasNegativas(){
         Moneda dop=moneda(dopId,"DOP",true);when(monedas.findByIdAndEmpresaId(dopId,empresa)).thenReturn(Optional.of(dop));
-        when(movimientos.totalesBancarios(any(),any(),any(),anyString(),isNull(),isNull()))
-            .thenReturn(List.of(total(dopId,"DOP",new BigDecimal("18316.40"))));
+        TotalSaldoMonedaProjection totalBancos=total(dopId,"DOP",new BigDecimal("18316.40"));
+        TotalSaldoMonedaProjection totalCajas=total(dopId,"DOP",new BigDecimal("-18112.00"));
+        when(movimientos.totalesBancarios(any(),any(),any(),anyString(),isNull(),isNull())).thenReturn(List.of(totalBancos));
         when(movimientos.totalesCajas(any(),any(),any(),anyString(),isNull(),isNull(),isNull(),eq(true),anySet()))
-            .thenReturn(List.of(total(dopId,"DOP",new BigDecimal("-18112.00"))));
+            .thenReturn(List.of(totalCajas));
         var result=service.resumen(LocalDate.of(2026,10,10),"",null,null,null,dopId,true,true);
         assertThat(result.bancos()).isEqualByComparingTo("18316.40");
         assertThat(result.cajas()).isEqualByComparingTo("-18112.00");

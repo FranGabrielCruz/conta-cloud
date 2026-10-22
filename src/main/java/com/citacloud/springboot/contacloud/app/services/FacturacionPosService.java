@@ -150,6 +150,7 @@ public class FacturacionPosService {
     public FacturaVentaResultadoDto confirmar(ConfirmarVentaInput input){
         if(input==null||input.idempotencia()==null)throw new ReglaNegocioException("No fue posible identificar la operación de cobro.");
         var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();
+        IdempotencyGuard.acquire(p.tenantId(),empresa,input.idempotencia());
         Optional<FacturaVenta> existente=facturas.findByTenantIdAndEmpresaIdAndClaveIdempotencia(p.tenantId(),empresa,input.idempotencia());
         if(existente.isPresent())return resultado(existente.get());
         if(input.almacenId()==null)throw new ReglaNegocioException("No fue posible identificar el almacén de la venta.");
@@ -159,13 +160,16 @@ public class FacturacionPosService {
         if(input.lineas()==null||input.lineas().isEmpty())throw new ReglaNegocioException("Agrega al menos un producto o servicio.");
         if(input.lineas().size()>200)throw new ReglaNegocioException("La factura excede el máximo de 200 líneas.");
         Set<UUID> ids=new HashSet<>();List<CalculoLinea> calculosBase=new ArrayList<>();List<LineaVistaPreviaDescuentoInput> lineasDescuento=new ArrayList<>();
+        Map<UUID,Producto> productosBloqueados=new HashMap<>();
+        input.lineas().stream().filter(Objects::nonNull).map(LineaVentaInput::productoId).filter(Objects::nonNull).distinct()
+            .sorted(Comparator.comparing(UUID::toString)).forEach(id->productosBloqueados.put(id,productos.bloquear(id,p.tenantId(),empresa)
+                .orElseThrow(()->new RecursoNoEncontradoException("Producto no encontrado."))));
         for(LineaVentaInput entrada:input.lineas()){
             if(entrada==null||entrada.productoId()==null||entrada.cantidad()==null||entrada.cantidad().signum()<=0)
                 throw new ReglaNegocioException("Todas las cantidades deben ser mayores que cero.");
             if(!ids.add(entrada.productoId()))throw new ReglaNegocioException("El producto ya existe en la factura.");
             BigDecimal cantidad=entrada.cantidad().setScale(SCALE,RoundingMode.HALF_UP);
-            Producto producto=productos.bloquear(entrada.productoId(),p.tenantId(),empresa)
-                .orElseThrow(()->new RecursoNoEncontradoException("Producto no encontrado."));
+            Producto producto=productosBloqueados.get(entrada.productoId());
             if(!producto.isActivo()||producto.getPrecioVenta()==null)throw new ReglaNegocioException("El producto "+producto.getNombre()+" no está disponible para venta.");
             if(!ctx.caja.getMonedaId().equals(producto.getMonedaId()))throw new ReglaNegocioException("El producto "+producto.getNombre()+" utiliza una moneda distinta a la caja.");
             BigDecimal precio=producto.getPrecioVenta().setScale(SCALE,RoundingMode.HALF_UP);

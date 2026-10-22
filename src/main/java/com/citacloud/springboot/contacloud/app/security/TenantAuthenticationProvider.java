@@ -10,8 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.LinkedHashSet;
 
 @Component
@@ -22,6 +25,7 @@ public class TenantAuthenticationProvider implements AuthenticationProvider {
     private final UsuarioSucursalRepository sucursales;
     private final PasswordEncoder passwordEncoder;
     @Autowired(required=false) private DirectoryGateway directory;
+    @Autowired private LoginAttemptService loginAttempts;
     @Value("${contacloud.multidatabase.enabled:false}") private boolean multiDatabase;
     public TenantAuthenticationProvider(EmpresaRepository empresas, UsuarioRepository usuarios,
                                         UsuarioEmpresaRepository accesos, UsuarioSucursalRepository sucursales,
@@ -35,6 +39,18 @@ public class TenantAuthenticationProvider implements AuthenticationProvider {
         if (credencial.length != 2 || credencial[0].isBlank() || credencial[1].isBlank()) {
             throw new BadCredentialsException("Credenciales invalidas");
         }
+        String source=source();
+        if(loginAttempts!=null)loginAttempts.verifyAllowed(credencial[0],credencial[1],source);
+        try {
+            Authentication result=authenticateInternal(authentication,credencial);
+            if(loginAttempts!=null)loginAttempts.succeeded(credencial[0],credencial[1],source);
+            return result;
+        } catch (AuthenticationException ex) {
+            if(loginAttempts!=null)loginAttempts.failed(credencial[0],credencial[1],source);
+            throw new BadCredentialsException("Credenciales invalidas");
+        }
+    }
+    private Authentication authenticateInternal(Authentication authentication,String[] credencial) {
         CompanyLocator locator=null;
         if(multiDatabase){if(directory==null)throw new AuthenticationServiceException("Directorio multitenant no disponible");locator=directory.findCompanyByCode(credencial[0]).filter(CompanyLocator::activo).orElseThrow(()->new BadCredentialsException("Credenciales invalidas"));}
         java.util.UUID routeTenant=locator==null?null:locator.tenantId();
@@ -54,6 +70,7 @@ public class TenantAuthenticationProvider implements AuthenticationProvider {
             return UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
         }
     }
+    private static String source(){var a=RequestContextHolder.getRequestAttributes();return a instanceof ServletRequestAttributes r?r.getRequest().getRemoteAddr():"unknown";}
     @Override public boolean supports(Class<?> authentication) {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
     }

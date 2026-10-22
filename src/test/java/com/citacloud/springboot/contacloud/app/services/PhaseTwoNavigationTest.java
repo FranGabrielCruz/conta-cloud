@@ -21,6 +21,7 @@ import com.citacloud.springboot.contacloud.app.views.CategoriasView;
 import com.citacloud.springboot.contacloud.app.views.UnidadesMedidaView;
 import com.citacloud.springboot.contacloud.app.views.ClientesView;
 import com.citacloud.springboot.contacloud.app.views.CotizacionesView;
+import com.citacloud.springboot.contacloud.app.views.FacturacionPosView;
 import com.citacloud.springboot.contacloud.app.views.AlmacenesView;
 import com.citacloud.springboot.contacloud.app.views.MovimientosInventarioView;
 import com.citacloud.springboot.contacloud.app.views.InventarioTransferenciasView;
@@ -99,6 +100,7 @@ class PhaseTwoNavigationTest {
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(ClientesView.class.getAnnotation(Route.class).value(),
                 CotizacionesView.class.getAnnotation(Route.class).value(),
+                FacturacionPosView.class.getAnnotation(Route.class).value(),
                 CajasView.class.getAnnotation(Route.class).value(),
                 ProveedoresView.class.getAnnotation(Route.class).value(),
                 ProductosView.class.getAnnotation(Route.class).value(),

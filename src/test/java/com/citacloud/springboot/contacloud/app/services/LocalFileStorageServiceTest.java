@@ -32,4 +32,16 @@ class LocalFileStorageServiceTest {
         assertThrows(IllegalArgumentException.class, () -> storage.store("../fuera", "png", new byte[]{1}));
         assertThrows(IllegalArgumentException.class, () -> storage.store("safe", "svg", new byte[]{1}));
     }
+
+    @Test void publicaPdfCompletoSinDejarArchivosTemporales() throws Exception {
+        var storage=new LocalFileStorageService(temp.toString());
+        String key="tenants/t/documents/test.pdf";
+        byte[] pdf="%PDF-1.7\n%%EOF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        storage.storePdf(key,pdf);
+        assertArrayEquals(pdf,storage.load(key).orElseThrow());
+        try(var files=java.nio.file.Files.list(temp.resolve("tenants/t/documents"))){
+            assertTrue(files.noneMatch(path->path.getFileName().toString().endsWith(".tmp")));
+        }
+        assertThrows(IllegalStateException.class,()->storage.storePdf(key,pdf));
+    }
 }

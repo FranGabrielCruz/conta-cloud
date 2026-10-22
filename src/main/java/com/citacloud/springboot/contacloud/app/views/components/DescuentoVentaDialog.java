@@ -161,6 +161,6 @@ public class DescuentoVentaDialog extends Dialog {
     private static Div metrica(String etiqueta, Span valor) { Span label = new Span(etiqueta); label.addClassName("cc-adjustment-summary-label"); Div d = new Div(label, valor); d.addClassName("cc-adjustment-summary-metric"); return d; }
     private static Div fila(String etiqueta, Span valor) { Div d = new Div(new Span(etiqueta), valor); d.addClassName("cc-discount-preview-row"); return d; }
     private static Div fila(String etiqueta, String valor) { return fila(etiqueta, new Span(valor)); }
-    private static void error(RuntimeException ex, String fallback) { Notification.show(ex.getMessage() == null || ex.getMessage().isBlank() ? fallback : ex.getMessage()); }
+    private static void error(RuntimeException ex, String fallback) { com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, fallback); }
     public record Aplicado(DescuentoVentaInput descuento, VistaPreviaDescuentoDto vista) {}
 }

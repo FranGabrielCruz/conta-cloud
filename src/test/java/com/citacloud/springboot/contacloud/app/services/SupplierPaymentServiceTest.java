@@ -93,12 +93,12 @@ class SupplierPaymentServiceTest {
         UUID accountId=UUID.randomUUID(),key=UUID.randomUUID();
         prepararCatalogosPago(accountId);
         PagoProveedor[] persisted={null};
-        when(payments.saveAndFlush(any())).thenAnswer(invocation->{
+        doAnswer(invocation->{
             PagoProveedor payment=invocation.getArgument(0);
             if(payment.getId()==null)ReflectionTestUtils.setField(payment,"id",UUID.randomUUID());
             persisted[0]=payment;
             return payment;
-        });
+        }).when(payments).saveAndFlush(any());
         when(payments.bloquear(any(),eq(tenant),eq(company)))
             .thenAnswer(invocation->Optional.ofNullable(persisted[0]));
         when(drafts.findAllByPagoIdAndTenantIdAndEmpresaId(any(),eq(tenant),eq(company)))

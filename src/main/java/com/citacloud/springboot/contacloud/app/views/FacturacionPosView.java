@@ -1,6 +1,7 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.dto.*;
+import com.citacloud.springboot.contacloud.app.errors.UiErrorHandler;
 import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import com.citacloud.springboot.contacloud.app.services.*;
@@ -1152,8 +1153,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private static void error(RuntimeException error, String fallback) {
-        String mensaje = error.getMessage();
-        Notification.show(mensaje == null || mensaje.isBlank() ? fallback : mensaje);
+        UiErrorHandler.show(error, fallback);
     }
 
     private static class Fila {
