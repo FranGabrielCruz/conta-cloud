@@ -8,9 +8,13 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Metrics;
 import java.util.*;
 
 public class TenantProvisioningService {
+    private static final Logger log=LoggerFactory.getLogger(TenantProvisioningService.class);
     private final DirectoryGateway directory; private final DatabaseAllocationService allocation;
     private final DataSourceRegistry registry; private final TenantDatabaseResolver routing;
     private final PasswordEncoder passwordEncoder;
@@ -38,17 +42,31 @@ public class TenantProvisioningService {
         DatabaseNodeType hosting=request.hostingMode()==HostingMode.DEDICATED?DatabaseNodeType.DEDICADA:DatabaseNodeType.COMPARTIDA;
         try{
             directory.createProvisioningTenant(tenantId,node.id(),hosting,request.idempotencyKey());
+            directory.markProvisioningStep(tenantId,"DIRECTORY_CREATED");
             var targetDataSource=registry.get(node);JdbcTemplate target=new JdbcTemplate(targetDataSource);
             new TransactionTemplate(new DataSourceTransactionManager(targetDataSource)).executeWithoutResult(status->
                 createOperational(target,tenantId,empresaId,rolId,usuarioId,accesoId,code,request,usuarioValidado,passwordHash));
+            directory.markProvisioningStep(tenantId,"OPERATIONAL_CREATED");
             directory.registerCompany(empresaId,tenantId,code,request.empresa().nombreComercial().trim());
+            directory.markProvisioningStep(tenantId,"COMPANY_REGISTERED");
             target.update("update empresas set activo=true where id=? and tenant_id=?",empresaId,tenantId);
             directory.markTenantStatus(tenantId,TenantStatus.ACTIVE);routing.invalidate(tenantId);
             return new ProvisioningResult(tenantId,empresaId,code,node.code(),TenantStatus.ACTIVE.name());
         }catch(RuntimeException ex){
-            try{directory.markTenantStatus(tenantId,TenantStatus.FAILED);}catch(RuntimeException ignored){}
-            try{allocation.release(node.id());}catch(RuntimeException ignored){}
-            routing.invalidate(tenantId);throw new ReglaNegocioException("No fue posible completar el provisioning del tenant.",ex);
+            Metrics.counter("contacloud.provisioning","result","failed").increment();
+            String traceId=com.citacloud.springboot.contacloud.app.errors.TraceContext.currentOrCreate();
+            String compensationStatus="COMPLETED",compensationError=null;
+            try{allocation.release(node.id());}catch(RuntimeException compensation){
+                Metrics.counter("contacloud.provisioning","result","compensation_failed").increment();
+                compensationStatus="FAILED";compensationError=safeError(compensation);
+                log.error("event=TENANT_PROVISIONING_COMPENSATION_FAILED traceId={} tenantId={} nodeId={}",traceId,tenantId,node.id(),compensation);
+            }
+            try{directory.markProvisioningFailure(tenantId,"FAILED",safeError(ex),traceId,compensationStatus,compensationError);}
+            catch(RuntimeException persistence){
+                log.error("event=TENANT_PROVISIONING_FAILURE_NOT_RECORDED traceId={} tenantId={}",traceId,tenantId,persistence);
+                ex.addSuppressed(persistence);
+            }
+            routing.invalidate(tenantId);throw new ReglaNegocioException("No fue posible completar el provisioning del tenant. Código de seguimiento: "+com.citacloud.springboot.contacloud.app.errors.TraceContext.shortId(traceId),ex);
         }
     }
     private static void createOperational(JdbcTemplate jdbc,UUID tenantId,UUID empresaId,UUID rolId,
@@ -81,4 +99,5 @@ public class TenantProvisioningService {
     static boolean permisoDisponibleParaTenant(String modulo,String recurso){return PermisoTenantPolicy.disponibleParaAdministradorInicial(modulo,recurso);}
     private record PermisoProvisionable(UUID id,String modulo,String recurso){}
     private static String blank(String s){return s==null||s.isBlank()?null:s.trim();}
+    private static String safeError(Throwable error){String message=error==null?null:error.getMessage();String value=message==null||message.isBlank()?error.getClass().getSimpleName():message;return value.length()>1000?value.substring(0,1000):value;}
 }

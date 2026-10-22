@@ -2,6 +2,7 @@ package com.citacloud.springboot.contacloud.app.errors;
 
 import com.citacloud.springboot.contacloud.app.services.RecursoNoEncontradoException;
 import com.citacloud.springboot.contacloud.app.services.ReglaNegocioException;
+import io.micrometer.core.instrument.Metrics;
 import java.io.UncheckedIOException;
 import java.util.Locale;
 import org.springframework.dao.CannotAcquireLockException;
@@ -35,13 +36,21 @@ public final class ErrorClassifier {
             return expected(ErrorCategory.AUTHORIZATION_ERROR, ErrorCode.FORBIDDEN_OPERATION,
                 HttpStatus.FORBIDDEN, "No tienes permiso para realizar esta operación.");
         }
+        if (contains(error, "deadlock")) {
+            return expected(ErrorCategory.CONCURRENCY_ERROR, ErrorCode.DEADLOCK_CONFLICT,
+                HttpStatus.CONFLICT, "No fue posible completar la operación por un conflicto concurrente. Intente nuevamente.");
+        }
+        if (contains(error, "lock timeout") || contains(error, "could not obtain lock") || error instanceof CannotAcquireLockException) {
+            return expected(ErrorCategory.CONCURRENCY_ERROR, ErrorCode.LOCK_TIMEOUT,
+                HttpStatus.CONFLICT, "No fue posible completar la operación porque el recurso está siendo utilizado. Intente nuevamente.");
+        }
         if (isConcurrency(error, root)) {
             return expected(ErrorCategory.CONCURRENCY_ERROR, ErrorCode.CONCURRENCY_CONFLICT,
                 HttpStatus.CONFLICT, "La información cambió mientras realizabas la operación. Actualiza e inténtalo nuevamente.");
         }
         if (error instanceof ReglaNegocioException) {
             String message = safe(error.getMessage(), "No fue posible completar la operación.");
-            return expected(ErrorCategory.BUSINESS_RULE_ERROR, businessCode(message),
+            return expected(ErrorCategory.BUSINESS_RULE_ERROR, ((ReglaNegocioException)error).getCode(),
                 HttpStatus.UNPROCESSABLE_ENTITY, message);
         }
         if (error instanceof DataIntegrityViolationException) {
@@ -70,23 +79,13 @@ public final class ErrorClassifier {
             || contains(error, "deadlock") || contains(error, "lock timeout") || contains(error, "could not obtain lock");
     }
 
-    private static ErrorCode businessCode(String message) {
-        String value = message.toLowerCase(Locale.ROOT);
-        if (value.contains("existencia insuficiente") || value.contains("inventario suficiente")) return ErrorCode.INVENTORY_INSUFFICIENT;
-        if (value.contains("caja") && value.contains("cerrad")) return ErrorCode.CASH_REGISTER_CLOSED;
-        if (value.contains("factura") && value.contains("pagad")) return ErrorCode.INVOICE_ALREADY_PAID;
-        if (value.contains("ya fue confirm") || value.contains("ya está confirm")) return ErrorCode.DOCUMENT_ALREADY_CONFIRMED;
-        if (value.contains("descuento") && value.contains("super")) return ErrorCode.DISCOUNT_LIMIT_EXCEEDED;
-        if (value.contains("recargo") && value.contains("super")) return ErrorCode.SURCHARGE_LIMIT_EXCEEDED;
-        if (value.contains("modificad") && value.contains("otro usuario")) return ErrorCode.CONCURRENCY_CONFLICT;
-        return ErrorCode.BUSINESS_RULE_ERROR;
-    }
-
     private static ClassifiedError expected(ErrorCategory category, ErrorCode code, HttpStatus status, String message) {
+        Metrics.counter("contacloud.errors", "category", category.name(), "code", code.name()).increment();
         return new ClassifiedError(category, code, status, message, true);
     }
 
     private static ClassifiedError unexpected(ErrorCategory category, ErrorCode code) {
+        Metrics.counter("contacloud.errors", "category", category.name(), "code", code.name()).increment();
         return new ClassifiedError(category, code, HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED, false);
     }
 

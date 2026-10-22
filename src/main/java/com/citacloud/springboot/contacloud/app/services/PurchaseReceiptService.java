@@ -34,11 +34,12 @@ public class PurchaseReceiptService {
     private final InventoryMovementService inventory;
     private final RecepcionCompraMapper mapper;
     private final AuditoriaService audit;
+    private final IdempotentOperationService idempotency;
 
     public PurchaseReceiptService(PurchaseReceiptRepository receipts, PurchaseReceiptLineRepository receiptLines,
             SupplierRepository suppliers, AlmacenRepository warehouses, ProductRepository products,
             PurchaseOrderRepository orders, PurchaseInvoiceRepository invoices, PurchaseReceiptNumberService numbers, InventoryMovementService inventory,
-            RecepcionCompraMapper mapper, AuditoriaService audit) {
+            RecepcionCompraMapper mapper, AuditoriaService audit, IdempotentOperationService idempotency) {
         this.receipts = receipts;
         this.receiptLines = receiptLines;
         this.suppliers = suppliers;
@@ -50,6 +51,7 @@ public class PurchaseReceiptService {
         this.inventory = inventory;
         this.mapper = mapper;
         this.audit = audit;
+        this.idempotency = idempotency;
     }
 
     @Transactional(readOnly = true)
@@ -191,9 +193,11 @@ public class PurchaseReceiptService {
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('recepciones.crear')")
     public RecepcionCompraDto create(RecepcionCompraInput input) {
         var principal = TenantContext.principalActual();
-        if(input!=null)IdempotencyGuard.acquire(principal.tenantId(),principal.empresaId(),input.claveIdempotencia());
+        if(input==null||input.claveIdempotencia()==null)throw new ReglaNegocioException("No fue posible identificar la operación de recepción.");
+        String operation="PURCHASE_RECEIPT_CREATE";var start=idempotency.begin(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),fingerprint(input));
+        if(start.replay())return fullDto(safe(start.resultId()));
         RecepcionCompra existing = existing(input, principal);
-        if (existing != null) return fullDto(existing);
+        if (existing != null){idempotency.complete(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),"RecepcionCompra",existing.getId());return fullDto(existing);}
         Validated validated = validate(input, principal);
         RecepcionCompra receipt = mapper.toEntity(normalizedInput(input, validated), principal.tenantId(), principal.empresaId(),
             numbers.next(principal.tenantId(), principal.empresaId()), principal.usuarioId());
@@ -201,6 +205,7 @@ public class PurchaseReceiptService {
         apply(receipt, validated, principal);
         receipt = receipts.saveAndFlush(receipt);
         audit.registrar("PURCHASE_RECEIPT_CREATED", "RecepcionCompra", receipt.getId(), detail(receipt, null));
+        idempotency.complete(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),"RecepcionCompra",receipt.getId());
         return fullDto(receipt);
     }
 
@@ -208,12 +213,14 @@ public class PurchaseReceiptService {
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('recepciones.crear') and hasAuthority('recepciones.confirmar')")
     public RecepcionCompraDto createAndConfirm(RecepcionCompraInput input) {
         var principal = TenantContext.principalActual();
-        if(input!=null)IdempotencyGuard.acquire(principal.tenantId(),principal.empresaId(),input.claveIdempotencia());
+        if(input==null||input.claveIdempotencia()==null)throw new ReglaNegocioException("No fue posible identificar la operación de confirmación.");
+        String operation="PURCHASE_RECEIPT_CREATE_AND_CONFIRM";var start=idempotency.begin(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),fingerprint(input));
+        if(start.replay())return fullDto(safe(start.resultId()));
         RecepcionCompra existing = existing(input, principal);
         if (existing != null) {
-            if (existing.getEstado() == EstadoRecepcionCompra.CONFIRMED) return fullDto(existing);
+            if (existing.getEstado() == EstadoRecepcionCompra.CONFIRMED){idempotency.complete(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),"RecepcionCompra",existing.getId());return fullDto(existing);}
             draft(existing);
-            return confirmNew(locked(existing.getId()), principal);
+            RecepcionCompraDto result=confirmNew(locked(existing.getId()), principal);idempotency.complete(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),"RecepcionCompra",existing.getId());return result;
         }
         Validated validated = validate(input, principal);
         RecepcionCompra receipt = mapper.toEntity(normalizedInput(input, validated), principal.tenantId(), principal.empresaId(),
@@ -222,7 +229,7 @@ public class PurchaseReceiptService {
         apply(receipt, validated, principal);
         receipt = receipts.saveAndFlush(receipt);
         audit.registrar("PURCHASE_RECEIPT_CREATED", "RecepcionCompra", receipt.getId(), detail(receipt, null));
-        return confirmNew(receipt, principal);
+        RecepcionCompraDto result=confirmNew(receipt, principal);idempotency.complete(principal.tenantId(),principal.empresaId(),operation,input.claveIdempotencia(),"RecepcionCompra",receipt.getId());return result;
     }
 
     @Transactional
@@ -608,6 +615,7 @@ public class PurchaseReceiptService {
             principal.tenantId(), principal.empresaId(), input.claveIdempotencia()).orElse(null);
     }
     private static ComprasCatalogosDto.Opcion option(UUID id, String name) { return new ComprasCatalogosDto.Opcion(id, name); }
+    private static String fingerprint(RecepcionCompraInput input){return CommandFingerprint.sha256(new Object[]{input.proveedorId(),input.ordenCompraId(),input.facturaProveedorId(),input.almacenId(),input.fecha(),input.referencia(),input.notas(),input.motivoDiferencia(),input.lineas()});}
     private static String clean(String value) { return value == null ? "" : value.trim(); }
     private static String optional(String value, int max) {
         String clean = clean(value);

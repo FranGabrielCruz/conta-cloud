@@ -2,6 +2,7 @@ package com.citacloud.springboot.contacloud.app.controllers;
 
 import com.citacloud.springboot.contacloud.app.errors.*;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
+import com.citacloud.springboot.contacloud.app.services.CriticalFailureAuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
@@ -16,6 +17,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private final CriticalFailureAuditService failureAudit;
+
+    public ApiExceptionHandler(CriticalFailureAuditService failureAudit){this.failureAudit=failureAudit;}
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> invalidBody(MethodArgumentNotValidException exception, HttpServletRequest request) {
@@ -46,6 +50,8 @@ public class ApiExceptionHandler {
             log.error("event=REQUEST_FAILED traceId={} tenantId={} companyId={} userId={} endpoint={} code={} result=ERROR exceptionType={}",
                 traceId, tenant(), company(), user(), request.getRequestURI(), classified.code(), exception.getClass().getName(), exception);
         }
+        try{failureAudit.record(classified,request.getRequestURI(),traceId);}
+        catch(RuntimeException auditError){log.error("event=CRITICAL_FAILURE_AUDIT_FAILED traceId={} endpoint={}",traceId,request.getRequestURI(),auditError);}
         return response(classified, request, List.of());
     }
 

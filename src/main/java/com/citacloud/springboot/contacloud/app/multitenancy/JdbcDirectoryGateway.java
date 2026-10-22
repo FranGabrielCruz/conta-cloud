@@ -71,12 +71,47 @@ public class JdbcDirectoryGateway implements DirectoryGateway {
         insert into tenant_directory(tenant_id,database_node_id,hosting_type,status,provisioning_key)
         values (?,?,?,'PROVISIONING',?)
         """,tenantId,nodeId,hostingType.name(),key);}
+    @Override public void markProvisioningStep(UUID tenantId,String step){jdbc.update("""
+        update tenant_directory set provisioning_step=?,last_error=null,last_trace_id=null,
+        compensation_status='NONE',compensation_error=null,version=version+1,updated_at=current_timestamp
+        where tenant_id=?
+        """,step,tenantId);}
+    @Override public void markProvisioningFailure(UUID tenantId,String step,String error,String traceId,
+            String compensationStatus,String compensationError){jdbc.update("""
+        update tenant_directory set status='FAILED',provisioning_step=?,last_error=?,last_trace_id=?,
+        compensation_status=?,compensation_error=?,version=version+1,updated_at=current_timestamp
+        where tenant_id=?
+        """,step,error,traceId,compensationStatus,compensationError,tenantId);}
     @Override public void markTenantStatus(UUID tenantId,TenantStatus status){jdbc.update("update tenant_directory set status=?,version=version+1,updated_at=current_timestamp where tenant_id=?",status.name(),tenantId);}
     @Override public void registerCompany(UUID empresaId,UUID tenantId,String codigo,String nombre){jdbc.update("""
         insert into company_directory(empresa_id,tenant_id,codigo,nombre,activo) values (?,?,?,?,true)
         on conflict(empresa_id) do update set codigo=excluded.codigo,nombre=excluded.nombre,activo=true,updated_at=current_timestamp
         """,empresaId,tenantId,codigo,nombre);}
     @Override public void setCompanyActive(UUID empresaId,boolean active){jdbc.update("update company_directory set activo=?,updated_at=current_timestamp where empresa_id=?",active,empresaId);}
+    @Override public Optional<LoginAttemptState> findLoginAttempt(String key){return jdbc.query("""
+        select failure_count,window_started_at,blocked_until from login_attempt where identity_key=?
+        """,(rs,n)->new LoginAttemptState(rs.getInt(1),rs.getTimestamp(2).toInstant(),
+            rs.getTimestamp(3)==null?null:rs.getTimestamp(3).toInstant()),key).stream().findFirst();}
+    @Override public LoginAttemptState recordLoginFailure(String key,int maxAttempts,java.time.Instant now,
+            java.time.Duration window,java.time.Duration blockDuration){return Objects.requireNonNull(transactions.execute(status->{
+        Optional<LoginAttemptState> current=findLoginAttemptForUpdate(key);boolean expired=current.isEmpty()
+            || current.get().blockedUntil()!=null&&!current.get().blockedUntil().isAfter(now)
+            || current.get().blockedUntil()==null&&current.get().windowStartedAt().plus(window).isBefore(now);
+        int failures=expired?1:current.get().failures()+1;java.time.Instant started=expired?now:current.get().windowStartedAt();
+        java.time.Instant blocked=failures>=maxAttempts?now.plus(blockDuration):null;
+        jdbc.update("""
+            insert into login_attempt(identity_key,failure_count,window_started_at,blocked_until,updated_at)
+            values (?,?,?,?,current_timestamp)
+            on conflict(identity_key) do update set failure_count=excluded.failure_count,
+            window_started_at=excluded.window_started_at,blocked_until=excluded.blocked_until,updated_at=current_timestamp
+            """,key,failures,Timestamp.from(started),blocked==null?null:Timestamp.from(blocked));
+        return new LoginAttemptState(failures,started,blocked);
+    }));}
+    private Optional<LoginAttemptState> findLoginAttemptForUpdate(String key){return jdbc.query("""
+        select failure_count,window_started_at,blocked_until from login_attempt where identity_key=? for update
+        """,(rs,n)->new LoginAttemptState(rs.getInt(1),rs.getTimestamp(2).toInstant(),
+            rs.getTimestamp(3)==null?null:rs.getTimestamp(3).toInstant()),key).stream().findFirst();}
+    @Override public void clearLoginAttempt(String key){jdbc.update("delete from login_attempt where identity_key=?",key);}
     @Override public List<TenantDirectoryOption> searchTenants(String query,int limit){String term="%"+safe(query)+"%";return jdbc.query("""
         select td.tenant_id,coalesce(string_agg(cd.nombre, ', ' order by cd.nombre),td.tenant_id::text) tenant_name,dn.*
         from tenant_directory td join database_node dn on dn.id=td.database_node_id

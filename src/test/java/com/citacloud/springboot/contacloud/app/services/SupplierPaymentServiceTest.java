@@ -32,12 +32,16 @@ class SupplierPaymentServiceTest {
     private final SupplierCreditNoteRepository creditNotes=mock(SupplierCreditNoteRepository.class);
     private final SupplierPaymentNumberService numbers=mock(SupplierPaymentNumberService.class);
     private final BankReconciliationMatchRepository reconciliation=mock(BankReconciliationMatchRepository.class);
+    private final IdempotentOperationService idempotency=mock(IdempotentOperationService.class);
     private final SupplierPaymentService service=new SupplierPaymentService(payments,applications,drafts,movements,
-        new CuentaDineroResolver(cash,banks),sessions,audit,suppliers,currencies,invoices,payables,creditNotes,numbers,reconciliation);
+        new CuentaDineroResolver(cash,banks),sessions,audit,suppliers,currencies,invoices,payables,creditNotes,numbers,reconciliation,
+        idempotency);
     private final UUID tenant=UUID.randomUUID(),company=UUID.randomUUID(),user=UUID.randomUUID();
     private final UUID supplier=UUID.randomUUID(),branch=UUID.randomUUID(),currency=UUID.randomUUID();
 
     @BeforeEach void setup(){
+        when(idempotency.begin(any(),any(),anyString(),any(),anyString()))
+            .thenReturn(new IdempotentOperationService.Start(true,null,null));
         var principal=new TenantPrincipal(user,tenant,company,null,"DEMO","Admin","admin","",true,true,Set.of(),
             Set.of("facturas_proveedores.pagar_contado"));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));

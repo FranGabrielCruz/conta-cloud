@@ -605,8 +605,7 @@ public class RecepcionesView extends VerticalLayout implements BeforeEnterObserv
     private static String value(String value) { return value == null ? "" : value; }
     private static boolean can(String permission) { return TenantContext.principalActual().permisos().contains(permission); }
     private static void error(RuntimeException exception, String fallback) {
-        Notification.show(exception instanceof ReglaNegocioException || exception instanceof RecursoNoEncontradoException
-            ? exception.getMessage() : fallback);
+        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(exception, fallback);
     }
 
     private record LineDraft(UUID orderLineId, UUID invoiceLineId, OrdenCompraCatalogosDto.ProductoOpcion product,

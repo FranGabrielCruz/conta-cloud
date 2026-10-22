@@ -30,12 +30,16 @@ class PurchaseReceiptAuthorizationTest {
     private final PurchaseReceiptNumberService numbers = mock(PurchaseReceiptNumberService.class);
     private final InventoryMovementService inventory = mock(InventoryMovementService.class);
     private final AuditoriaService audit = mock(AuditoriaService.class);
+    private final IdempotentOperationService idempotency = mock(IdempotentOperationService.class);
     private final PurchaseReceiptService service = new PurchaseReceiptService(receipts, receiptLines, suppliers,
-        warehouses, products, orders, invoices, numbers, inventory, new RecepcionCompraMapper(), audit);
+        warehouses, products, orders, invoices, numbers, inventory, new RecepcionCompraMapper(), audit,
+        idempotency);
     private final UUID tenant = UUID.randomUUID(), empresa = UUID.randomUUID(), usuario = UUID.randomUUID();
 
     @BeforeEach
     void prepare() {
+        when(idempotency.begin(any(), any(), anyString(), any(), anyString()))
+            .thenReturn(new IdempotentOperationService.Start(true, null, null));
         when(receipts.saveAndFlush(any())).then(returnsFirstArg());
         when(numbers.next(tenant, empresa)).thenReturn("REC-000001");
     }

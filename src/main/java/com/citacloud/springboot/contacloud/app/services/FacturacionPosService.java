@@ -27,7 +27,7 @@ public class FacturacionPosService {
     private final MetodoPagoVentaRepository metodosPago; private final AplicacionPagoVentaRepository aplicacionesPago;
     private final BankAccountRepository cuentasBancarias;
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
-    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;
+    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
@@ -35,11 +35,11 @@ public class FacturacionPosService {
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
             FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,
-            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc){
+            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc,IdempotentOperationService idempotency){
         this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
-        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.recargos=recargos;this.jdbc=jdbc;
+        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.recargos=recargos;this.jdbc=jdbc;this.idempotency=idempotency;
     }
 
     @Transactional(readOnly=true)
@@ -149,14 +149,15 @@ public class FacturacionPosService {
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.cobrar')")
     public FacturaVentaResultadoDto confirmar(ConfirmarVentaInput input){
         if(input==null||input.idempotencia()==null)throw new ReglaNegocioException("No fue posible identificar la operación de cobro.");
-        var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();
-        IdempotencyGuard.acquire(p.tenantId(),empresa,input.idempotencia());
+        var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();String operation="SALES_INVOICE_CONFIRM";
+        var start=idempotency.begin(p.tenantId(),empresa,operation,input.idempotencia(),fingerprint(input));
+        if(start.replay())return resultado(facturas.findByIdAndTenantIdAndEmpresaId(start.resultId(),p.tenantId(),empresa).orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada.")));
         Optional<FacturaVenta> existente=facturas.findByTenantIdAndEmpresaIdAndClaveIdempotencia(p.tenantId(),empresa,input.idempotencia());
-        if(existente.isPresent())return resultado(existente.get());
+        if(existente.isPresent()){idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",existente.get().getId());return resultado(existente.get());}
         if(input.almacenId()==null)throw new ReglaNegocioException("No fue posible identificar el almacén de la venta.");
         ContextoPos ctx=contexto(input.token(),true,input.almacenId());
         existente=facturas.findByTenantIdAndEmpresaIdAndClaveIdempotencia(p.tenantId(),empresa,input.idempotencia());
-        if(existente.isPresent())return resultado(existente.get());
+        if(existente.isPresent()){idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",existente.get().getId());return resultado(existente.get());}
         if(input.lineas()==null||input.lineas().isEmpty())throw new ReglaNegocioException("Agrega al menos un producto o servicio.");
         if(input.lineas().size()>200)throw new ReglaNegocioException("La factura excede el máximo de 200 líneas.");
         Set<UUID> ids=new HashSet<>();List<CalculoLinea> calculosBase=new ArrayList<>();List<LineaVistaPreviaDescuentoInput> lineasDescuento=new ArrayList<>();
@@ -234,8 +235,11 @@ public class FacturacionPosService {
         descuentos.consumirAutorizacion(descuentoValidado.autorizacionId(),factura.getId());
         recargos.consumirAutorizacion(recargoValidado.autorizacionId(),factura.getId());
         ventasGuardadas.completarDesdeFactura(input.ventaGuardadaId(),factura.getId(),p.usuarioId(),ctx.terminal.getId(),p.tenantId(),empresa);
+        idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",factura.getId());
         return resultado(factura);
     }
+
+    private static String fingerprint(ConfirmarVentaInput i){return CommandFingerprint.sha256(new Object[]{i.token(),i.almacenId(),i.clienteId(),i.nota(),i.ventaGuardadaId(),i.descuento(),i.recargo(),i.lineas(),i.aplicaciones()});}
 
     private List<AplicacionValidada> validarAplicaciones(List<AplicacionCobroInput> entradas,BigDecimal total,ContextoPos ctx,Set<String> permisos){
         if(entradas==null||entradas.isEmpty())throw new ReglaNegocioException("Agrega al menos un método de pago.");

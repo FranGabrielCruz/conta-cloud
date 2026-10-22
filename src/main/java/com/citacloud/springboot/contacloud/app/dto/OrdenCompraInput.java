@@ -5,4 +5,11 @@ import java.util.List;
 import java.util.UUID;
 
 public record OrdenCompraInput(UUID proveedorId,UUID sucursalId,LocalDate fecha,LocalDate fechaEntrega,
-        UUID monedaId,UUID condicionPagoId,String referencia,String notas,List<LineaOrdenCompraInput> lineas,Long version) {}
+        UUID monedaId,UUID condicionPagoId,String referencia,String notas,List<LineaOrdenCompraInput> lineas,Long version,
+        UUID claveOperacion) {
+    public OrdenCompraInput { if (claveOperacion == null) claveOperacion = UUID.randomUUID(); }
+    public OrdenCompraInput(UUID proveedorId,UUID sucursalId,LocalDate fecha,LocalDate fechaEntrega,
+            UUID monedaId,UUID condicionPagoId,String referencia,String notas,List<LineaOrdenCompraInput> lineas,Long version) {
+        this(proveedorId,sucursalId,fecha,fechaEntrega,monedaId,condicionPagoId,referencia,notas,lineas,version,null);
+    }
+}

@@ -377,9 +377,7 @@ public class PaymentTermsView extends VerticalLayout implements BeforeEnterObser
     }
 
     private static void error(RuntimeException ex, String fallback) {
-        String mensaje = ex instanceof ReglaNegocioException || ex instanceof RecursoNoEncontradoException
-            ? ex.getMessage() : fallback;
-        Notification.show(mensaje == null || mensaje.isBlank() ? fallback : mensaje);
+        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, fallback);
     }
 
     private static final class EstadoFormulario {

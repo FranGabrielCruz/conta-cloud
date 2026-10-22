@@ -378,9 +378,7 @@ public class CuentasBancariasView extends VerticalLayout
     }
 
     private static void error(RuntimeException ex, String fallback) {
-        String message = ex instanceof ReglaNegocioException || ex instanceof RecursoNoEncontradoException
-            ? ex.getMessage() : fallback;
-        Notification.show(message == null || message.isBlank() ? fallback : message);
+        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, fallback);
     }
 
     private static final class EstadoFormulario {

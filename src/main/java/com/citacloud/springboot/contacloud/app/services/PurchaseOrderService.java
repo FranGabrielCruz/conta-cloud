@@ -10,8 +10,6 @@ import org.springframework.data.domain.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -27,14 +25,15 @@ public class PurchaseOrderService {
     private final OrdenCompraMapper mapper; private final AuditoriaService audit;
     private final EmpresaRepository companies; private final DatosEmpresaRepository companyData; private final UsuarioRepository users;
     private final LocalFileStorageService storage; private final PurchaseOrderPdfService pdf;
+    private final IdempotentOperationService idempotency;
 
     public PurchaseOrderService(PurchaseOrderRepository orders,SupplierRepository suppliers,SucursalRepository branches,
             MonedaRepository currencies,CondicionPagoRepository terms,ImpuestoRepository taxes,
             ProductRepository products,PurchaseOrderCalculationService calculations,PurchaseOrderNumberService numbers,OrdenCompraMapper mapper,
             AuditoriaService audit,EmpresaRepository companies,DatosEmpresaRepository companyData,UsuarioRepository users,
-            LocalFileStorageService storage,PurchaseOrderPdfService pdf){this.orders=orders;this.suppliers=suppliers;this.branches=branches;this.currencies=currencies;
+            LocalFileStorageService storage,PurchaseOrderPdfService pdf,IdempotentOperationService idempotency){this.orders=orders;this.suppliers=suppliers;this.branches=branches;this.currencies=currencies;
         this.terms=terms;this.taxes=taxes;this.products=products;this.calculations=calculations;this.numbers=numbers;this.mapper=mapper;this.audit=audit;
-        this.companies=companies;this.companyData=companyData;this.users=users;this.storage=storage;this.pdf=pdf;}
+        this.companies=companies;this.companyData=companyData;this.users=users;this.storage=storage;this.pdf=pdf;this.idempotency=idempotency;}
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('ordenes_compra.ver')")
@@ -53,13 +52,14 @@ public class PurchaseOrderService {
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('ordenes_compra.ver')")
     public byte[] officialPdf(UUID id){
         OrdenCompra order=safe(id);
-        if(order.getEstado()==EstadoOrdenCompra.DRAFT||order.getPdfObjectKey()==null)
-            throw new ReglaNegocioException("La orden de compra todavía no tiene un PDF oficial.");
+        if(order.getEstado()==EstadoOrdenCompra.DRAFT)
+            throw new ReglaNegocioException("La orden de compra todavía no ha sido emitida.");
         Proveedor supplier=suppliers.findByIdAndTenantIdAndEmpresaId(order.getProveedorId(),order.getTenantId(),order.getEmpresaId())
             .orElseThrow(()->new ReglaNegocioException("No fue posible identificar al proveedor de la orden."));
         if(order.getEmitidaPor()==null||order.getEmitidaEn()==null)
             throw new ReglaNegocioException("La orden de compra no tiene información de emisión válida.");
-        return pdf.generate(reportData(order,supplier,order.getEmitidaPor(),order.getEmitidaEn()));
+        try{return pdf.generate(reportData(order,supplier,order.getEmitidaPor(),order.getEmitidaEn()));}
+        catch(RuntimeException error){io.micrometer.core.instrument.Metrics.counter("contacloud.pdf","document","purchase_order","result","failed").increment();throw error;}
     }
 
     @Transactional(readOnly=true)
@@ -106,8 +106,14 @@ public class PurchaseOrderService {
 
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('ordenes_compra.crear') and hasAuthority('ordenes_compra.emitir')")
-    public OrdenCompraDto createAndIssue(OrdenCompraInput input){var p=TenantContext.principalActual();OrdenCompra order=createDraft(input,p);
-        audit.registrar("PURCHASE_ORDER_CREATED","OrdenCompra",order.getId(),detail(order));return issueOrder(order,order.getVersion());
+    public OrdenCompraDto createAndIssue(OrdenCompraInput input){var p=TenantContext.principalActual();
+        if(input==null||input.claveOperacion()==null)throw new ReglaNegocioException("No fue posible identificar la operación de emisión.");
+        String operation="PURCHASE_ORDER_CREATE_AND_ISSUE";String fingerprint=fingerprint(input);
+        var start=idempotency.begin(p.tenantId(),p.empresaId(),operation,input.claveOperacion(),fingerprint);
+        if(start.replay())return mapper.toDto(safe(start.resultId()));
+        OrdenCompra order=createDraft(input,p);audit.registrar("PURCHASE_ORDER_CREATED","OrdenCompra",order.getId(),detail(order));
+        OrdenCompraDto result=issueOrder(order,order.getVersion());
+        idempotency.complete(p.tenantId(),p.empresaId(),operation,input.claveOperacion(),"OrdenCompra",order.getId());return result;
     }
 
     private OrdenCompra createDraft(OrdenCompraInput input,com.citacloud.springboot.contacloud.app.security.TenantPrincipal p){Validated v=validate(input,p.tenantId(),p.empresaId());
@@ -137,14 +143,11 @@ public class PurchaseOrderService {
         if(order.getLineas().isEmpty())throw new ReglaNegocioException("La orden debe tener al menos una línea antes de emitirla.");
         Proveedor supplier=activeSupplier(order.getProveedorId(),order.getTenantId(),order.getEmpresaId());
         recalculateStored(order);var principal=TenantContext.principalActual();OffsetDateTime issuedAt=OffsetDateTime.now();
-        PurchaseOrderReportData report=reportData(order,supplier,principal.usuarioId(),issuedAt);byte[] bytes=pdf.generate(report);String key=null;
-        try{key=pdf.store(report,bytes);String storedKey=key;TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
-                @Override public void afterCompletion(int status){if(status!=STATUS_COMMITTED)pdf.discard(storedKey);}
-            });order.emitir(providerName(supplier),supplier.getIdentificacionFiscal(),principal.usuarioId(),issuedAt,key);
-            order=orders.saveAndFlush(order);audit.registrar("PURCHASE_ORDER_PDF_GENERATED","OrdenCompra",order.getId(),"{\"objectKey\":\""+escape(key)+"\"}");
-            audit.registrar("PURCHASE_ORDER_ISSUED","OrdenCompra",order.getId(),detail(order));return mapper.toDto(order);
-        }catch(RuntimeException ex){if(key!=null)pdf.discard(key);throw ex;}
+        order.emitir(providerName(supplier),supplier.getIdentificacionFiscal(),principal.usuarioId(),issuedAt,null);
+        order=orders.saveAndFlush(order);audit.registrar("PURCHASE_ORDER_ISSUED","OrdenCompra",order.getId(),detail(order));return mapper.toDto(order);
     }
+
+    private static String fingerprint(OrdenCompraInput input){return CommandFingerprint.sha256(new Object[]{input.proveedorId(),input.sucursalId(),input.fecha(),input.fechaEntrega(),input.monedaId(),input.condicionPagoId(),input.referencia(),input.notas(),input.lineas()});}
 
     private PurchaseOrderReportData reportData(OrdenCompra order,Proveedor supplier,UUID userId,OffsetDateTime issuedAt){
         Empresa company=companies.findByIdAndTenantId(order.getEmpresaId(),order.getTenantId()).orElseThrow(()->new ReglaNegocioException("No fue posible identificar la empresa de la orden."));

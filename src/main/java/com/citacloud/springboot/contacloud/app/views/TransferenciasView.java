@@ -189,7 +189,6 @@ public class TransferenciasView extends VerticalLayout implements BeforeEnterObs
         c.setText("Hay cambios sin guardar. ¿Deseas descartarlos?");c.setCancelable(true);c.setCancelText("Continuar editando");
         c.setConfirmText("Descartar cambios");c.setConfirmButtonTheme("error primary");c.addConfirmListener(e->action.run());c.open();}
     private static boolean puede(String permiso){return TenantContext.principalActual().permisos().contains(permiso);}
-    private static void error(RuntimeException ex,String fallback){String m=ex instanceof ReglaNegocioException||ex instanceof RecursoNoEncontradoException
-        ?ex.getMessage():fallback;Notification.show(m==null||m.isBlank()?fallback:m);}
+    private static void error(RuntimeException ex,String fallback){com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex,fallback);}
     private static final class EstadoFormulario{private boolean dirty;void marcar(boolean client){if(client)dirty=true;}}
 }

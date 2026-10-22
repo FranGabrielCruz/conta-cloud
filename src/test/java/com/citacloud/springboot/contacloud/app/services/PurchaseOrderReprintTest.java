@@ -32,7 +32,8 @@ class PurchaseOrderReprintTest {
         PurchaseOrderPdfService pdf=mock(PurchaseOrderPdfService.class);
         PurchaseOrderService service=new PurchaseOrderService(orders,suppliers,mock(SucursalRepository.class),mock(MonedaRepository.class),
             mock(CondicionPagoRepository.class),mock(ImpuestoRepository.class),mock(ProductRepository.class),mock(PurchaseOrderCalculationService.class),
-            mock(PurchaseOrderNumberService.class),mock(OrdenCompraMapper.class),mock(AuditoriaService.class),companies,companyData,users,storage,pdf);
+            mock(PurchaseOrderNumberService.class),mock(OrdenCompraMapper.class),mock(AuditoriaService.class),companies,companyData,users,storage,pdf,
+            mock(IdempotentOperationService.class));
 
         OffsetDateTime issuedAt=OffsetDateTime.parse("2026-10-03T12:00:00-04:00");
         OrdenCompra order=mock(OrdenCompra.class);when(order.getId()).thenReturn(orderId);when(order.getTenantId()).thenReturn(tenant);
