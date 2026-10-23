@@ -17,6 +17,7 @@ import com.citacloud.springboot.contacloud.app.views.components.ButtonSize;
 import com.citacloud.springboot.contacloud.app.views.components.DescuentoVentaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.RecargoVentaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.DevolucionesVentasDialog;
+import com.citacloud.springboot.contacloud.app.views.components.PosNumericKeypad;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -67,6 +68,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final Div resumen = new Div();
     private final TextArea observacion = new TextArea("Observación interna");
     private final DoubleEnterDetector doubleEnter = new DoubleEnterDetector();
+    private final PosNumericKeypad tecladoNumerico = new PosNumericKeypad();
     private String token;
     private TerminalPosDto terminal;
     private PosPaymentDialog dialogoCobroActivo;
@@ -300,6 +302,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private void prepararNuevaVenta() {
+        tecladoNumerico.clearTarget();
         filas.clear();
         clienteSeleccionado = null;
         clienteSlot.removeAll();
@@ -399,6 +402,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private Component accionesFila(Fila fila) {
         Button eliminar = iconButton(VaadinIcon.TRASH, "Eliminar producto", e -> {
+            tecladoNumerico.clearTarget(fila.lineaId);
             filas.remove(fila);
             ventaModificada();
         });
@@ -432,17 +436,16 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private Component campoCantidad(Fila fila) {
         BigDecimalField cantidad = new BigDecimalField();
         cantidad.setValue(fila.cantidad);
-        cantidad.setValueChangeMode(ValueChangeMode.EAGER);
         cantidad.addClassName("cc-pos-quantity");
-        cantidad.addValueChangeListener(event -> {
-            if (!event.isFromClient()) return;
-            reiniciarDobleEnter();
-            cambiarCantidad(fila, event.getValue(), cantidad);
-        });
+        cantidad.setAriaLabel("Cantidad de " + fila.nombre);
+        tecladoNumerico.bind(cantidad, fila.lineaId,
+                PosNumericKeypad.Options.quantity(fila.permiteFracciones,
+                        () -> { reiniciarDobleEnter(); enfocarProducto(); }),
+                value -> { reiniciarDobleEnter(); cambiarCantidad(fila, value, cantidad); });
         Button disminuir = iconButton(VaadinIcon.MINUS, "Disminuir cantidad",
-                e -> cambiarCantidad(fila, CantidadPosCalculo.disminuir(fila.cantidad, BigDecimal.ONE), cantidad));
+                e -> { tecladoNumerico.clearTarget(fila.lineaId); cambiarCantidad(fila, CantidadPosCalculo.disminuir(fila.cantidad, BigDecimal.ONE), cantidad); });
         Button aumentar = iconButton(VaadinIcon.PLUS, "Aumentar cantidad",
-                e -> cambiarCantidad(fila, CantidadPosCalculo.incrementar(fila.cantidad, BigDecimal.ONE), cantidad));
+                e -> { tecladoNumerico.clearTarget(fila.lineaId); cambiarCantidad(fila, CantidadPosCalculo.incrementar(fila.cantidad, BigDecimal.ONE), cantidad); });
         disminuir.addClassName("cc-pos-quantity-control");
         aumentar.addClassName("cc-pos-quantity-control");
         Div editor = new Div(disminuir, cantidad, aumentar);
@@ -532,6 +535,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (!tieneVentaEnCurso()) return;
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (dialogoLimpiarActivo != null && dialogoLimpiarActivo.isOpened()) return;
+        suspenderTecladoNumerico();
 
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Limpiar venta");
@@ -609,15 +613,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private Component construirTeclado() {
-        Span titulo = new Span("🔢 TECLADO NUMÉRICO");
-        titulo.addClassName("cc-pos-keypad-title");
-        Div teclas = new Div();
-        teclas.addClassName("cc-pos-keypad");
-        for (String tecla : List.of("7", "8", "9", "4", "5", "6", "1", "2", "3", "0", ".", "00"))
-            teclas.add(new Button(tecla, e -> agregarTecla(tecla)));
-        Div bloque = new Div(titulo, teclas);
-        bloque.addClassName("cc-pos-keypad-block");
-        return bloque;
+        return tecladoNumerico;
     }
 
     private void configurarMasAcciones(Button target) {
@@ -679,6 +675,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void dialogoProductos(boolean soloConsulta) {
         if (terminal == null) return;
+        suspenderTecladoNumerico();
         Dialog dialog = dialogo(soloConsulta ? "CONSULTAR PRECIO" : "AGREGAR PRODUCTO");
         TextField filtro = new TextField();
         filtro.setPlaceholder("Buscar por código, nombre o código de barras...");
@@ -726,6 +723,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void dialogoClientes() {
         if (terminal == null) return;
         if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
+        suspenderTecladoNumerico();
         Dialog dialog = dialogo("SELECCIONAR CLIENTE");
         dialogoClienteActivo = dialog;
         TextField filtro = new TextField();
@@ -868,6 +866,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (filas.isEmpty()) { Notification.show("Agregue al menos un producto antes de aplicar un descuento."); return; }
         if (!puede("facturas.descuentos.aplicar")) { Notification.show("No tienes permiso para aplicar descuentos."); return; }
+        suspenderTecladoNumerico();
         try {
             DescuentoVentaDialog dialog = new DescuentoVentaDialog(descuentosService, idempotencia, lineasDescuento(),
                     null, descuentoActual, aplicado -> {
@@ -897,6 +896,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (filas.isEmpty()) { Notification.show("No hay productos en la venta para aplicar un recargo."); return; }
         if (!puede("facturas.recargos.aplicar")) { Notification.show("No tienes permiso para aplicar recargos."); return; }
+        suspenderTecladoNumerico();
         try {
             RecargoVentaDialog dialog = new RecargoVentaDialog(recargosService, idempotencia, lineasRecargo(), recargoActual,
                     aplicado -> { recargoActual=aplicado.recargo(); aplicarVistaRecargo(aplicado.vista()); refrescar(); },
@@ -987,6 +987,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (terminal == null) return;
         if (filas.isEmpty()) { Notification.show("Agregue al menos un producto para cobrar."); return; }
+        suspenderTecladoNumerico();
         BigDecimal totalVenta = filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add);
         try {
             List<MetodoPagoPosDto> metodos = service.metodosPago();
@@ -1011,6 +1012,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (filas.isEmpty()) { Notification.show("No hay una venta para guardar."); return; }
         if (!puede("ventas_guardadas.guardar")) { Notification.show("No tienes permiso para guardar ventas."); return; }
+        suspenderTecladoNumerico();
         Dialog dialog = dialogo("GUARDAR VENTA");
         dialog.addClassName("cc-save-sale-dialog");
         dialogoGuardarVentaActivo = dialog;
@@ -1076,6 +1078,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             return;
         }
         if (dialogoVentasGuardadasActivo != null && dialogoVentasGuardadasActivo.isOpened()) return;
+        suspenderTecladoNumerico();
         VentasGuardadasDialog dialog = new VentasGuardadasDialog(ventasGuardadas, token, !filas.isEmpty(),
                 this::dialogoGuardarVenta, id -> recuperarVentaGuardada(id, dialogoVentasGuardadasActivo),
                 this::actualizarIndicadorVentasGuardadas, () -> {
@@ -1144,6 +1147,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoUltimasActivo != null && dialogoUltimasActivo.isOpened()) return;
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
+        suspenderTecladoNumerico();
         UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, this::enfocarProducto);
         dialogoUltimasActivo = dialog;
         dialog.addOpenedChangeListener(event -> {
@@ -1160,6 +1164,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             Notification.show("No tienes permiso para consultar devoluciones de ventas.");
             return;
         }
+        suspenderTecladoNumerico();
         DevolucionesVentasDialog dialog = new DevolucionesVentasDialog(devolucionesService,
                 this::abrirPdfDevolucion, this::enfocarProducto);
         dialogoDevolucionesActivo = dialog;
@@ -1218,12 +1223,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
     }
 
-    private void agregarTecla(String tecla) {
-        if (productoBuscar != null) {
-            productoBuscar.getElement().executeJs("this.filter = (this.filter || '') + $0", tecla);
-            productoBuscar.focus();
-        }
-    }
+    private void suspenderTecladoNumerico() { tecladoNumerico.finishAndClear(); }
 
     private void enfocarProducto() { if (productoBuscar != null) productoBuscar.focus(); }
 
@@ -1298,6 +1298,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         private final boolean controlaExistencia;
         private final boolean permiteDescuentos;
         private final boolean permiteRecargos;
+        private final boolean permiteFracciones;
         private BigDecimal cantidad = BigDecimal.ONE;
         private BigDecimal descuento = BigDecimal.ZERO;
         private BigDecimal recargo = BigDecimal.ZERO;
@@ -1318,6 +1319,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             controlaExistencia = producto.controlaExistencia();
             permiteDescuentos = producto.permiteDescuentos();
             permiteRecargos = producto.permiteRecargos();
+            permiteFracciones = permiteFracciones(producto.unidad());
         }
 
         private String codigo() { return codigo; }
@@ -1327,5 +1329,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         private BigDecimal baseImponible() { return base().subtract(descuento).add(recargo).setScale(4, RoundingMode.HALF_UP); }
         private BigDecimal impuesto() { return baseImponible().multiply(tasa).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP); }
         private BigDecimal total() { return baseImponible().add(impuesto()); }
+
+        private static boolean permiteFracciones(String unidad) {
+            if (unidad == null) return false;
+            return Set.of("kg", "lb", "m", "l", "gal", "h")
+                    .contains(unidad.trim().toLowerCase(Locale.ROOT));
+        }
     }
 }

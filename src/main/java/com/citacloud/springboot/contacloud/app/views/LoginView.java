@@ -24,6 +24,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
     private static final Logger log = LoggerFactory.getLogger(LoginView.class);
     private static final String EMPRESA_STORAGE_KEY = "contacloud.login.empresa";
     private static final String USUARIO_STORAGE_KEY = "contacloud.login.usuario";
+    private static final String SESSION_EXPIRED_KEY = "contacloud.session.expired";
     private final TextField empresa = new TextField("Empresa");
     private final TextField usuario = new TextField("Usuario");
     private final PasswordField password = new PasswordField("Contraseña");
@@ -46,7 +47,10 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         tarjeta.setWidth("min(92vw, 420px)"); tarjeta.getStyle().set("padding", "2rem").set("border-radius", "16px")
             .set("box-shadow", "0 16px 48px rgba(15,23,42,.14)");
         add(tarjeta);
-        addAttachListener(event -> restaurarDatosRecordados());
+        addAttachListener(event -> {
+            restaurarDatosRecordados();
+            informarExpiracionPorInactividad();
+        });
     }
     private void ingresar() {
         if (!ingresar.isEnabled()) return;
@@ -85,6 +89,17 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         usuario.getElement().executeJs("return localStorage.getItem($0) || ''", USUARIO_STORAGE_KEY)
             .then(String.class, valor -> {
                 if (valor != null && !valor.isBlank()) usuario.setValue(valor);
+            });
+    }
+
+    private void informarExpiracionPorInactividad() {
+        getElement().executeJs("""
+            document.documentElement.classList.remove('cc-session-expiring');
+            const expired = sessionStorage.getItem($0) === 'true';
+            sessionStorage.removeItem($0);
+            return expired;
+            """, SESSION_EXPIRED_KEY).then(Boolean.class, expired -> {
+                if (Boolean.TRUE.equals(expired)) Notification.show("Tu sesión se cerró por inactividad.");
             });
     }
 

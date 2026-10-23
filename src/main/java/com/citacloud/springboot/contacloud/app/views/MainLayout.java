@@ -45,7 +45,6 @@ public class MainLayout extends AppLayout {
                       CompanyConfigurationService companyConfiguration,
                       AuthenticationContext authenticationContext,
                       @Value("${contacloud.version}") String version,
-                      @Value("${contacloud.session.warning-after}") Duration warningAfter,
                       @Value("${contacloud.session.expire-after}") Duration expireAfter) {
         this.companyConfiguration = companyConfiguration;
         this.contextoUsuario = contextoUsuario;
@@ -56,7 +55,7 @@ public class MainLayout extends AppLayout {
         addToDrawer(crearDrawer(menuService));
 
         contentHost.addClassName("cc-content");
-        var inactivityGuard = new InactivityGuard(authenticationContext, warningAfter, expireAfter);
+        var inactivityGuard = new InactivityGuard(authenticationContext, expireAfter);
         var shell = new VerticalLayout(inactivityGuard, contentHost, crearFooter(version));
         shell.addClassName("cc-shell");
         shell.setPadding(false);

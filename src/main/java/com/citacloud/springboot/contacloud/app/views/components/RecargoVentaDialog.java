@@ -4,6 +4,7 @@ import com.citacloud.springboot.contacloud.app.dto.*;
 import com.citacloud.springboot.contacloud.app.models.*;
 import com.citacloud.springboot.contacloud.app.services.*;
 import com.vaadin.flow.component.*;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -14,6 +15,7 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.textfield.*;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import java.math.*;
 import java.util.*;
 import java.util.function.Consumer;
@@ -43,6 +45,7 @@ public class RecargoVentaDialog extends Dialog {
     private final Span posterior = new Span("—");
     private final Span cantidadSeleccionada = new Span("0");
     private final Div filaCantidad = metrica("SELECCIONADOS", cantidadSeleccionada);
+    private final PosNumericKeypad keypad = new PosNumericKeypad(PosNumericKeypad.Mode.POPOVER);
     private final Div preview;
     private final AppActionButton confirmar;
 
@@ -76,6 +79,7 @@ public class RecargoVentaDialog extends Dialog {
 
         concepto.setItems(opciones.tipos());
         concepto.setItemLabelGenerator(ConfiguracionRecargoDto.Tipo::nombre);
+        concepto.setRenderer(new ComponentRenderer<>(item -> opcionConTooltip(item.nombre())));
         concepto.setAriaLabel("Concepto");
         concepto.setWidthFull();
         if (actual != null) concepto.setValue(opciones.tipos().stream()
@@ -87,6 +91,7 @@ public class RecargoVentaDialog extends Dialog {
         valor.setWidthFull();
         motivo.setItems(opciones.motivos());
         motivo.setItemLabelGenerator(ConfiguracionRecargoDto.Motivo::nombre);
+        motivo.setRenderer(new ComponentRenderer<>(item -> opcionConTooltip(item.nombre())));
         motivo.setClearButtonVisible(!opciones.requiereMotivo());
         motivo.setRequiredIndicatorVisible(false);
         motivo.setAriaLabel("Motivo");
@@ -113,16 +118,21 @@ public class RecargoVentaDialog extends Dialog {
         preview = new Div(filaCantidad, metrica("BASE APLICABLE", base),
                 metrica("RECARGO", recargo), metrica("IMPORTE FINAL", posterior));
         preview.addClassNames("cc-discount-preview", "cc-adjustment-summary");
+        Button abrirTeclado = keypad.bind(valor, "SURCHARGE_VALUE", PosNumericKeypad.Options.money(this::enfocarConfirmar), value -> { });
+        actualizarTargetTeclado();
+        keypad.closeOnFocus(alcance, tipo, concepto, motivo, detalle);
+        Div controlValor = new Div(valor, abrirTeclado);
+        controlValor.addClassName("cc-numeric-field-control");
         Div campos = new Div(
                 grupoCampo("Concepto", true, concepto),
-                grupoCampo("Valor", false, valor),
+                grupoCampo("Valor", false, controlValor),
                 grupoCampo("Motivo", opciones.requiereMotivo(), motivo));
         campos.addClassNames("cc-adjustment-fields", "cc-surcharge-inline-fields");
 
         HorizontalLayout opcionesLayout = new HorizontalLayout(alcance, tipo);
         opcionesLayout.setWidthFull();
         opcionesLayout.setFlexGrow(1, alcance, tipo);
-        add(opcionesLayout, selector, campos, detalle, preview);
+        add(opcionesLayout, selector, campos, keypad, detalle, preview);
 
         AppActionButton eliminar = new AppActionButton(ActionType.DELETE, ButtonSize.MAIN,
                 "Quitar recargo", e -> { quitar.run(); close(); });
@@ -138,7 +148,7 @@ public class RecargoVentaDialog extends Dialog {
         registrar();
         actualizarSelector();
         addOpenedChangeListener(e -> { if (e.isOpened()) valor.focus(); });
-        addClosedListener(e -> cerrar.run());
+        addClosedListener(e -> { keypad.clearTarget(); cerrar.run(); });
     }
 
     private void configurarSelector() {
@@ -198,23 +208,28 @@ public class RecargoVentaDialog extends Dialog {
 
     private void registrar() {
         alcance.addValueChangeListener(e -> { actualizarSelector(); actualizarVista(); });
-        tipo.addValueChangeListener(e -> { actualizarFormatoValor(); actualizarVista(); });
+        tipo.addValueChangeListener(e -> { keypad.close(); actualizarTargetTeclado(); actualizarFormatoValor(); actualizarVista(); });
         valor.addValueChangeListener(e -> actualizarVista());
         motivo.addValueChangeListener(e -> {
+            actualizarTooltip(motivo, e.getValue() == null ? null : e.getValue().nombre());
             detalle.setVisible(e.getValue() != null && e.getValue().otro());
             actualizarVista();
         });
         detalle.addValueChangeListener(e -> actualizarVista());
         concepto.addValueChangeListener(e -> {
             ConfiguracionRecargoDto.Tipo seleccionado = e.getValue();
+            actualizarTooltip(concepto, seleccionado == null ? null : seleccionado.nombre());
             if (seleccionado != null) {
                 tipo.setValue(seleccionado.tipoPredeterminado());
                 if (seleccionado.valorPredeterminado() == null) valor.clear();
                 else valor.setValue(seleccionado.valorPredeterminado());
                 valor.setReadOnly(!seleccionado.valorEditable());
+                keypad.refresh(valor);
             }
             actualizarVista();
         });
+        actualizarTooltip(concepto, concepto.getValue() == null ? null : concepto.getValue().nombre());
+        actualizarTooltip(motivo, motivo.getValue() == null ? null : motivo.getValue().nombre());
     }
 
     private void actualizarSelector() {
@@ -279,6 +294,13 @@ public class RecargoVentaDialog extends Dialog {
         } catch (RuntimeException ex) {
             com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, "No fue posible aplicar el recargo.");
         }
+    }
+
+    private void enfocarConfirmar() { confirmar.focus(); }
+
+    private void actualizarTargetTeclado() {
+        keypad.setOwner(valor, tipo.getValue() == TipoRecargoVenta.PERCENTAGE
+                ? "SURCHARGE_PERCENTAGE" : "SURCHARGE_AMOUNT");
     }
 
     private void dialogoAutorizacion(SolicitudVistaPreviaRecargoInput solicitud, VistaPreviaRecargoDto vista) {
@@ -382,6 +404,18 @@ public class RecargoVentaDialog extends Dialog {
         Div grupo = new Div(label, control);
         grupo.addClassName("cc-adjustment-field-group");
         return grupo;
+    }
+
+    private static Span opcionConTooltip(String texto) {
+        Span opcion = new Span(texto == null ? "" : texto);
+        opcion.addClassName("cc-adjustment-combo-option");
+        opcion.getElement().setAttribute("title", texto == null ? "" : texto);
+        return opcion;
+    }
+
+    private static void actualizarTooltip(ComboBox<?> campo, String texto) {
+        if (texto == null || texto.isBlank()) campo.getElement().removeAttribute("title");
+        else campo.getElement().setAttribute("title", texto);
     }
 
     private static Div metrica(String etiqueta, Span valor) {

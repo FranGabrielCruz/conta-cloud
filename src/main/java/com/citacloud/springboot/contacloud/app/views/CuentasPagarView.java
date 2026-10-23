@@ -88,6 +88,9 @@ public class CuentasPagarView extends VerticalLayout implements BeforeEnterObser
     static String display(BigDecimal n,ResumenCuentasPagarDto r,Map<String,BigDecimal> amounts){
         if(n!=null)return moneyWithSymbol(n,r.simbolo(),r.moneda());
         String separated=amounts.entrySet().stream().filter(entry->entry.getValue().signum()!=0)
+            .sorted(Comparator.<Map.Entry<String,BigDecimal>,Boolean>comparing(
+                    entry->!Objects.equals(entry.getKey(),r.moneda()))
+                .thenComparing(Map.Entry::getKey))
             .map(entry->entry.getKey()+" "+money(entry.getValue())).reduce((left,right)->left+" · "+right).orElse("");
         return separated.isBlank()?moneyWithSymbol(BigDecimal.ZERO,r.simbolo(),r.moneda()):separated;
     }

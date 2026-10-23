@@ -54,6 +54,13 @@ public class PosPaymentDialog extends Dialog {
     private final Div accionesFooter = new Div();
     private final Button alternarModo = new Button();
     private final DoubleSpaceDetector doubleSpace = new DoubleSpaceDetector();
+    private final PosNumericKeypad keypad = new PosNumericKeypad(PosNumericKeypad.Mode.POPOVER);
+    private Button tecladoRecibidoSimple;
+    private Button tecladoMonto;
+    private Button tecladoRecibido;
+    private Div controlRecibidoSimple;
+    private Div controlMonto;
+    private Div controlRecibido;
 
     private MetodoPagoPosDto metodoSimple;
     private MetodoPagoPosDto metodoActual;
@@ -89,12 +96,27 @@ public class PosPaymentDialog extends Dialog {
         exacto.addClassNames("cc-pos-cash-exact", "cc-pos-cash-option");
         exacto.setTooltipText("Usar monto exacto (doble espacio)");
         exacto.addClickListener(e -> usarMontoExacto());
+        configurarTecladoNumerico();
         registrarDobleEspacio();
-        Shortcuts.addShortcutListener(this, this::cerrar, Key.ESCAPE);
+        Shortcuts.addShortcutListener(this, () -> {
+            if (!keypad.closeIfOpen()) cerrar();
+        }, Key.ESCAPE);
         addOpenedChangeListener(e -> {
             if (e.isOpened()) mostrarSimple();
             else reiniciarDobleEspacio();
         });
+    }
+
+    private void configurarTecladoNumerico() {
+        tecladoRecibidoSimple = keypad.bind(recibidoSimple, "CASH_RECEIVED", PosNumericKeypad.Options.moneyLive(confirmar::focus),
+                value -> actualizarSimple());
+        tecladoMonto = keypad.bind(monto, "MULTI_APPLIED", PosNumericKeypad.Options.moneyLive(() -> {
+            if (recibido.isVisible()) recibido.focus();
+            else aplicar.focus();
+        }), value -> actualizarCambio());
+        tecladoRecibido = keypad.bind(recibido, "MULTI_CASH_RECEIVED", PosNumericKeypad.Options.moneyLive(aplicar::focus),
+                value -> actualizarCambio());
+        keypad.closeOnFocus(referenciaSimple, cuentaSimple, bancoSimple, referencia, cuenta, banco);
     }
 
     private void registrarDobleEspacio() {
@@ -182,6 +204,7 @@ public class PosPaymentDialog extends Dialog {
             Button rapido = new Button(String.format(Locale.US, "%,.0f", importe), e -> {
                 recibidoSimple.setValue(importe);
                 recibidoSimple.focus();
+                keypad.close();
             });
             rapido.addClassName("cc-pos-cash-option");
             rapido.setTooltipText("Recibido " + dinero(importe));
@@ -189,11 +212,13 @@ public class PosPaymentDialog extends Dialog {
         }
         Span recibidoEtiqueta = new Span("Recibido");
         recibidoEtiqueta.addClassName("cc-pos-received-label");
+        controlRecibidoSimple = controlNumerico(recibidoSimple, tecladoRecibidoSimple);
         recibidoSimpleFila.removeAll();
-        recibidoSimpleFila.add(recibidoEtiqueta, recibidoSimple);
+        recibidoSimpleFila.add(recibidoEtiqueta, controlRecibidoSimple);
         recibidoSimpleFila.addClassName("cc-pos-received-row");
-        VerticalLayout panel = new VerticalLayout(recibidoSimpleFila, importesRapidos, referenciaSimple,
-                cuentaSimple, bancoSimple);
+        VerticalLayout panel = new VerticalLayout(recibidoSimpleFila, importesRapidos,
+                referenciaSimple, cuentaSimple, bancoSimple);
+        panel.add(keypad);
         panel.setPadding(false);
         panel.setSpacing(false);
         panel.addClassName("cc-pos-simple-payment");
@@ -203,6 +228,7 @@ public class PosPaymentDialog extends Dialog {
     private void seleccionarSimple(MetodoPagoPosDto metodo) {
         if (metodo == null) return;
         reiniciarDobleEspacio();
+        keypad.clearTarget();
         metodoSimple = metodo;
         recibidoSimple.clear();
         referenciaSimple.clear();
@@ -217,6 +243,7 @@ public class PosPaymentDialog extends Dialog {
         cuentaSimple.setVisible(metodo.requiereCuentaBancaria());
         bancoSimple.setVisible(metodo.tipo() == TipoMetodoPagoVenta.CHECK);
         actualizarSimple();
+        keypad.refresh(recibidoSimple);
         if (metodo.efectivo()) recibidoSimple.focus();
         else if (metodo.requiereCuentaBancaria()) cuentaSimple.focus();
         else referenciaSimple.focus();
@@ -275,11 +302,13 @@ public class PosPaymentDialog extends Dialog {
             recibido.addValueChangeListener(e -> actualizarCambio());
             editorMultipleConfigurado = true;
         }
-        HorizontalLayout campos = new HorizontalLayout(monto, recibido, referencia, cuenta, banco);
+        controlMonto = controlNumerico(monto, tecladoMonto);
+        controlRecibido = controlNumerico(recibido, tecladoRecibido);
+        HorizontalLayout campos = new HorizontalLayout(controlMonto, controlRecibido, referencia, cuenta, banco);
         campos.setWidthFull();
         campos.setAlignItems(FlexComponent.Alignment.END);
         campos.addClassName("cc-pos-payment-fields");
-        Div editor = new Div(campos, new Div(cambio, aplicar));
+        Div editor = new Div(campos, keypad, new Div(cambio, aplicar));
         editor.addClassName("cc-pos-payment-editor");
         return editor;
     }
@@ -369,7 +398,9 @@ public class PosPaymentDialog extends Dialog {
 
     private void seleccionarMultiple(MetodoPagoPosDto metodo) {
         if (metodo == null) return;
+        keypad.clearTarget();
         metodoActual = metodo;
+        keypad.setOwner(monto, targetMonto(metodo));
         BigDecimal restante = pendiente().max(BigDecimal.ZERO);
         AplicacionTemporal efectivoExistente = metodo.efectivo()
                 ? aplicaciones.stream().filter(a -> a.metodo.efectivo()).findFirst().orElse(null)
@@ -387,7 +418,11 @@ public class PosPaymentDialog extends Dialog {
         referencia.setRequiredIndicatorVisible(metodo.requiereReferencia());
         banco.setVisible(metodo.tipo() == TipoMetodoPagoVenta.CHECK);
         actualizarCambio();
-        if (metodo.efectivo()) recibido.focus(); else monto.focus();
+        if (controlRecibido != null) controlRecibido.setVisible(metodo.efectivo());
+        keypad.refresh(recibido);
+        keypad.refresh(monto);
+        if (metodo.efectivo()) recibido.focus();
+        else monto.focus();
     }
 
     private void aplicar() {
@@ -496,6 +531,7 @@ public class PosPaymentDialog extends Dialog {
         reiniciarDobleEspacio();
         recibidoSimple.setValue(total);
         actualizarSimple();
+        keypad.clearTarget();
         confirmar.focus();
     }
 
@@ -513,7 +549,25 @@ public class PosPaymentDialog extends Dialog {
 
     private void cerrar() {
         reiniciarDobleEspacio();
+        keypad.clearTarget();
         close();
+    }
+
+    private static Div controlNumerico(BigDecimalField field, Button trigger) {
+        Div control = new Div(field, trigger);
+        control.addClassName("cc-numeric-field-control");
+        return control;
+    }
+
+    private static String targetMonto(MetodoPagoPosDto metodo) {
+        return switch (metodo.tipo()) {
+            case CASH -> "MULTI_CASH_APPLIED";
+            case CREDIT_CARD -> "MULTI_CREDIT_AMOUNT";
+            case DEBIT_CARD -> "MULTI_DEBIT_AMOUNT";
+            case BANK_TRANSFER -> "MULTI_TRANSFER_AMOUNT";
+            case CHECK -> "MULTI_CHECK_AMOUNT";
+            case OTHER -> "MULTI_OTHER_AMOUNT";
+        };
     }
 
     private void actualizarCambio() {

@@ -6,6 +6,8 @@ import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,14 +21,33 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class DevolucionVentaServiceTest {
+    @Test void consultaCincoFacturasPorPaginaEnBackend(){
+        UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID();
+        var principal=new TenantPrincipal(UUID.randomUUID(),tenant,empresa,null,"DEMO","Admin","admin","",true,true,Set.of(),Set.of("devoluciones_venta.ver"));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+        FacturaVentaRepository facturas=mock(FacturaVentaRepository.class);
+        when(facturas.buscarParaDevolucion(any(),any(),anyBoolean(),anyCollection(),anyString(),anyString(),isNull(),isNull(),anyString(),any(Pageable.class)))
+                .thenReturn(Page.empty());
+        DevolucionVentaService service=nuevoServicio(facturas);
+
+        try{
+            service.buscar("",null,null,null,1);
+
+            var pageable=org.mockito.ArgumentCaptor.forClass(Pageable.class);
+            verify(facturas).buscarParaDevolucion(eq(tenant),eq(empresa),eq(true),anyCollection(),eq(""),eq(""),isNull(),isNull(),eq("TODAS"),pageable.capture());
+            assertEquals(1,pageable.getValue().getPageNumber());
+            assertEquals(5,pageable.getValue().getPageSize());
+        }finally{
+            SecurityContextHolder.clearContext();
+        }
+    }
+
     @Test void noBuscaFacturasFueraDelTenantAutenticado(){
         UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),factura=UUID.randomUUID();
         var principal=new TenantPrincipal(UUID.randomUUID(),tenant,empresa,null,"DEMO","Admin","admin","",true,true,Set.of(),Set.of("devoluciones_venta.crear"));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
         FacturaVentaRepository facturas=mock(FacturaVentaRepository.class);
-        DevolucionVentaService service=new DevolucionVentaService(facturas,mock(LineaFacturaVentaRepository.class),mock(DevolucionVentaRepository.class),
-                mock(LineaDevolucionVentaRepository.class),mock(MotivoDevolucionVentaRepository.class),mock(AlmacenRepository.class),mock(NotaCreditoVentaRepository.class),
-                mock(CreditoClienteRepository.class),mock(InventoryMovementService.class),mock(IdempotentOperationService.class),mock(AuditoriaService.class),mock(JdbcTemplate.class),new SimpleMeterRegistry());
+        DevolucionVentaService service=nuevoServicio(facturas);
         ReglaNegocioException error=assertThrows(ReglaNegocioException.class,()->service.preparar(factura));
         assertEquals(ErrorCode.RETURN_INVOICE_NOT_FOUND,error.getCode());verify(facturas).findByIdAndTenantIdAndEmpresaId(factura,tenant,empresa);
         SecurityContextHolder.clearContext();
@@ -62,5 +83,11 @@ class DevolucionVentaServiceTest {
     private static LineaFacturaVenta nuevaLinea(){
         try{var constructor=LineaFacturaVenta.class.getDeclaredConstructor();constructor.setAccessible(true);return constructor.newInstance();}
         catch(ReflectiveOperationException ex){throw new AssertionError(ex);}
+    }
+
+    private static DevolucionVentaService nuevoServicio(FacturaVentaRepository facturas){
+        return new DevolucionVentaService(facturas,mock(LineaFacturaVentaRepository.class),mock(DevolucionVentaRepository.class),
+                mock(LineaDevolucionVentaRepository.class),mock(MotivoDevolucionVentaRepository.class),mock(AlmacenRepository.class),mock(NotaCreditoVentaRepository.class),
+                mock(CreditoClienteRepository.class),mock(InventoryMovementService.class),mock(IdempotentOperationService.class),mock(AuditoriaService.class),mock(JdbcTemplate.class),new SimpleMeterRegistry());
     }
 }

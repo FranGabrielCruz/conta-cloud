@@ -10,6 +10,7 @@ public enum ActionType {
     CANCEL("Cancelar", VaadinIcon.CLOSE, "neutral"),
     CLOSE("Cerrar", VaadinIcon.CLOSE, "neutral"),
     BACK("Volver", VaadinIcon.ARROW_LEFT, "neutral"),
+    RETURN("Iniciar devolución", VaadinIcon.REPLY, "neutral"),
     DELETE("Eliminar", VaadinIcon.TRASH, "danger"),
     ACTIVATE("Activar", VaadinIcon.POWER_OFF, "success"),
     DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),

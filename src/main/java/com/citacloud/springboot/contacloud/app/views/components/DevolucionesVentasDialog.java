@@ -12,7 +12,6 @@ import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.textfield.*;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -37,7 +36,7 @@ public class DevolucionesVentasDialog extends Dialog {
     public DevolucionesVentasDialog(DevolucionVentaService service,Consumer<UUID> abrirPdf,Runnable alCerrar){
         this.service=service;this.abrirPdf=abrirPdf;this.alCerrar=alCerrar;setHeaderTitle("DEVOLUCIONES DE VENTAS");
         addClassName("cc-sales-return-dialog");setWidth("min(1180px, 96vw)");setMaxHeight("94vh");setModal(true);setDraggable(false);
-        cuerpo.setPadding(false);cuerpo.setSpacing(true);cuerpo.setWidthFull();paginacion=new AppPagination(req->cargarFacturas(),10,10);
+        cuerpo.setPadding(false);cuerpo.setSpacing(true);cuerpo.setWidthFull();paginacion=new AppPagination(req->cargarFacturas(),5,5);
         configurarBusqueda();mostrarBusqueda();add(cuerpo);addDialogCloseActionListener(e->cerrar());
     }
 
@@ -52,7 +51,13 @@ public class DevolucionesVentasDialog extends Dialog {
         facturas.addColumn(FacturaDevolucionResumenDto::cliente).setHeader("Cliente").setFlexGrow(1);
         facturas.addColumn(f->f.moneda()+" "+money(f.total())).setHeader("Total").setAutoWidth(true);
         facturas.addColumn(FacturaDevolucionResumenDto::estado).setHeader("Estado").setAutoWidth(true);
-        facturas.addColumn(new ComponentRenderer<>(f->{Button b=new Button(VaadinIcon.REPLY.create());b.addClassName("cc-grid-icon-button");b.setTooltipText("Crear devolución");b.getElement().setAttribute("aria-label","Crear devolución");b.setVisible(TenantContext.principalActual().permisos().contains("devoluciones_venta.crear"));b.addClickListener(e->seleccionar(f.id()));return b;})).setHeader("Acc.").setWidth("64px").setFlexGrow(0);
+        facturas.addColumn(new ComponentRenderer<>(f->{
+            AppActionButton accion=new AppActionButton(ActionType.RETURN,ButtonSize.GRID_ACTION,
+                    "Iniciar devolución",e->seleccionar(f.id()));
+            accion.addClassName("cc-sales-return-start-action");
+            accion.setVisible(TenantContext.principalActual().permisos().contains("devoluciones_venta.crear"));
+            return accion;
+        })).setHeader("Acc.").setWidth("48px").setFlexGrow(0);
     }
 
     private void mostrarBusqueda(){

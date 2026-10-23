@@ -33,7 +33,7 @@ public interface FacturaVentaRepository extends JpaRepository<FacturaVenta,UUID>
                 AND EXISTS(SELECT 1 FROM sales_return r WHERE r.tenant_id=f.tenant_id AND r.empresa_id=f.empresa_id AND r.sales_invoice_id=f.id)
                 AND NOT EXISTS(SELECT 1 FROM sales_invoice_line il WHERE il.sales_invoice_id=f.id AND il.quantity>(SELECT COALESCE(SUM(rl.returned_quantity),0) FROM sales_return_line rl WHERE rl.tenant_id=f.tenant_id AND rl.empresa_id=f.empresa_id AND rl.sales_invoice_line_id=il.id)))
           )
-        ORDER BY CASE WHEN lower(f.internal_number)=:texto THEN 0 ELSE 1 END,f.confirmed_at DESC,f.id DESC
+        ORDER BY f.confirmed_at DESC,f.id DESC
         """,countQuery="""
         SELECT count(*) FROM sales_invoice f
         WHERE f.tenant_id=:tenant AND f.empresa_id=:empresa AND f.status='CONFIRMED'

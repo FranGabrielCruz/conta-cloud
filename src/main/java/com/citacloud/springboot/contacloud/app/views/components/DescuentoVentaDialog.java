@@ -4,6 +4,7 @@ import com.citacloud.springboot.contacloud.app.dto.*;
 import com.citacloud.springboot.contacloud.app.models.*;
 import com.citacloud.springboot.contacloud.app.services.*;
 import com.vaadin.flow.component.*;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -39,6 +40,7 @@ public class DescuentoVentaDialog extends Dialog {
     private final Span mensajeSeleccion = new Span();
     private final Span base = new Span("—"), descuento = new Span("—"), posterior = new Span("—"), cantidadSeleccionada = new Span("0");
     private final Div filaCantidad = metrica("SELECCIONADOS", cantidadSeleccionada);
+    private final PosNumericKeypad keypad = new PosNumericKeypad(PosNumericKeypad.Mode.POPOVER);
     private final Div preview;
     private final AppActionButton confirmar;
     private VistaPreviaDescuentoDto ultimaVista;
@@ -66,17 +68,21 @@ public class DescuentoVentaDialog extends Dialog {
         configurarSelector();
         preview = new Div(filaCantidad, metrica("BASE APLICABLE", base), metrica("DESCUENTO", descuento), metrica("IMPORTE FINAL", posterior));
         preview.addClassNames("cc-discount-preview", "cc-adjustment-summary");
-        Div campos = new Div(grupoCampo("Valor", false, valor), grupoCampo("Motivo", opciones.requiereMotivo(), motivo));
+        Button abrirTeclado = keypad.bind(valor, "DISCOUNT_VALUE", PosNumericKeypad.Options.money(this::enfocarConfirmar), value -> { });
+        actualizarTargetTeclado();
+        keypad.closeOnFocus(alcance, tipo, motivo, detalle);
+        Div controlValor = new Div(valor, abrirTeclado); controlValor.addClassName("cc-numeric-field-control");
+        Div campos = new Div(grupoCampo("Valor", false, controlValor), grupoCampo("Motivo", opciones.requiereMotivo(), motivo));
         campos.addClassNames("cc-adjustment-fields", "cc-discount-inline-fields");
         HorizontalLayout opcionesLayout = new HorizontalLayout(alcance, tipo); opcionesLayout.setWidthFull(); opcionesLayout.setFlexGrow(1, alcance, tipo);
-        add(opcionesLayout, selector, campos, detalle, preview);
+        add(opcionesLayout, selector, campos, keypad, detalle, preview);
         AppActionButton eliminar = new AppActionButton(ActionType.DELETE, ButtonSize.MAIN, "Quitar descuento", e -> { quitar.run(); close(); }); eliminar.setVisible(actual != null);
         confirmar = new AppActionButton(ActionType.ACCEPT, ButtonSize.MAIN, actual == null ? "Aplicar descuento" : "Aplicar cambios", e -> confirmar());
         AppActionButton cancelar = new AppActionButton(ActionType.CANCEL, ButtonSize.MAIN, "Cancelar", e -> close());
         eliminar.getStyle().set("margin-right", "auto"); getFooter().add(eliminar, confirmar, cancelar);
         actualizarFormatoValor(); registrarCambios(); actualizarSelector();
         addOpenedChangeListener(e -> { if (e.isOpened()) { valor.focus(); actualizarVista(); } });
-        addClosedListener(e -> cerrar.run());
+        addClosedListener(e -> { keypad.clearTarget(); cerrar.run(); });
     }
 
     private void configurarSelector() {
@@ -106,7 +112,7 @@ public class DescuentoVentaDialog extends Dialog {
     }
 
     private void registrarCambios() {
-        alcance.addValueChangeListener(e -> { actualizarSelector(); actualizarVista(); }); tipo.addValueChangeListener(e -> { actualizarFormatoValor(); actualizarVista(); });
+        alcance.addValueChangeListener(e -> { actualizarSelector(); actualizarVista(); }); tipo.addValueChangeListener(e -> { keypad.close(); actualizarTargetTeclado(); actualizarFormatoValor(); actualizarVista(); });
         valor.addValueChangeListener(e -> actualizarVista()); motivo.addValueChangeListener(e -> { detalle.setVisible(e.getValue() != null && e.getValue().otro()); actualizarVista(); });
         detalle.addValueChangeListener(e -> actualizarVista());
     }
@@ -136,6 +142,13 @@ public class DescuentoVentaDialog extends Dialog {
             if (vista.requiereAutorizacion()) { if (!opciones.permiteAutorizacion()) throw new ReglaNegocioException("El descuento supera el límite permitido."); dialogoAutorizacion(solicitud, vista); return; }
             aplicar.accept(new Aplicado(solicitud.descuento(), vista)); close();
         } catch (RuntimeException ex) { error(ex, "No fue posible aplicar el descuento."); }
+    }
+
+    private void enfocarConfirmar() { confirmar.focus(); }
+
+    private void actualizarTargetTeclado() {
+        keypad.setOwner(valor, tipo.getValue() == TipoDescuentoVenta.PERCENTAGE
+                ? "DISCOUNT_PERCENTAGE" : "DISCOUNT_AMOUNT");
     }
 
     private void dialogoAutorizacion(SolicitudVistaPreviaDescuentoInput solicitud, VistaPreviaDescuentoDto vista) {

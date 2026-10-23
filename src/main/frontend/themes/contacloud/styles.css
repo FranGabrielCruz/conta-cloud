@@ -30,6 +30,14 @@ html {
   color-scheme: light;
 }
 
+/* Permanece activo para RPC de Vaadin, pero no ocupa espacio visual. */
+.cc-inactivity-guard { display: none !important; }
+
+html.cc-session-expiring body {
+  pointer-events: none;
+  cursor: wait;
+}
+
 html[theme~="dark"] {
   --cc-primary: #6ea8fe;
   --cc-sidebar: #111827;
@@ -394,6 +402,20 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-keypad-block { margin-top: 0; }
 .cc-pos-keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: var(--lumo-space-xs); }
 .cc-pos-keypad vaadin-button { min-width: 0; min-height: 42px; margin: 0; font-size: var(--lumo-font-size-l); font-weight: 800; background: var(--lumo-contrast-10pct); }
+.cc-pos-keypad vaadin-button:not([disabled]):hover { background: var(--lumo-contrast-20pct); }
+.cc-pos-keypad vaadin-button:not([disabled]):active { transform: translateY(1px); background: var(--lumo-primary-color-20pct); }
+.cc-pos-keypad-disabled { opacity: .58; }
+.cc-pos-keypad-disabled .cc-pos-keypad-title { color: var(--lumo-disabled-text-color); }
+.cc-pos-keypad-backspace vaadin-icon { width: 20px; height: 20px; }
+.cc-pos-keypad-popover-host { display: contents; }
+.cc-pos-keypad-popover-content { box-sizing: border-box; width: 100%; padding: 2px; }
+.cc-pos-keypad-popover-content .cc-pos-keypad { margin-top: 0; gap: 6px; }
+.cc-pos-keypad-popover-content .cc-pos-keypad vaadin-button { min-height: 46px; }
+.cc-numeric-field-control { display: flex; align-items: flex-end; gap: 4px; width: 100%; min-width: 0; }
+.cc-numeric-field-control > vaadin-big-decimal-field { flex: 1 1 auto; width: auto; min-width: 0; }
+.cc-numeric-keypad-toggle { flex: 0 0 34px; width: 34px; min-width: 34px; height: 34px; min-height: 34px; margin: 0 0 5px; padding: 0; color: var(--lumo-secondary-text-color); background: var(--lumo-contrast-5pct); border: 1px solid var(--lumo-contrast-20pct); }
+.cc-numeric-keypad-toggle vaadin-icon { width: 18px; height: 18px; }
+.cc-numeric-keypad-toggle[aria-pressed="true"] { color: var(--lumo-primary-text-color); background: var(--lumo-primary-color-10pct); border-color: var(--lumo-primary-color-50pct); }
 .cc-pos-charge { width: 100%; height: 104px; min-height: 104px !important; max-height: 104px; flex: 0 0 104px; margin: 0; padding: 0 24px; background: var(--lumo-success-color); color: var(--lumo-base-color); font-size: 24px; font-weight: 800; line-height: 1.2; }
 .cc-pos-side > .cc-pos-charge { margin-top: auto; }
 .cc-pos-charge-content { width: 100%; height: 100%; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 12px; box-sizing: border-box; }
@@ -462,13 +484,13 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-pos-body { flex-direction: column; height: auto; overflow: visible; }
   .cc-pos-side { min-width: 0; }
   .cc-pos-quick-actions, .cc-pos-keypad-block, .cc-pos-charge { max-width: none; }
-  .cc-pos-keypad { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .cc-pos-keypad-fixed .cc-pos-keypad { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
   .cc-pos-bottom { grid-template-columns: 1fr; }
   .cc-pos-search-row { flex-direction: column; align-items: stretch; }
   .cc-pos-search-row > * { width: 100% !important; }
-  .cc-pos-keypad { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cc-pos-keypad-fixed .cc-pos-keypad { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cc-pos-payment-total-row, .cc-pos-payment-change-row { gap: var(--lumo-space-s); }
   .cc-pos-payment-metric-label { font-size: var(--lumo-font-size-s); }
   .cc-pos-payment-methods > * { flex: 1 1 calc(50% - var(--lumo-space-s)); }
@@ -935,7 +957,19 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 }
 
 .cc-surcharge-inline-fields {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr) minmax(0, 9fr);
+    grid-template-columns: minmax(0, 30fr) minmax(190px, 25fr) minmax(0, 45fr);
+}
+
+.cc-surcharge-inline-fields .cc-numeric-field-control {
+    min-width: 190px;
+}
+
+.cc-adjustment-combo-option {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .cc-adjustment-field-group {
@@ -1060,6 +1094,10 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
         gap: 8px;
     }
 
+    .cc-surcharge-inline-fields .cc-numeric-field-control {
+        min-width: 0;
+    }
+
     .cc-discount-preview.cc-adjustment-summary,
     .cc-discount-preview.cc-adjustment-summary.cc-summary-sale {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1114,6 +1152,23 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
   margin-left: auto;
   font-size: var(--lumo-font-size-l);
   font-weight: 700;
+}
+
+.cc-sales-return-dialog vaadin-button.cc-sales-return-start-action {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  --vaadin-button-background: transparent;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 @media (max-width: 800px) {
