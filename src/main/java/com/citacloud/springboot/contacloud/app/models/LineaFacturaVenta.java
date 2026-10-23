@@ -75,5 +75,6 @@ public class LineaFacturaVenta {
     public BigDecimal getPrecioUnitario(){return precioUnitario;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getImpuesto(){return impuesto;}
     public BigDecimal getSubtotalBruto(){return subtotalBruto;}public BigDecimal getDescuento(){return descuento;}public BigDecimal getBaseImponible(){return baseImponible;}public TipoDescuentoVenta getTipoDescuento(){return tipoDescuento;}public BigDecimal getValorDescuento(){return valorDescuento;}public String getMotivoDescuentoNombre(){return motivoDescuentoNombre;}public String getMotivoDescuentoDetalle(){return motivoDescuentoDetalle;}
     public BigDecimal getTotal(){return total;} public boolean isControlaExistencia(){return controlaExistencia;} public UUID getUnidadId(){return unidadId;}
+    public UUID getFacturaId(){return facturaId;} public BigDecimal getTasaImpuesto(){return tasaImpuesto;}
     public BigDecimal getRecargo(){return recargo;}public String getConceptoRecargoNombre(){return conceptoRecargoNombre;}public String getMotivoRecargoNombre(){return motivoRecargoNombre;}
 }

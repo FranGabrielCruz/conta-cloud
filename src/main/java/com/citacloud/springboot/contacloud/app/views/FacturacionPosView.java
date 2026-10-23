@@ -16,6 +16,7 @@ import com.citacloud.springboot.contacloud.app.views.components.AppActionButton;
 import com.citacloud.springboot.contacloud.app.views.components.ButtonSize;
 import com.citacloud.springboot.contacloud.app.views.components.DescuentoVentaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.RecargoVentaDialog;
+import com.citacloud.springboot.contacloud.app.views.components.DevolucionesVentasDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -51,6 +52,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final VentaGuardadaService ventasGuardadas;
     private final DescuentoVentaService descuentosService;
     private final RecargoVentaService recargosService;
+    private final DevolucionVentaService devolucionesService;
+    private final DevolucionVentaPdfService devolucionesPdf;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -73,6 +76,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private VentasGuardadasDialog dialogoVentasGuardadasActivo;
     private DescuentoVentaDialog dialogoDescuentoActivo;
     private RecargoVentaDialog dialogoRecargoActivo;
+    private Dialog dialogoLimpiarActivo;
+    private DevolucionesVentasDialog dialogoDevolucionesActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -85,10 +90,12 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private String ventaGuardadaActivaNumero;
     private String referenciaVentaGuardada;
     private Button guardarVentaRapida;
+    private Button limpiarVentaRapida;
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
                               FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
                               DescuentoVentaService descuentosService, RecargoVentaService recargosService,
+                              DevolucionVentaService devolucionesService, DevolucionVentaPdfService devolucionesPdf,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -97,6 +104,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.ventasGuardadas = ventasGuardadas;
         this.descuentosService = descuentosService;
         this.recargosService = recargosService;
+        this.devolucionesService = devolucionesService;
+        this.devolucionesPdf = devolucionesPdf;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -107,6 +116,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         contenido.setSizeFull();
         clienteSlot.addClassName("cc-pos-customer-slot");
         clienteSlot.setVisible(false);
+        observacion.addValueChangeListener(event -> actualizarEstadoLimpiar());
         add(contenido);
         registrarAtajos();
         registrarDobleEnter();
@@ -304,6 +314,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         referenciaVentaGuardada = null;
         idempotencia = UUID.randomUUID();
         actualizarTotales();
+        actualizarEstadoLimpiar();
     }
 
     private VerticalLayout construirVenta() {
@@ -497,18 +508,104 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         Button retener = tarjeta("💾", "Guardar", "F5", "Guardar venta (F5)", e -> dialogoVentasGuardadas());
         retener.addClassName("cc-pos-save-sale");
         guardarVentaRapida = retener;
-        Button limpiar = tarjeta("🗑", "Limpiar", "", "Limpiar venta", e -> pendiente("Limpiar venta"));
+        Button limpiar = tarjeta("🗑", "Limpiar", "", "Limpiar venta", e -> dialogoLimpiarVenta());
         limpiar.addClassName("cc-pos-quick-clear");
+        limpiar.getElement().setAttribute("aria-label", "Limpiar venta");
+        limpiarVentaRapida = limpiar;
+        Button devoluciones = tarjeta("↩", "Devoluciones", "", "Gestionar devoluciones de ventas", e -> dialogoDevoluciones());
+        devoluciones.setVisible(puede("devoluciones_venta.ver"));
         Div tarjetas = new Div(
                 agregar, descuentoRapido, recargoRapido, retener, limpiar,
                 tarjeta("👥", "Clientes", "F6", "Seleccionar cliente (F6)", e -> dialogoClientes()),
                 tarjeta("🧾", "Últimas", "F7", "Ver últimas facturas (F7)", e -> dialogoUltimasFacturas()),
-                tarjeta("↩", "Devoluciones", "", "Devoluciones", e -> pendiente("Devoluciones")));
+                devoluciones);
         tarjetas.addClassName("cc-pos-quick-grid");
         Div bloque = new Div(cabecera, tarjetas);
         bloque.addClassName("cc-pos-quick-actions");
         actualizarIndicadorVentasGuardadas();
+        actualizarEstadoLimpiar();
         return bloque;
+    }
+
+    private void dialogoLimpiarVenta() {
+        reiniciarDobleEnter();
+        if (!tieneVentaEnCurso()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (dialogoLimpiarActivo != null && dialogoLimpiarActivo.isOpened()) return;
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Limpiar venta");
+        dialog.setWidth("min(440px, 94vw)");
+        dialog.setCloseOnEsc(true);
+        dialog.setCloseOnOutsideClick(false);
+        dialog.addClassName("cc-pos-clear-dialog");
+        dialog.getElement().setAttribute("aria-label", "Confirmar limpieza de la venta");
+        dialogoLimpiarActivo = dialog;
+
+        Paragraph mensaje = new Paragraph("Se eliminarán los datos de la venta actual.");
+        Div detalle = new Div(
+                new Span("Productos: " + filas.size()),
+                new Span("Total: " + moneda(totalActualVenta())));
+        detalle.addClassName("cc-pos-clear-summary");
+        Paragraph advertencia = new Paragraph("Esta acción no se puede deshacer.");
+        advertencia.addClassName("cc-pos-clear-warning");
+        dialog.add(mensaje, detalle, advertencia);
+
+        AppActionButton limpiar = new AppActionButton(ActionType.DELETE, ButtonSize.MAIN,
+                "Limpiar venta", null);
+        AppActionButton cancelar = new AppActionButton(ActionType.CANCEL, ButtonSize.MAIN,
+                "Cancelar", e -> dialog.close());
+        boolean[] completada = {false};
+        limpiar.addClickListener(event -> {
+            if (!limpiar.isEnabled()) return;
+            limpiar.setEnabled(false);
+            try {
+                if (ventaGuardadaActivaId != null) {
+                    ventasGuardadas.liberarRecuperacion(ventaGuardadaActivaId, token, terminal.almacenId());
+                }
+                completada[0] = true;
+                prepararNuevaVenta();
+                refrescar();
+                dialog.close();
+                actualizarIndicadorVentasGuardadas();
+                enfocarProducto();
+            } catch (RuntimeException ex) {
+                limpiar.setEnabled(true);
+                error(ex, "No fue posible limpiar la venta.");
+            }
+        });
+        dialog.getFooter().add(limpiar, cancelar);
+        dialog.addOpenedChangeListener(event -> {
+            if (event.isOpened()) {
+                cancelar.focus();
+            } else {
+                if (dialogoLimpiarActivo == dialog) dialogoLimpiarActivo = null;
+                if (!completada[0] && limpiarVentaRapida != null) limpiarVentaRapida.focus();
+            }
+        });
+        dialog.open();
+    }
+
+    private boolean tieneVentaEnCurso() {
+        return tieneDatosVenta(filas.size(), clienteSeleccionado != null, descuentoVenta, recargoVenta,
+                observacion.getValue(), ventaGuardadaActivaId);
+    }
+
+    static boolean tieneDatosVenta(int productos, boolean clienteSeleccionado, BigDecimal descuento,
+                                   BigDecimal recargo, String observacion, UUID ventaGuardadaId) {
+        return productos > 0 || clienteSeleccionado
+                || (descuento != null && descuento.signum() != 0)
+                || (recargo != null && recargo.signum() != 0)
+                || (observacion != null && !observacion.isBlank())
+                || ventaGuardadaId != null;
+    }
+
+    private BigDecimal totalActualVenta() {
+        return filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private void actualizarEstadoLimpiar() {
+        if (limpiarVentaRapida != null) limpiarVentaRapida.setEnabled(tieneVentaEnCurso());
     }
 
     private Component construirTeclado() {
@@ -742,6 +839,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             clienteSlot.add(new PosCustomerLine(cliente, this::dialogoClientes, () -> seleccionarCliente(null)));
             clienteSlot.setVisible(true);
         }
+        actualizarEstadoLimpiar();
         enfocarProducto();
     }
 
@@ -852,7 +950,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         filas.forEach(f -> f.descuento = BigDecimal.ZERO);
     }
 
-    private void refrescar() { grid.setItems(filas); actualizarTotales(); }
+    private void refrescar() { grid.setItems(filas); actualizarTotales(); actualizarEstadoLimpiar(); }
 
     private void actualizarTotales() {
         BigDecimal base = BigDecimal.ZERO, tax = BigDecimal.ZERO, grand = BigDecimal.ZERO, discount = BigDecimal.ZERO;
@@ -1054,6 +1152,23 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         dialog.open();
     }
 
+    private void dialogoDevoluciones() {
+        reiniciarDobleEnter();
+        if (dialogoDevolucionesActivo != null && dialogoDevolucionesActivo.isOpened()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (!puede("devoluciones_venta.ver")) {
+            Notification.show("No tienes permiso para consultar devoluciones de ventas.");
+            return;
+        }
+        DevolucionesVentasDialog dialog = new DevolucionesVentasDialog(devolucionesService,
+                this::abrirPdfDevolucion, this::enfocarProducto);
+        dialogoDevolucionesActivo = dialog;
+        dialog.addOpenedChangeListener(event -> {
+            if (!event.isOpened() && dialogoDevolucionesActivo == dialog) dialogoDevolucionesActivo = null;
+        });
+        dialog.open();
+    }
+
     private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
         try {
             List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.lineaId, f.id, f.cantidad, f.precio)).toList();
@@ -1085,6 +1200,21 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
         } catch (RuntimeException ex) {
             Notification.show("No fue posible abrir el PDF de la factura. Intente nuevamente.");
+        }
+    }
+
+    private void abrirPdfDevolucion(UUID devolucionId) {
+        try {
+            ArchivoPdfDto archivo = devolucionesPdf.generar(devolucionId);
+            StreamResource recurso = new StreamResource(archivo.nombreArchivo(),
+                    () -> new ByteArrayInputStream(archivo.contenido()));
+            recurso.setContentType("application/pdf");
+            recurso.setCacheTime(0);
+            var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
+            UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
+            Notification.show("Devolución confirmada correctamente.");
+        } catch (RuntimeException ex) {
+            Notification.show("La devolución fue confirmada, pero no fue posible abrir el PDF. Puede reimprimirlo después.");
         }
     }
 

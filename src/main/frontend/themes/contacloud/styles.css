@@ -381,10 +381,16 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .cc-pos-quick-card { width: 100%; min-width: 0; min-height: 52px; margin: 0; padding: 2px; background: var(--lumo-contrast-10pct); border: 1px solid var(--lumo-contrast-20pct); font-size: var(--lumo-font-size-xs); }
 .cc-pos-quick-clear { color: var(--lumo-error-text-color); }
+.cc-pos-quick-clear[disabled] { color: var(--lumo-disabled-text-color); opacity: .55; }
 .cc-pos-quick-card > div { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
 .cc-pos-quick-card > div > span:nth-child(2) { max-width: 100%; white-space: nowrap; }
 .cc-pos-card-icon { font-size: 1.1rem; }
 .cc-pos-card-shortcut { min-height: 1em; color: var(--lumo-secondary-text-color); font-size: var(--lumo-font-size-xs); }
+.cc-pos-clear-dialog::part(content) { padding-top: var(--lumo-space-s); }
+.cc-pos-clear-dialog::part(footer) { gap: var(--lumo-space-xs); justify-content: flex-end; }
+.cc-pos-clear-dialog p { margin: var(--lumo-space-xs) 0; }
+.cc-pos-clear-summary { display: flex; flex-direction: column; gap: 4px; margin: var(--lumo-space-m) 0; padding: var(--lumo-space-s) var(--lumo-space-m); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); background: var(--lumo-contrast-5pct); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cc-pos-clear-warning { color: var(--lumo-error-text-color); font-weight: 700; }
 .cc-pos-keypad-block { margin-top: 0; }
 .cc-pos-keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: var(--lumo-space-xs); }
 .cc-pos-keypad vaadin-button { min-width: 0; min-height: 42px; margin: 0; font-size: var(--lumo-font-size-l); font-weight: 800; background: var(--lumo-contrast-10pct); }
@@ -1085,4 +1091,32 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
         grid-template-columns: minmax(0, 1fr);
         row-gap: 16px;
     }
+}
+/* Devoluciones de ventas: modal independiente y tablas compactas. */
+.cc-sales-return-dialog .cc-sales-return-filters {
+  display: grid;
+  grid-template-columns: minmax(250px, 2fr) repeat(3, minmax(150px, 1fr));
+  gap: var(--lumo-space-m);
+}
+
+.cc-sales-return-dialog .cc-sales-return-invoice {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--lumo-space-s);
+  padding: var(--lumo-space-m);
+  border: 1px solid var(--lumo-contrast-20pct);
+  border-radius: var(--lumo-border-radius-m);
+  background: var(--lumo-contrast-5pct);
+}
+
+.cc-sales-return-dialog .cc-sales-return-summary {
+  display: block;
+  margin-left: auto;
+  font-size: var(--lumo-font-size-l);
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .cc-sales-return-dialog .cc-sales-return-filters,
+  .cc-sales-return-dialog .cc-sales-return-invoice { grid-template-columns: 1fr; }
 }

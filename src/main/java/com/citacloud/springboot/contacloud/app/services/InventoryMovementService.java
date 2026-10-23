@@ -59,4 +59,14 @@ public class InventoryMovementService {
             factura.getFecha(),linea.getCantidad(),"OUT","SALE",origen,factura.getId(),factura.getNumero(),null,
             linea.getId(),linea.getUnidadId(),null,usuario));
     }
+    public void devolverVenta(DevolucionVenta devolucion,LineaDevolucionVenta linea,UUID almacen,UUID usuario){
+        if(!linea.isControlaExistencia())return;
+        String origen="SALES_RETURN";
+        String key=MovimientoInventario.clave(origen,devolucion.getId(),almacen,linea.getProductoId(),"IN",linea.getId());
+        if(movements.existsByTenantIdAndEmpresaIdAndClaveOrigen(devolucion.getTenantId(),devolucion.getEmpresaId(),key))return;
+        movements.save(new MovimientoInventario(devolucion.getTenantId(),devolucion.getEmpresaId(),
+            numbers.siguiente(devolucion.getTenantId(),devolucion.getEmpresaId()),almacen,linea.getProductoId(),
+            devolucion.getConfirmadaEn().toLocalDate(),linea.getCantidad(),"IN","SALES_RETURN",origen,devolucion.getId(),
+            devolucion.getNumero(),null,linea.getId(),linea.getUnidadId(),null,usuario));
+    }
 }

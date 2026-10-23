@@ -63,6 +63,7 @@ public class FacturaVenta {
     public UUID getId(){return id;} public UUID getTenantId(){return tenantId;} public UUID getEmpresaId(){return empresaId;}
     public String getNumero(){return numero;} public LocalDate getFecha(){return fecha;} public OffsetDateTime getConfirmadaEn(){return confirmadaEn;}
     public UUID getCajaId(){return cajaId;} public UUID getSesionCajaId(){return sesionCajaId;} public UUID getSucursalId(){return sucursalId;} public UUID getAlmacenId(){return almacenId;}
+    public UUID getClienteId(){return clienteId;}
     public String getClienteNombre(){return clienteNombre;} public String getClienteIdentificacion(){return clienteIdentificacion;}
     public String getVendedorNombre(){return vendedorNombre;} public UUID getMonedaId(){return monedaId;} public String getMonedaCodigo(){return monedaCodigo;}
     public String getMonedaSimbolo(){return monedaSimbolo;} public String getNota(){return note;} public BigDecimal getSubtotal(){return subtotal;}
