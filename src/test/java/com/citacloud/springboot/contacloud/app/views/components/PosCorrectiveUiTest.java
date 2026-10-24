@@ -26,7 +26,7 @@ class PosCorrectiveUiTest {
         String repository = Files.readString(Path.of(
                 "src/main/java/com/citacloud/springboot/contacloud/app/repositories/FacturaVentaRepository.java"));
 
-        assertThat(source).contains("new AppPagination(req->cargarFacturas(),5,5)",
+        assertThat(source).contains("new PosDialogPagination(req->cargarFacturas())",
                 "facturas.setAllRowsVisible(true)",
                 "buscar.addValueChangeListener(e->{paginacion.reset();cargarFacturas();})",
                 "desde.addValueChangeListener(e->{paginacion.reset();cargarFacturas();})",

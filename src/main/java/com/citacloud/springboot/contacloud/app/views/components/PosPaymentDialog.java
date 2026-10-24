@@ -39,6 +39,7 @@ public class PosPaymentDialog extends Dialog {
 
     private final List<AplicacionTemporal> aplicaciones = new ArrayList<>();
     private final Grid<AplicacionTemporal> grid = new Grid<>();
+    private final PosDialogPagination paginacionPagos = new PosDialogPagination(r -> cargarPaginaPagos());
     private final BigDecimalField monto = new BigDecimalField("Monto aplicado");
     private final BigDecimalField recibido = new BigDecimalField("Recibido");
     private final TextField referencia = new TextField("Referencia / autorización");
@@ -97,6 +98,7 @@ public class PosPaymentDialog extends Dialog {
         exacto.setTooltipText("Usar monto exacto (doble espacio)");
         exacto.addClickListener(e -> usarMontoExacto());
         configurarTecladoNumerico();
+        normalizarImportesAlPerderFoco();
         registrarDobleEspacio();
         Shortcuts.addShortcutListener(this, () -> {
             if (!keypad.closeIfOpen()) cerrar();
@@ -197,12 +199,12 @@ public class PosPaymentDialog extends Dialog {
         }
         importesRapidos.removeAll();
         importesRapidos.addClassName("cc-pos-cash-quick");
-        exacto.setText(String.format(Locale.US, "%,.2f Exacto", total));
+        exacto.setText(PosNumberFormatter.money(total) + " Exacto");
         importesRapidos.add(exacto);
         for (String valor : List.of("20", "50", "100", "200", "500", "1000")) {
             BigDecimal importe = new BigDecimal(valor);
             Button rapido = new Button(String.format(Locale.US, "%,.0f", importe), e -> {
-                recibidoSimple.setValue(importe);
+                recibidoSimple.setValue(PosNumberFormatter.moneyInput(importe));
                 recibidoSimple.focus();
                 keypad.close();
             });
@@ -274,7 +276,7 @@ public class PosPaymentDialog extends Dialog {
         actualizarDisponibilidadAtajoExacto();
         contenido.removeAll();
         contenido.add(totalBox(false), titulo("DISTRIBUIR PAGO"), accesosMetodos(this::seleccionarMultiple),
-                construirEditorMultiple(), titulo("PAGOS APLICADOS"), grid, construirResumenMultiple());
+                construirEditorMultiple(), titulo("PAGOS APLICADOS"), grid, paginacionPagos, construirResumenMultiple());
         alternarModo.setText("Volver a pago simple");
         alternarModo.setIcon(VaadinIcon.ARROW_BACKWARD.create());
         alternarModo.setTooltipText("Volver a pago simple");
@@ -382,7 +384,7 @@ public class PosPaymentDialog extends Dialog {
             grid.addComponentColumn(a -> {
                 Button boton = new Button(VaadinIcon.TRASH.create(), e -> {
                     aplicaciones.remove(a);
-                    grid.setItems(aplicaciones);
+                    refrescarPagos();
                     actualizarResumen();
                 });
                 boton.addClassName("cc-grid-icon-button");
@@ -391,9 +393,22 @@ public class PosPaymentDialog extends Dialog {
                 return boton;
             }).setHeader("Acción").setAutoWidth(true);
         }
-        grid.setItems(aplicaciones);
-        grid.setAllRowsVisible(false);
+        grid.setAllRowsVisible(true);
         grid.addClassName("cc-pos-payment-grid");
+        refrescarPagos();
+    }
+
+    private void refrescarPagos() {
+        paginacionPagos.setTotal(aplicaciones.size());
+        paginacionPagos.setVisible(aplicaciones.size() > PosDialogPagination.DEFAULT_PAGE_SIZE);
+        cargarPaginaPagos();
+    }
+
+    private void cargarPaginaPagos() {
+        AppPagination.PageRequest pagina = paginacionPagos.currentRequest();
+        int desde = Math.min(pagina.page() * pagina.size(), aplicaciones.size());
+        int hasta = Math.min(desde + pagina.size(), aplicaciones.size());
+        grid.setItems(aplicaciones.subList(desde, hasta));
     }
 
     private void seleccionarMultiple(MetodoPagoPosDto metodo) {
@@ -405,12 +420,12 @@ public class PosPaymentDialog extends Dialog {
         AplicacionTemporal efectivoExistente = metodo.efectivo()
                 ? aplicaciones.stream().filter(a -> a.metodo.efectivo()).findFirst().orElse(null)
                 : null;
-        monto.setValue(efectivoExistente == null ? restante : efectivoExistente.monto);
+        monto.setValue(PosNumberFormatter.moneyInput(efectivoExistente == null ? restante : efectivoExistente.monto));
         recibido.clear();
         referencia.clear();
         cuenta.clear();
         banco.clear();
-        if (metodo.efectivo()) recibido.setValue(efectivoExistente == null ? restante : efectivoExistente.recibido);
+        if (metodo.efectivo()) recibido.setValue(PosNumberFormatter.moneyInput(efectivoExistente == null ? restante : efectivoExistente.recibido));
         recibido.setVisible(metodo.efectivo());
         cuenta.setVisible(metodo.requiereCuentaBancaria());
         referencia.setVisible(metodo.requiereReferencia() || metodo.electronico()
@@ -464,7 +479,7 @@ public class PosPaymentDialog extends Dialog {
         if (efectivoExistente != null) aplicaciones.remove(efectivoExistente);
         aplicaciones.add(new AplicacionTemporal(metodoActual, valor, recibidoValor, cambioValor,
                 cuenta.getValue(), referencia.getValue().trim(), banco.getValue().trim()));
-        grid.setItems(aplicaciones);
+        refrescarPagos();
         actualizarResumen();
         seleccionarMultiple(metodoActual);
     }
@@ -529,7 +544,7 @@ public class PosPaymentDialog extends Dialog {
     private void usarMontoExacto() {
         if (!atajoExactoDisponible()) return;
         reiniciarDobleEspacio();
-        recibidoSimple.setValue(total);
+        recibidoSimple.setValue(PosNumberFormatter.moneyInput(total));
         actualizarSimple();
         keypad.clearTarget();
         confirmar.focus();
@@ -606,7 +621,21 @@ public class PosPaymentDialog extends Dialog {
     }
 
     static String formatearDinero(String moneda, BigDecimal valor) {
-        return moneda + " " + String.format(Locale.US, "%,.2f", valor == null ? BigDecimal.ZERO : valor);
+        return moneda + " " + PosNumberFormatter.money(valor);
+    }
+
+    private void normalizarImportesAlPerderFoco() {
+        for (BigDecimalField campo : List.of(recibidoSimple, monto, recibido)) {
+            campo.addBlurListener(e -> { normalizarImporte(campo); PosNumberFormatter.showMoney(campo); });
+            campo.addFocusListener(e -> PosNumberFormatter.showQuantity(campo));
+        }
+    }
+
+    private static void normalizarImporte(BigDecimalField campo) {
+        BigDecimal actual = campo.getValue();
+        if (actual == null) return;
+        BigDecimal normalizado = PosNumberFormatter.moneyInput(actual);
+        if (!actual.equals(normalizado)) campo.setValue(normalizado);
     }
 
     private static BigDecimal escala(BigDecimal valor) {

@@ -18,7 +18,7 @@ import java.util.*;
 
 @Service
 public class DevolucionVentaService {
-    public static final int TAMANO_PAGINA=5;
+    public static final int TAMANO_PAGINA=PosPaginationPolicy.DIALOG_DEFAULT_PAGE_SIZE;
     private static final UUID SUCURSAL_MARCADOR=new UUID(0L,0L);
     private static final String OPERATION="SALES_RETURN_CONFIRM";
     private final FacturaVentaRepository facturas; private final LineaFacturaVentaRepository lineasFactura;

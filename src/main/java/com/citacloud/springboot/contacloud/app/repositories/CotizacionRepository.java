@@ -26,6 +26,22 @@ public interface CotizacionRepository extends JpaRepository<Cotizacion,UUID> {
         @Param("desde")LocalDate desde,@Param("hasta")LocalDate hasta,@Param("estado")EstadoCotizacion estado,
         @Param("cliente")UUID cliente,@Param("moneda")UUID moneda,Pageable pageable);
 
+    @EntityGraph(attributePaths={"sucursal","moneda"})
+    @Query("""
+      select c from Cotizacion c where c.tenantId=:tenant and c.empresaId=:empresa
+      and c.status in :estados
+      and (:buscar='' or lower(c.numero) like lower(concat('%',:buscar,'%'))
+        or lower(c.clienteNombre) like lower(concat('%',:buscar,'%'))
+        or lower(coalesce(c.clienteIdentificacion,'')) like lower(concat('%',:buscar,'%'))
+        or replace(replace(coalesce(c.clienteIdentificacion,''),'-',''),' ','') like concat('%',:identificacion,'%'))
+      and (:desde is null or c.fecha>=:desde) and (:hasta is null or c.fecha<=:hasta)
+      and (:estado is null or c.status=:estado)
+      """)
+    Page<Cotizacion> buscarParaPos(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("buscar")String buscar,@Param("identificacion")String identificacion,
+        @Param("desde")LocalDate desde,@Param("hasta")LocalDate hasta,@Param("estado")EstadoCotizacion estado,
+        @Param("estados")Collection<EstadoCotizacion> estados,Pageable pageable);
+
     @EntityGraph(attributePaths={"lineas","sucursal","moneda"})
     Optional<Cotizacion> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenant,UUID empresa);
 

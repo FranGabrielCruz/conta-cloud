@@ -23,7 +23,6 @@ import com.vaadin.flow.server.*;
 import jakarta.annotation.security.PermitAll;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -103,7 +102,7 @@ public class CotizacionesView extends VerticalLayout implements BeforeEnterObser
 
     private void lineForm(CotizacionCatalogosDto catalogs,LineDraft current,List<LineDraft> lines,Runnable refresh){Dialog d=dialog(current==null?"AGREGAR LÍNEA":"EDITAR LÍNEA");
         ComboBox<CotizacionCatalogosDto.ProductoOpcion> product=new ComboBox<>("Producto / Servicio");product.setItems(q->service.buscarProductos(q.getFilter().orElse(""),q.getOffset(),q.getLimit()).stream());product.setItemLabelGenerator(x->x.codigo()+" · "+x.nombre());product.setRequiredIndicatorVisible(true);
-        TextArea description=new TextArea("Descripción");description.setRequiredIndicatorVisible(true);description.setMaxLength(500);BigDecimalField quantity=new BigDecimalField("Cantidad");quantity.setRequiredIndicatorVisible(true);
+        TextArea description=new TextArea("Descripción");description.setRequiredIndicatorVisible(true);description.setMaxLength(500);BigDecimalField quantity=new BigDecimalField("Cantidad");quantity.setRequiredIndicatorVisible(true);quantity.addBlurListener(e->{BigDecimal actual=quantity.getValue();if(actual!=null){BigDecimal normalizado=PosNumberFormatter.quantityInput(actual);if(!actual.equals(normalizado))quantity.setValue(normalizado);}});
         BigDecimalField price=new BigDecimalField("Precio unitario");price.setRequiredIndicatorVisible(true);price.setReadOnly(!can("cotizaciones.precios"));Select<TipoDescuentoCotizacion> discountType=new Select<>();discountType.setLabel("Tipo de descuento");discountType.setItems(TipoDescuentoCotizacion.values());discountType.setItemLabelGenerator(t->t==TipoDescuentoCotizacion.MONTO?"Monto":"Porcentaje");discountType.setReadOnly(!can("cotizaciones.descuentos"));
         BigDecimalField discount=new BigDecimalField("Descuento");discount.setReadOnly(!can("cotizaciones.descuentos"));ComboBox<CotizacionCatalogosDto.ImpuestoOpcion> tax=new ComboBox<>("Impuesto");tax.setItems(catalogs.impuestos());tax.setItemLabelGenerator(x->x.nombre()+" ("+number(x.tasa())+"%)");tax.setClearButtonVisible(true);
         if(current==null){quantity.setValue(BigDecimal.ONE);price.setValue(BigDecimal.ZERO);discountType.setValue(TipoDescuentoCotizacion.MONTO);discount.setValue(BigDecimal.ZERO);}else{product.setValue(current.product());description.setValue(current.description());quantity.setValue(current.quantity());price.setValue(current.unitPrice());discountType.setValue(current.discountType());discount.setValue(current.discountValue());tax.setValue(current.tax());}
@@ -149,7 +148,7 @@ public class CotizacionesView extends VerticalLayout implements BeforeEnterObser
     static String state(EstadoCotizacion s){if(s==null)return "Todos";return switch(s){case BORRADOR->"Borrador";case ENVIADA->"Enviada";case ACEPTADA->"Aceptada";case RECHAZADA->"Rechazada";case VENCIDA->"Vencida";case ANULADA->"Anulada";case CONVERTIDA->"Convertida";};}
     private static String event(String s){return s==null?"—":s.charAt(0)+s.substring(1).toLowerCase(Locale.ROOT);}
     private static String customerLabel(CotizacionCatalogosDto.ClienteOpcion c){return c.codigo()+" · "+c.nombre()+(blank(c.identificacion())?"":" · "+c.identificacion());}
-    private static String money(BigDecimal v){return new DecimalFormat("#,##0.00").format(v==null?BigDecimal.ZERO:v);}private static String number(BigDecimal v){return v==null?"0":v.stripTrailingZeros().toPlainString();}
+    private static String money(BigDecimal v){return PosNumberFormatter.money(v);}private static String number(BigDecimal v){return PosNumberFormatter.quantity(v);}
     private static String date(LocalDate v){return v==null?"—":DATE.format(v);}private static String display(String v){return blank(v)?"—":v;}private static String value(String v){return v==null?"":v;}private static boolean blank(String v){return v==null||v.isBlank();}private static String unit(String n,String a){return blank(n)?"—":n+(blank(a)?"":" ("+a+")");}
     private static boolean can(String permission){return TenantContext.principalActual().permisos().contains(permission);}
     private static <T> void selectId(ComboBox<T> field,List<T> values,UUID id,java.util.function.Function<T,UUID> getter){field.setValue(id==null?null:values.stream().filter(v->Objects.equals(getter.apply(v),id)).findFirst().orElse(null));}

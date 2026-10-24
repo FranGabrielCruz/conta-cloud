@@ -29,14 +29,14 @@ public class DevolucionesVentasDialog extends Dialog {
     private final VerticalLayout cuerpo=new VerticalLayout(); private final TextField buscar=new TextField("Buscar factura o cliente");
     private final DatePicker desde=new DatePicker("Desde"),hasta=new DatePicker("Hasta");
     private final ComboBox<EstadoDevolucionFacturaFiltro> estado=new ComboBox<>("Estado");
-    private final Grid<FacturaDevolucionResumenDto> facturas=new Grid<>(); private final AppPagination paginacion;
+    private final Grid<FacturaDevolucionResumenDto> facturas=new Grid<>(); private final PosDialogPagination paginacion;
     private DevolucionVentaDetalleDto detalle; private final Map<UUID,BigDecimalField> cantidades=new LinkedHashMap<>();
     private UUID claveOperacion=UUID.randomUUID(); private Button confirmar;
 
     public DevolucionesVentasDialog(DevolucionVentaService service,Consumer<UUID> abrirPdf,Runnable alCerrar){
         this.service=service;this.abrirPdf=abrirPdf;this.alCerrar=alCerrar;setHeaderTitle("DEVOLUCIONES DE VENTAS");
         addClassName("cc-sales-return-dialog");setWidth("min(1180px, 96vw)");setMaxHeight("94vh");setModal(true);setDraggable(false);
-        cuerpo.setPadding(false);cuerpo.setSpacing(true);cuerpo.setWidthFull();paginacion=new AppPagination(req->cargarFacturas(),5,5);
+        cuerpo.setPadding(false);cuerpo.setSpacing(true);cuerpo.setWidthFull();paginacion=new PosDialogPagination(req->cargarFacturas());
         configurarBusqueda();mostrarBusqueda();add(cuerpo);addDialogCloseActionListener(e->cerrar());
     }
 
@@ -79,8 +79,9 @@ public class DevolucionesVentasDialog extends Dialog {
         Grid<DevolucionVentaDetalleDto.Linea> grid=new Grid<>();grid.addClassName("cc-sales-return-detail-grid");grid.setAllRowsVisible(true);
         grid.addColumn(l->l.codigo()+" · "+l.producto()).setHeader("Producto").setFlexGrow(1);grid.addColumn(DevolucionVentaDetalleDto.Linea::unidad).setHeader("Unidad").setAutoWidth(true);
         grid.addColumn(l->qty(l.facturado())).setHeader("Facturado").setAutoWidth(true);grid.addColumn(l->qty(l.devuelto())).setHeader("Devuelto").setAutoWidth(true);grid.addColumn(l->qty(l.disponible())).setHeader("Disponible").setAutoWidth(true);
-        grid.addColumn(new ComponentRenderer<>(l->{BigDecimalField c=new BigDecimalField();c.setWidth("120px");c.setValue(BigDecimal.ZERO);c.setLabel("Devolver");c.setHelperText("Máx. "+qty(l.disponible()));c.addValueChangeListener(e->actualizarResumen());cantidades.put(l.lineaFacturaId(),c);return c;})).setHeader("Devolver").setWidth("150px").setFlexGrow(0);
-        grid.setItems(detalle.lineas());
+        grid.addColumn(new ComponentRenderer<>(l->cantidades.computeIfAbsent(l.lineaFacturaId(),id->{BigDecimalField c=new BigDecimalField();c.setWidth("120px");c.setValue(BigDecimal.ZERO);c.setLabel("Devolver");c.setHelperText("Máx. "+qty(l.disponible()));c.addValueChangeListener(e->actualizarResumen());c.addBlurListener(e->{BigDecimal actual=c.getValue();if(actual!=null){BigDecimal normalizado=PosNumberFormatter.quantityInput(actual);if(!actual.equals(normalizado))c.setValue(normalizado);}});return c;}))).setHeader("Devolver").setWidth("150px").setFlexGrow(0);
+        PosDialogPagination paginacionDetalle=new PosDialogPagination(request->{int inicio=Math.min(request.page()*request.size(),detalle.lineas().size());int fin=Math.min(inicio+request.size(),detalle.lineas().size());grid.setItems(detalle.lineas().subList(inicio,fin));});
+        paginacionDetalle.setTotal(detalle.lineas().size());int finInicial=Math.min(PosDialogPagination.DEFAULT_PAGE_SIZE,detalle.lineas().size());grid.setItems(detalle.lineas().subList(0,finInicial));
         ComboBox<DevolucionVentaDetalleDto.Motivo> motivo=new ComboBox<>("Motivo");motivo.setItems(detalle.motivos());motivo.setItemLabelGenerator(DevolucionVentaDetalleDto.Motivo::nombre);motivo.setRequiredIndicatorVisible(true);
         TextArea observacion=new TextArea("Observación");observacion.setMaxLength(1000);observacion.setWidthFull();
         Checkbox inventario=new Checkbox("Los productos físicos retornan al inventario");ComboBox<DevolucionVentaDetalleDto.Almacen> almacen=new ComboBox<>("Almacén destino");almacen.setItems(detalle.almacenes());almacen.setItemLabelGenerator(DevolucionVentaDetalleDto.Almacen::nombre);almacen.setVisible(false);
@@ -91,7 +92,7 @@ public class DevolucionesVentasDialog extends Dialog {
         Button volver=new AppActionButton(ActionType.BACK,ButtonSize.MAIN,"Volver a facturas",e->mostrarBusqueda());Button cancelar=new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cerrar",e->cerrar());
         HorizontalLayout formulario=new HorizontalLayout(motivo,almacen);formulario.setWidthFull();formulario.setAlignItems(FlexComponent.Alignment.END);formulario.setFlexGrow(1,motivo,almacen);
         HorizontalLayout acciones=new HorizontalLayout(confirmar,volver,cancelar);acciones.setWidthFull();acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        cuerpo.add(cabecera,grid,formulario,inventario,observacion,resumen,acciones);actualizarResumen();
+        cuerpo.add(cabecera,grid,paginacionDetalle,formulario,inventario,observacion,resumen,acciones);actualizarResumen();
     }
 
     private void actualizarResumen(){
@@ -110,6 +111,6 @@ public class DevolucionesVentasDialog extends Dialog {
 
     private void cerrar(){close();if(alCerrar!=null)alCerrar.run();}
     private String estadoLabel(EstadoDevolucionFacturaFiltro e){return switch(e){case TODAS->"Todas";case PAGADA->"Pagadas";case PARCIALMENTE_DEVUELTA->"Parcialmente devueltas";case DEVUELTA->"Devueltas";};}
-    private static String money(BigDecimal v){return String.format(Locale.US,"%,.2f",v==null?BigDecimal.ZERO:v);}
-    private static String qty(BigDecimal v){return v==null?"0":v.stripTrailingZeros().toPlainString();}
+    private static String money(BigDecimal v){return PosNumberFormatter.money(v);}
+    private static String qty(BigDecimal v){return PosNumberFormatter.quantity(v);}
 }

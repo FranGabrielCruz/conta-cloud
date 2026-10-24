@@ -37,6 +37,7 @@ public class RecargoVentaDialog extends Dialog {
     private final TextArea detalle = new TextArea("Detalle");
     private final VerticalLayout selector = new VerticalLayout();
     private final Grid<LineaVistaPreviaRecargoInput> grid = new Grid<>();
+    private final PosDialogPagination paginacionProductos = new PosDialogPagination(r -> cargarPaginaProductos());
     private final Checkbox todos = new Checkbox();
     private final Span contador = new Span();
     private final Span mensaje = new Span();
@@ -89,6 +90,8 @@ public class RecargoVentaDialog extends Dialog {
         if (actual != null) valor.setValue(actual.valor());
         valor.setAriaLabel("Valor");
         valor.setWidthFull();
+        valor.addBlurListener(e -> { normalizarValorVisual(); mostrarValorFormateado(); });
+        valor.addFocusListener(e -> PosNumberFormatter.showQuantity(valor));
         motivo.setItems(opciones.motivos());
         motivo.setItemLabelGenerator(ConfiguracionRecargoDto.Motivo::nombre);
         motivo.setRenderer(new ComponentRenderer<>(item -> opcionConTooltip(item.nombre())));
@@ -197,13 +200,20 @@ public class RecargoVentaDialog extends Dialog {
                 .setKey("cantidad").setTextAlign(ColumnTextAlign.END).setWidth("90px").setFlexGrow(0);
         grid.addColumn(linea -> moneda(importe(linea))).setHeader("Importe")
                 .setKey("importe").setTextAlign(ColumnTextAlign.END).setWidth("150px").setFlexGrow(0);
-        grid.setItems(lineas);
         grid.addClassNames("cc-discount-products-grid", "cc-adjustment-products-grid");
-        if (lineas.size() <= 6) grid.setAllRowsVisible(true);
-        else grid.setHeight("300px");
+        grid.setAllRowsVisible(true);
+        paginacionProductos.setTotal(lineas.size());
+        cargarPaginaProductos();
         contador.addClassName("cc-discount-selected-count");
         mensaje.addClassName("cc-discount-selection-message");
-        selector.add(new H4("SELECCIONAR PRODUCTOS"), grid, contador, mensaje);
+        selector.add(new H4("SELECCIONAR PRODUCTOS"), grid, paginacionProductos, contador, mensaje);
+    }
+
+    private void cargarPaginaProductos() {
+        AppPagination.PageRequest pagina = paginacionProductos.currentRequest();
+        int desde = Math.min(pagina.page() * pagina.size(), lineas.size());
+        int hasta = Math.min(desde + pagina.size(), lineas.size());
+        grid.setItems(lineas.subList(desde, hasta));
     }
 
     private void registrar() {
@@ -223,6 +233,7 @@ public class RecargoVentaDialog extends Dialog {
                 tipo.setValue(seleccionado.tipoPredeterminado());
                 if (seleccionado.valorPredeterminado() == null) valor.clear();
                 else valor.setValue(seleccionado.valorPredeterminado());
+                normalizarValorVisual();
                 valor.setReadOnly(!seleccionado.valorEditable());
                 keypad.refresh(valor);
             }
@@ -315,7 +326,7 @@ public class RecargoVentaDialog extends Dialog {
         Div resumen = new Div(
                 fila("Recargo solicitado", new Span(moneda(vista.montoRecargo()))),
                 fila("Máximo porcentaje", new Span(vista.porcentajeMaximoUsuario() == null
-                        ? "Sin límite" : vista.porcentajeMaximoUsuario() + "%")));
+                        ? "Sin límite" : PosNumberFormatter.percentage(vista.porcentajeMaximoUsuario()) + "%")));
         resumen.addClassName("cc-discount-preview");
         dialogo.add(resumen, usuario, clave);
         AppActionButton autorizar = new AppActionButton(ActionType.ACCEPT, ButtonSize.MAIN,
@@ -371,6 +382,20 @@ public class RecargoVentaDialog extends Dialog {
         boolean porcentaje = tipo.getValue() == TipoRecargoVenta.PERCENTAGE;
         valor.setSuffixComponent(porcentaje ? new Span("%") : null);
         valor.setPrefixComponent(porcentaje ? null : new Span(opciones.moneda()));
+        normalizarValorVisual();
+    }
+
+    private void normalizarValorVisual() {
+        BigDecimal actual=valor.getValue();
+        if(actual==null)return;
+        BigDecimal normalizado=tipo.getValue()==TipoRecargoVenta.PERCENTAGE
+                ?PosNumberFormatter.percentageInput(actual):PosNumberFormatter.moneyInput(actual);
+        if(!actual.equals(normalizado))valor.setValue(normalizado);
+    }
+
+    private void mostrarValorFormateado() {
+        if(tipo.getValue()==TipoRecargoVenta.PERCENTAGE)PosNumberFormatter.showPercentage(valor);
+        else PosNumberFormatter.showMoney(valor);
     }
 
     private void limpiar() {
@@ -385,12 +410,11 @@ public class RecargoVentaDialog extends Dialog {
     }
 
     private String moneda(BigDecimal valor) {
-        return opciones.moneda() + " " + String.format(Locale.US, "%,.2f",
-                valor == null ? BigDecimal.ZERO : valor);
+        return opciones.moneda() + " " + PosNumberFormatter.money(valor);
     }
 
     private static String cantidad(BigDecimal valor) {
-        return valor == null ? "0" : valor.stripTrailingZeros().toPlainString();
+        return PosNumberFormatter.quantity(valor);
     }
 
     private static String nombre(LineaVistaPreviaRecargoInput linea) {

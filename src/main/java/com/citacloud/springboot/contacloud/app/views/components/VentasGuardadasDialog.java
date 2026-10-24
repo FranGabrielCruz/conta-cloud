@@ -39,7 +39,7 @@ public class VentasGuardadasDialog extends Dialog {
     private final Runnable alCerrar;
     private final TextField buscar = new TextField();
     private final Grid<VentaGuardadaResumenDto> grid = new Grid<>();
-    private final AppPagination paginacion;
+    private final PosDialogPagination paginacion;
     private final AppActionButton guardarActual;
     private final boolean puedeConsultar;
     private List<VentaGuardadaResumenDto> visibles = List.of();
@@ -78,7 +78,7 @@ public class VentasGuardadasDialog extends Dialog {
         actualizarVentaActual(ventaActualDisponible);
 
         configurarGrid();
-        paginacion = new AppPagination(r -> cargar(), 10, 10);
+        paginacion = new PosDialogPagination(r -> cargar());
         paginacion.setVisible(puedeConsultar);
         buscar.addValueChangeListener(e -> {
             if (e.isFromClient()) {
@@ -140,7 +140,7 @@ public class VentasGuardadasDialog extends Dialog {
                 .setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
         grid.addComponentColumn(this::acciones).setHeader("Acciones").setWidth("100px").setFlexGrow(0);
         grid.setSelectionMode(Grid.SelectionMode.SINGLE);
-        // El repositorio ya pagina de 10 en 10. El Grid solo autoajusta su altura
+        // El repositorio ya pagina en backend. El Grid solo autoajusta su altura
         // a las filas de la página actual; no provoca la carga del histórico completo.
         grid.setAllRowsVisible(true);
         grid.setEmptyStateText(puedeConsultar ? "No hay ventas guardadas."
@@ -262,7 +262,7 @@ public class VentasGuardadasDialog extends Dialog {
     }
 
     private static String money(BigDecimal value) {
-        return String.format(Locale.US, "%,.2f", value);
+        return PosNumberFormatter.money(value);
     }
 
     private static void error(RuntimeException error, String fallback) {

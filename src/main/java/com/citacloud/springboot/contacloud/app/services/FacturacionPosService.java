@@ -4,9 +4,12 @@ import com.citacloud.springboot.contacloud.app.dto.*;
 import com.citacloud.springboot.contacloud.app.models.*;
 import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.*;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,7 @@ public class FacturacionPosService {
     private final BankAccountRepository cuentasBancarias;
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
     private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;
+    @Autowired private CotizacionRepository cotizaciones;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
@@ -110,6 +114,20 @@ public class FacturacionPosService {
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.crear')")
+    public Page<ProductoPosDto> buscarProductosPagina(String token,UUID almacenId,String texto,int pagina){
+        if(pagina<0)throw new ReglaNegocioException("La página solicitada no es válida.");
+        ContextoPos ctx=contexto(token,false,almacenId);String q=limpiar(texto);
+        return productos.buscarParaVenta(ctx.principal.tenantId(),ctx.empresa,ctx.caja.getMonedaId(),q,
+                PageRequest.of(pagina,PosPaginationPolicy.DIALOG_DEFAULT_PAGE_SIZE,
+                        Sort.by("nombre").and(Sort.by("codigo")).and(Sort.by("id"))))
+            .map(p->new ProductoPosDto(p.getId(),p.getCodigo(),p.getNombre(),p.getCodigoBarras(),p.getUnidadMedida().getAbreviatura(),
+                p.getPrecioVenta(),p.getImpuestoVenta()!=null&&p.getImpuestoVenta().isActivo()?p.getImpuestoVenta().getPorcentaje():BigDecimal.ZERO,
+                p.isControlaExistencia()?existencias.saldo(ctx.principal.tenantId(),ctx.empresa,ctx.almacen.getId(),p.getId()):BigDecimal.ZERO,
+                p.isControlaExistencia(),p.isPermiteExistenciaNegativa(),p.isPermiteDescuentos(),p.isPermiteRecargos()));
+    }
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.crear')")
     public void validarCantidad(String token,UUID almacenId,UUID productoId,BigDecimal cantidad){
         if(productoId==null||cantidad==null||cantidad.signum()<=0)
             throw new ReglaNegocioException("La cantidad debe ser mayor que cero.");
@@ -160,6 +178,16 @@ public class FacturacionPosService {
         if(existente.isPresent()){idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",existente.get().getId());return resultado(existente.get());}
         if(input.lineas()==null||input.lineas().isEmpty())throw new ReglaNegocioException("Agrega al menos un producto o servicio.");
         if(input.lineas().size()>200)throw new ReglaNegocioException("La factura excede el máximo de 200 líneas.");
+        Cotizacion cotizacionOrigen=null;Map<UUID,LineaCotizacion> lineasCotizacion=new HashMap<>();
+        if(input.cotizacionOrigenId()!=null){
+            cotizacionOrigen=cotizaciones.bloquear(input.cotizacionOrigenId(),p.tenantId(),empresa)
+                .orElseThrow(()->new RecursoNoEncontradoException("Cotización no encontrada."));
+            if(cotizacionOrigen.getEstado()!=EstadoCotizacion.ENVIADA&&cotizacionOrigen.getEstado()!=EstadoCotizacion.ACEPTADA)
+                throw new ReglaNegocioException("La cotización ya no está disponible para facturar.");
+            if(!cotizacionOrigen.getMonedaId().equals(ctx.caja.getMonedaId()))
+                throw new ReglaNegocioException("La moneda de la cotización no coincide con la moneda de la caja.");
+            cotizacionOrigen.getLineas().forEach(l->lineasCotizacion.put(l.getId(),l));
+        }
         Set<UUID> ids=new HashSet<>();List<CalculoLinea> calculosBase=new ArrayList<>();List<LineaVistaPreviaDescuentoInput> lineasDescuento=new ArrayList<>();
         Map<UUID,Producto> productosBloqueados=new HashMap<>();
         input.lineas().stream().filter(Objects::nonNull).map(LineaVentaInput::productoId).filter(Objects::nonNull).distinct()
@@ -173,7 +201,13 @@ public class FacturacionPosService {
             Producto producto=productosBloqueados.get(entrada.productoId());
             if(!producto.isActivo()||producto.getPrecioVenta()==null)throw new ReglaNegocioException("El producto "+producto.getNombre()+" no está disponible para venta.");
             if(!ctx.caja.getMonedaId().equals(producto.getMonedaId()))throw new ReglaNegocioException("El producto "+producto.getNombre()+" utiliza una moneda distinta a la caja.");
-            BigDecimal precio=producto.getPrecioVenta().setScale(SCALE,RoundingMode.HALF_UP);
+            LineaCotizacion lineaCotizada=input.cotizacionOrigenId()==null?null:lineasCotizacion.get(entrada.cotizacionLineaOrigenId());
+            if(entrada.cotizacionLineaOrigenId()!=null&&lineaCotizada==null)
+                throw new ReglaNegocioException("Una línea ya no pertenece a la cotización seleccionada.");
+            if(lineaCotizada!=null&&!lineaCotizada.getProductoId().equals(producto.getId()))
+                throw new ReglaNegocioException("El producto no coincide con la línea cotizada.");
+            if(lineaCotizada!=null){BigDecimal convertida=jdbc.queryForObject("select coalesce(sum(converted_quantity),0) from sales_quote_line_conversion where tenant_id=? and empresa_id=? and sales_quote_line_id=?",BigDecimal.class,p.tenantId(),empresa,lineaCotizada.getId());BigDecimal pendiente=lineaCotizada.getCantidad().subtract(convertida==null?BigDecimal.ZERO:convertida);if(cantidad.compareTo(pendiente)>0)throw new ReglaNegocioException("La cantidad de "+producto.getNombre()+" supera lo pendiente de la cotización.");}
+            BigDecimal precio=(lineaCotizada==null?producto.getPrecioVenta():lineaCotizada.getPrecioUnitario()).setScale(SCALE,RoundingMode.HALF_UP);
             if(entrada.precioEsperado()==null||precio.compareTo(entrada.precioEsperado().setScale(SCALE,RoundingMode.HALF_UP))!=0)
                 throw new ReglaNegocioException("El precio de "+producto.getNombre()+" cambió. Actualiza la venta antes de cobrar.");
             Impuesto tax=producto.getImpuestoVenta()!=null&&producto.getImpuestoVenta().isActivo()?producto.getImpuestoVenta():null;
@@ -184,18 +218,24 @@ public class FacturacionPosService {
                 if(disponible.compareTo(cantidad)<0)throw new ReglaNegocioException("Existencia insuficiente para "+producto.getNombre()+".");
             }
             UUID lineaId=entrada.lineaId()==null?producto.getId():entrada.lineaId();
-            calculosBase.add(new CalculoLinea(lineaId,producto,cantidad,precio,bruto,BigDecimal.ZERO,BigDecimal.ZERO,bruto,tax,BigDecimal.ZERO,BigDecimal.ZERO));
+            calculosBase.add(new CalculoLinea(lineaId,producto,cantidad,precio,bruto,BigDecimal.ZERO,BigDecimal.ZERO,bruto,tax,BigDecimal.ZERO,BigDecimal.ZERO,entrada.cotizacionLineaOrigenId()));
             lineasDescuento.add(new LineaVistaPreviaDescuentoInput(lineaId,producto.getId(),producto.getNombre(),cantidad,precio,tasa,producto.isPermiteDescuentos()));
         }
         DescuentoVentaService.ValidacionConfirmacion descuentoValidado=descuentos.validarConfirmacion(input.idempotencia(),input.descuento(),lineasDescuento);
         Map<UUID,VistaPreviaDescuentoDto.Asignacion> asignaciones=new HashMap<>();
         descuentoValidado.vista().asignaciones().forEach(x->asignaciones.put(x.lineaId(),x));
+        if(cotizacionOrigen!=null)for(LineaVentaInput entrada:input.lineas()){
+            CalculoLinea base=calculosBase.stream().filter(c->c.lineaId.equals(entrada.lineaId())).findFirst().orElseThrow();
+            BigDecimal d=escala(entrada.descuentoCotizado());if(d.compareTo(base.subtotalBruto)>0)throw new ReglaNegocioException("El descuento cotizado supera el subtotal de "+base.producto.getNombre()+".");
+            BigDecimal bi=base.subtotalBruto.subtract(d);BigDecimal tax=bi.multiply(base.impuesto==null?BigDecimal.ZERO:base.impuesto.getPorcentaje()).divide(new BigDecimal("100"),SCALE,RoundingMode.HALF_UP);
+            asignaciones.put(base.lineaId,new VistaPreviaDescuentoDto.Asignacion(base.lineaId,base.producto.getId(),base.subtotalBruto,d,bi,tax,bi.add(tax)));
+        }
         List<LineaVistaPreviaRecargoInput> lineasRecargo=new ArrayList<>();
         for(CalculoLinea base:calculosBase){VistaPreviaDescuentoDto.Asignacion a=asignaciones.get(base.lineaId);lineasRecargo.add(new LineaVistaPreviaRecargoInput(base.lineaId,base.producto.getId(),base.producto.getNombre(),base.cantidad,base.precio,base.impuesto==null?BigDecimal.ZERO:base.impuesto.getPorcentaje(),a==null?BigDecimal.ZERO:a.descuento(),base.producto.isPermiteRecargos()));}
         RecargoVentaService.ValidacionConfirmacion recargoValidado=recargos.validarConfirmacion(input.idempotencia(),input.recargo(),lineasRecargo);
         Map<UUID,VistaPreviaRecargoDto.Asignacion> asignacionesRecargo=new HashMap<>();recargoValidado.vista().asignaciones().forEach(x->asignacionesRecargo.put(x.lineaId(),x));
         List<CalculoLinea> calculos=new ArrayList<>();BigDecimal subtotal=BigDecimal.ZERO,descuentoTotal=BigDecimal.ZERO,recargoTotal=BigDecimal.ZERO,impuestos=BigDecimal.ZERO,total=BigDecimal.ZERO;
-        for(CalculoLinea base:calculosBase){VistaPreviaDescuentoDto.Asignacion a=asignaciones.get(base.lineaId);VistaPreviaRecargoDto.Asignacion r=asignacionesRecargo.get(base.lineaId);if(a==null||r==null)throw new ReglaNegocioException("No fue posible reconciliar los ajustes de la venta.");CalculoLinea c=new CalculoLinea(base.lineaId,base.producto,base.cantidad,base.precio,a.subtotalBruto(),a.descuento(),r.recargo(),r.baseImponible(),base.impuesto,r.impuesto(),r.total());calculos.add(c);subtotal=subtotal.add(c.subtotalBruto);descuentoTotal=descuentoTotal.add(c.descuento);recargoTotal=recargoTotal.add(c.recargo);impuestos=impuestos.add(c.impuestoMonto);total=total.add(c.total);}
+        for(CalculoLinea base:calculosBase){VistaPreviaDescuentoDto.Asignacion a=asignaciones.get(base.lineaId);VistaPreviaRecargoDto.Asignacion r=asignacionesRecargo.get(base.lineaId);if(a==null||r==null)throw new ReglaNegocioException("No fue posible reconciliar los ajustes de la venta.");CalculoLinea c=new CalculoLinea(base.lineaId,base.producto,base.cantidad,base.precio,a.subtotalBruto(),a.descuento(),r.recargo(),r.baseImponible(),base.impuesto,r.impuesto(),r.total(),base.cotizacionLineaOrigenId);calculos.add(c);subtotal=subtotal.add(c.subtotalBruto);descuentoTotal=descuentoTotal.add(c.descuento);recargoTotal=recargoTotal.add(c.recargo);impuestos=impuestos.add(c.impuestoMonto);total=total.add(c.total);}
         List<AplicacionValidada> cobros=validarAplicaciones(input.aplicaciones(),total,ctx,p.permisos());
         BigDecimal aplicado=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::monto).toList());
         BigDecimal cambio=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::cambio).toList());
@@ -234,12 +274,14 @@ public class FacturacionPosService {
             ",\"descuento\":"+descuentoTotal+",\"recargo\":"+recargoTotal+",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
         descuentos.consumirAutorizacion(descuentoValidado.autorizacionId(),factura.getId());
         recargos.consumirAutorizacion(recargoValidado.autorizacionId(),factura.getId());
+        if(cotizacionOrigen!=null&&calculos.stream().anyMatch(c->c.cotizacionLineaOrigenId!=null))
+            registrarConversionCotizacion(cotizacionOrigen,factura,calculos,p.usuarioId());
         ventasGuardadas.completarDesdeFactura(input.ventaGuardadaId(),factura.getId(),p.usuarioId(),ctx.terminal.getId(),p.tenantId(),empresa);
         idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",factura.getId());
         return resultado(factura);
     }
 
-    private static String fingerprint(ConfirmarVentaInput i){return CommandFingerprint.sha256(new Object[]{i.token(),i.almacenId(),i.clienteId(),i.nota(),i.ventaGuardadaId(),i.descuento(),i.recargo(),i.lineas(),i.aplicaciones()});}
+    private static String fingerprint(ConfirmarVentaInput i){return CommandFingerprint.sha256(new Object[]{i.token(),i.almacenId(),i.clienteId(),i.nota(),i.ventaGuardadaId(),i.descuento(),i.recargo(),i.cotizacionOrigenId(),i.lineas(),i.aplicaciones()});}
 
     private List<AplicacionValidada> validarAplicaciones(List<AplicacionCobroInput> entradas,BigDecimal total,ContextoPos ctx,Set<String> permisos){
         if(entradas==null||entradas.isEmpty())throw new ReglaNegocioException("Agrega al menos un método de pago.");
@@ -281,6 +323,20 @@ public class FacturacionPosService {
         if(comparacion<0)throw new ReglaNegocioException("El cobro está incompleto. Queda un saldo pendiente de "+total.subtract(aplicado).setScale(2,RoundingMode.HALF_UP)+".");
         if(comparacion>0)throw new ReglaNegocioException("El total aplicado no puede superar el total de la venta.");
         return resultado;
+    }
+
+    private void registrarConversionCotizacion(Cotizacion cotizacion,FacturaVenta factura,List<CalculoLinea> calculos,UUID usuario){
+        UUID enlace=UUID.randomUUID();
+        jdbc.update("insert into sales_quote_document_link(id,tenant_id,empresa_id,sales_quote_id,document_type,document_id,document_number,document_status,created_by) values(?,?,?,?,?,?,?,?,?)",
+            enlace,factura.getTenantId(),factura.getEmpresaId(),cotizacion.getId(),"SALES_INVOICE",factura.getId(),factura.getNumero(),"CONFIRMED",usuario);
+        for(CalculoLinea linea:calculos)if(linea.cotizacionLineaOrigenId!=null)jdbc.update(
+            "insert into sales_quote_line_conversion(id,tenant_id,empresa_id,sales_quote_line_id,document_link_id,converted_quantity) values(?,?,?,?,?,?)",
+            UUID.randomUUID(),factura.getTenantId(),factura.getEmpresaId(),linea.cotizacionLineaOrigenId,enlace,linea.cantidad);
+        boolean completa=cotizacion.getLineas().stream().allMatch(l->{BigDecimal cantidad=jdbc.queryForObject(
+            "select coalesce(sum(converted_quantity),0) from sales_quote_line_conversion where tenant_id=? and empresa_id=? and sales_quote_line_id=?",
+            BigDecimal.class,factura.getTenantId(),factura.getEmpresaId(),l.getId());return cantidad!=null&&cantidad.compareTo(l.getCantidad())>=0;});
+        if(completa){cotizacion.marcarConvertida(usuario);cotizacion.registrarEvento("CONVERTIDA","Cotización convertida completamente en factura "+factura.getNumero()+".",usuario);cotizaciones.saveAndFlush(cotizacion);}
+        auditoria.registrar(completa?"SALES_QUOTE_CONVERTED":"SALES_QUOTE_PARTIALLY_CONVERTED","Cotizacion",cotizacion.getId(),"{\"facturaId\":\""+factura.getId()+"\"}");
     }
 
     private void registrarMovimientoCobro(ContextoPos ctx,FacturaVenta factura,AplicacionPagoVenta aplicacion,AplicacionValidada cobro,UUID usuario){
@@ -337,7 +393,7 @@ public class FacturacionPosService {
     private static String nuevoToken(){byte[] bytes=new byte[32];new SecureRandom().nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     private static String hash(String value){try{byte[] b=MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));return HexFormat.of().formatHex(b);}catch(NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}}
     private record ContextoPos(com.citacloud.springboot.contacloud.app.security.TenantPrincipal principal,UUID empresa,TerminalPos terminal,Caja caja,SesionCaja sesion,Almacen almacen){}
-    private record CalculoLinea(UUID lineaId,Producto producto,BigDecimal cantidad,BigDecimal precio,BigDecimal subtotalBruto,BigDecimal descuento,BigDecimal recargo,BigDecimal baseImponible,Impuesto impuesto,BigDecimal impuestoMonto,BigDecimal total){}
+    private record CalculoLinea(UUID lineaId,Producto producto,BigDecimal cantidad,BigDecimal precio,BigDecimal subtotalBruto,BigDecimal descuento,BigDecimal recargo,BigDecimal baseImponible,Impuesto impuesto,BigDecimal impuestoMonto,BigDecimal total,UUID cotizacionLineaOrigenId){}
     private record AplicacionValidada(MetodoPagoVenta metodo,BigDecimal monto,BigDecimal recibido,BigDecimal cambio,
                                       CuentaBancaria cuenta,String referencia,String banco){}
 }

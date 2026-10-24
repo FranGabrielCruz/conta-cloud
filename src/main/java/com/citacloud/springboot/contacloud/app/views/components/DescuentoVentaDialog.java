@@ -35,6 +35,7 @@ public class DescuentoVentaDialog extends Dialog {
     private final TextArea detalle = new TextArea("Detalle");
     private final VerticalLayout selector = new VerticalLayout();
     private final Grid<LineaVistaPreviaDescuentoInput> grid = new Grid<>();
+    private final PosDialogPagination paginacionProductos = new PosDialogPagination(r -> cargarPaginaProductos());
     private final Checkbox seleccionarTodos = new Checkbox();
     private final Span contador = new Span();
     private final Span mensajeSeleccion = new Span();
@@ -60,6 +61,8 @@ public class DescuentoVentaDialog extends Dialog {
         tipo.setItemLabelGenerator(x -> x == TipoDescuentoVenta.PERCENTAGE ? "Porcentaje %" : "Monto");
         tipo.setValue(actual == null ? disponiblesTipo().getFirst() : actual.tipo());
         valor.setWidthFull(); valor.setAriaLabel("Valor"); if (actual != null) valor.setValue(actual.valor());
+        valor.addBlurListener(e -> { normalizarValorVisual(); mostrarValorFormateado(); });
+        valor.addFocusListener(e -> PosNumberFormatter.showQuantity(valor));
         motivo.setItems(opciones.motivos()); motivo.setItemLabelGenerator(ConfiguracionDescuentoDto.Motivo::nombre);
         motivo.setClearButtonVisible(!opciones.requiereMotivo()); motivo.setRequiredIndicatorVisible(false); motivo.setAriaLabel("Motivo"); motivo.setWidthFull();
         if (actual != null && actual.motivoId() != null) motivo.setValue(opciones.motivos().stream().filter(x -> x.id().equals(actual.motivoId())).findFirst().orElse(null));
@@ -105,10 +108,17 @@ public class DescuentoVentaDialog extends Dialog {
         }).setKey("producto").setHeader("Producto").setWidth("auto").setFlexGrow(1);
         grid.addColumn(x -> cantidad(x.cantidad())).setKey("cantidad").setHeader("Cant.").setTextAlign(ColumnTextAlign.END).setWidth("90px").setFlexGrow(0);
         grid.addColumn(x -> moneda(importe(x))).setKey("importe").setHeader("Importe").setTextAlign(ColumnTextAlign.END).setWidth("150px").setFlexGrow(0);
-        grid.setItems(lineas); grid.addClassNames("cc-discount-products-grid", "cc-adjustment-products-grid");
-        if (lineas.size() <= 6) grid.setAllRowsVisible(true); else grid.setHeight("300px");
+        grid.addClassNames("cc-discount-products-grid", "cc-adjustment-products-grid");
+        grid.setAllRowsVisible(true); paginacionProductos.setTotal(lineas.size()); cargarPaginaProductos();
         contador.addClassName("cc-discount-selected-count"); mensajeSeleccion.addClassName("cc-discount-selection-message");
-        selector.add(titulo, grid, contador, mensajeSeleccion);
+        selector.add(titulo, grid, paginacionProductos, contador, mensajeSeleccion);
+    }
+
+    private void cargarPaginaProductos() {
+        AppPagination.PageRequest pagina = paginacionProductos.currentRequest();
+        int desde = Math.min(pagina.page() * pagina.size(), lineas.size());
+        int hasta = Math.min(desde + pagina.size(), lineas.size());
+        grid.setItems(lineas.subList(desde, hasta));
     }
 
     private void registrarCambios() {
@@ -162,14 +172,16 @@ public class DescuentoVentaDialog extends Dialog {
     private SolicitudVistaPreviaDescuentoInput solicitud(UUID autorizacion) { ConfiguracionDescuentoDto.Motivo m = motivo.getValue(); List<UUID> ids = alcance.getValue() == AlcanceDescuentoVenta.LINE ? List.copyOf(seleccionadas) : List.of(); DescuentoVentaInput d = new DescuentoVentaInput(alcance.getValue(), tipo.getValue(), valor.getValue(), ids, m == null ? null : m.id(), detalle.isVisible() ? detalle.getValue() : null, autorizacion); return new SolicitudVistaPreviaDescuentoInput(operacionId, d, lineas); }
     private List<AlcanceDescuentoVenta> disponiblesAlcance() { List<AlcanceDescuentoVenta> x = new ArrayList<>(); if (opciones.permiteVenta()) x.add(AlcanceDescuentoVenta.SALE); if (opciones.permiteLinea()) x.add(AlcanceDescuentoVenta.LINE); if (x.isEmpty()) throw new ReglaNegocioException("No hay alcances de descuento habilitados."); return x; }
     private List<TipoDescuentoVenta> disponiblesTipo() { List<TipoDescuentoVenta> x = new ArrayList<>(); if (opciones.permitePorcentaje()) x.add(TipoDescuentoVenta.PERCENTAGE); if (opciones.permiteMonto()) x.add(TipoDescuentoVenta.AMOUNT); if (x.isEmpty()) throw new ReglaNegocioException("No hay tipos de descuento habilitados."); return x; }
-    private void actualizarFormatoValor() { boolean porcentaje = tipo.getValue() == TipoDescuentoVenta.PERCENTAGE; valor.setSuffixComponent(porcentaje ? new Span("%") : null); valor.setPrefixComponent(porcentaje ? null : new Span(opciones.moneda())); }
+    private void actualizarFormatoValor() { boolean porcentaje = tipo.getValue() == TipoDescuentoVenta.PERCENTAGE; valor.setSuffixComponent(porcentaje ? new Span("%") : null); valor.setPrefixComponent(porcentaje ? null : new Span(opciones.moneda())); normalizarValorVisual(); }
+    private void normalizarValorVisual() { BigDecimal actual = valor.getValue(); if (actual == null) return; BigDecimal normalizado = tipo.getValue() == TipoDescuentoVenta.PERCENTAGE ? PosNumberFormatter.percentageInput(actual) : PosNumberFormatter.moneyInput(actual); if (!actual.equals(normalizado)) valor.setValue(normalizado); }
+    private void mostrarValorFormateado() { if (tipo.getValue() == TipoDescuentoVenta.PERCENTAGE) PosNumberFormatter.showPercentage(valor); else PosNumberFormatter.showMoney(valor); }
     private void limpiarVista() { ultimaVista = null; base.setText("—"); descuento.setText("—"); posterior.setText("—"); if (confirmar != null) confirmar.setEnabled(false); }
     private BigDecimal importe(LineaVistaPreviaDescuentoInput l) { return (l.precioEsperado() == null ? BigDecimal.ZERO : l.precioEsperado()).multiply(l.cantidad() == null ? BigDecimal.ZERO : l.cantidad()); }
     private String nombre(LineaVistaPreviaDescuentoInput l) { return l.productoNombre() == null || l.productoNombre().isBlank() ? "Producto" : l.productoNombre(); }
-    private String moneda(BigDecimal v) { return opciones.moneda() + " " + String.format(Locale.US, "%,.2f", v == null ? BigDecimal.ZERO : v); }
-    private String cantidad(BigDecimal v) { return v == null ? "0" : v.stripTrailingZeros().toPlainString(); }
-    private String porcentajeMonto(VistaPreviaDescuentoDto v) { return String.format(Locale.US, "%.2f%% · %s", v.porcentajeEfectivo(), moneda(v.montoDescuento())); }
-    private String limite(VistaPreviaDescuentoDto v) { String p = v.porcentajeMaximoUsuario() == null ? "Sin límite" : String.format(Locale.US, "%.2f%%", v.porcentajeMaximoUsuario()); String m = v.montoMaximoUsuario() == null ? "Sin límite" : moneda(v.montoMaximoUsuario()); return p + " · " + m; }
+    private String moneda(BigDecimal v) { return opciones.moneda() + " " + PosNumberFormatter.money(v); }
+    private String cantidad(BigDecimal v) { return PosNumberFormatter.quantity(v); }
+    private String porcentajeMonto(VistaPreviaDescuentoDto v) { return PosNumberFormatter.percentage(v.porcentajeEfectivo()) + "% · " + moneda(v.montoDescuento()); }
+    private String limite(VistaPreviaDescuentoDto v) { String p = v.porcentajeMaximoUsuario() == null ? "Sin límite" : PosNumberFormatter.percentage(v.porcentajeMaximoUsuario()) + "%"; String m = v.montoMaximoUsuario() == null ? "Sin límite" : moneda(v.montoMaximoUsuario()); return p + " · " + m; }
     private static Div grupoCampo(String etiqueta, boolean requerido, Component control) { Span label = new Span(etiqueta + (requerido ? " *" : "")); label.addClassName("cc-adjustment-inline-label"); Div grupo = new Div(label, control); grupo.addClassName("cc-adjustment-field-group"); return grupo; }
     private static Div metrica(String etiqueta, Span valor) { Span label = new Span(etiqueta); label.addClassName("cc-adjustment-summary-label"); Div d = new Div(label, valor); d.addClassName("cc-adjustment-summary-metric"); return d; }
     private static Div fila(String etiqueta, Span valor) { Div d = new Div(new Span(etiqueta), valor); d.addClassName("cc-discount-preview-row"); return d; }

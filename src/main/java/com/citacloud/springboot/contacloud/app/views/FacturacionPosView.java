@@ -17,7 +17,10 @@ import com.citacloud.springboot.contacloud.app.views.components.ButtonSize;
 import com.citacloud.springboot.contacloud.app.views.components.DescuentoVentaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.RecargoVentaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.DevolucionesVentasDialog;
+import com.citacloud.springboot.contacloud.app.views.components.CargarCotizacionDialog;
+import com.citacloud.springboot.contacloud.app.views.components.PosDialogPagination;
 import com.citacloud.springboot.contacloud.app.views.components.PosNumericKeypad;
+import com.citacloud.springboot.contacloud.app.views.components.PosNumberFormatter;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -55,6 +58,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final RecargoVentaService recargosService;
     private final DevolucionVentaService devolucionesService;
     private final DevolucionVentaPdfService devolucionesPdf;
+    private final CotizacionService cotizacionesService;
+    private final CotizacionPosService cotizacionPosService;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -80,6 +85,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private RecargoVentaDialog dialogoRecargoActivo;
     private Dialog dialogoLimpiarActivo;
     private DevolucionesVentasDialog dialogoDevolucionesActivo;
+    private CargarCotizacionDialog dialogoCotizacionesActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -91,6 +97,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private UUID ventaGuardadaActivaId;
     private String ventaGuardadaActivaNumero;
     private String referenciaVentaGuardada;
+    private UUID cotizacionOrigenId;
     private Button guardarVentaRapida;
     private Button limpiarVentaRapida;
 
@@ -98,6 +105,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
                               DescuentoVentaService descuentosService, RecargoVentaService recargosService,
                               DevolucionVentaService devolucionesService, DevolucionVentaPdfService devolucionesPdf,
+                              CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -108,6 +116,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.recargosService = recargosService;
         this.devolucionesService = devolucionesService;
         this.devolucionesPdf = devolucionesPdf;
+        this.cotizacionesService = cotizacionesService;
+        this.cotizacionPosService = cotizacionPosService;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -315,6 +325,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         ventaGuardadaActivaId = null;
         ventaGuardadaActivaNumero = null;
         referenciaVentaGuardada = null;
+        cotizacionOrigenId = null;
         idempotencia = UUID.randomUUID();
         actualizarTotales();
         actualizarEstadoLimpiar();
@@ -435,7 +446,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private Component campoCantidad(Fila fila) {
         BigDecimalField cantidad = new BigDecimalField();
-        cantidad.setValue(fila.cantidad);
+        cantidad.setValue(PosNumberFormatter.quantityInput(fila.cantidad));
         cantidad.addClassName("cc-pos-quantity");
         cantidad.setAriaLabel("Cantidad de " + fila.nombre);
         tecladoNumerico.bind(cantidad, fila.lineaId,
@@ -455,17 +466,18 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void cambiarCantidad(Fila fila, BigDecimal nuevaCantidad, BigDecimalField campo) {
         if (!CantidadPosCalculo.valida(nuevaCantidad)) {
-            campo.setValue(fila.cantidad);
+            campo.setValue(PosNumberFormatter.quantityInput(fila.cantidad));
             Notification.show("La cantidad mínima es 1.");
             return;
         }
         try {
             service.validarCantidad(token, terminal.almacenId(), fila.id, nuevaCantidad);
             fila.cantidad = nuevaCantidad;
-            campo.setValue(nuevaCantidad);
+            fila.recalcularDescuentoCotizado();
+            campo.setValue(PosNumberFormatter.quantityInput(nuevaCantidad));
             ventaModificada();
         } catch (RuntimeException ex) {
-            campo.setValue(fila.cantidad);
+            campo.setValue(PosNumberFormatter.quantityInput(fila.cantidad));
             error(ex, "No fue posible actualizar la cantidad.");
         }
     }
@@ -592,7 +604,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private boolean tieneVentaEnCurso() {
         return tieneDatosVenta(filas.size(), clienteSeleccionado != null, descuentoVenta, recargoVenta,
-                observacion.getValue(), ventaGuardadaActivaId);
+                observacion.getValue(), ventaGuardadaActivaId) || cotizacionOrigenId != null;
     }
 
     static boolean tieneDatosVenta(int productos, boolean clienteSeleccionado, BigDecimal descuento,
@@ -619,7 +631,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void configurarMasAcciones(Button target) {
         ContextMenu menu = new ContextMenu(target);
         menu.setOpenOnClick(true);
-        menu.addItem("Cargar cotización", e -> pendiente("Cargar cotización"));
+        if (puede("cotizaciones.ver")) menu.addItem("Cargar cotización", e -> dialogoCargarCotizacion());
         menu.addItem("Apartados", e -> pendiente("Apartados"));
         menu.addItem("Recibos / Cobros", e -> pendiente("Recibos / Cobros"));
         if (puede("ventas_guardadas.consultar")) menu.addItem("Ventas guardadas", e -> dialogoVentasGuardadas());
@@ -693,11 +705,21 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         resultados.addColumn(ProductoPosDto::unidad).setHeader("Unidad").setAutoWidth(true);
         resultados.addColumn(p -> terminal.monedaCodigo() + " " + dinero(p.precio())).setHeader("Precio")
                 .setAutoWidth(true).setTextAlign(ColumnTextAlign.END);
+        PosDialogPagination[] paginacion = new PosDialogPagination[1];
         Runnable cargar = () -> {
-            try { resultados.setItems(service.buscarProductos(token, terminal.almacenId(), filtro.getValue(), 0, 30)); }
-            catch (RuntimeException ex) { error(ex, "No fue posible buscar productos."); }
+            try {
+                var pagina = service.buscarProductosPagina(token, terminal.almacenId(), filtro.getValue(),
+                        paginacion[0].currentRequest().page());
+                resultados.setItems(pagina.getContent());
+                paginacion[0].setTotal(pagina.getTotalElements());
+            } catch (RuntimeException ex) {
+                resultados.setItems(List.of());
+                paginacion[0].setTotal(0);
+                error(ex, "No fue posible buscar productos.");
+            }
         };
-        filtro.addValueChangeListener(e -> cargar.run());
+        paginacion[0] = new PosDialogPagination(request -> cargar.run());
+        filtro.addValueChangeListener(e -> { paginacion[0].reset(); cargar.run(); });
         if (!soloConsulta) {
             resultados.addItemDoubleClickListener(e -> seleccionarProducto(dialog, e.getItem()));
             Button seleccionar = new Button("Agregar producto", VaadinIcon.PLUS.create(), e -> {
@@ -708,7 +730,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             seleccionar.addClassName("cc-pos-primary");
             dialog.getFooter().add(seleccionar);
         }
-        dialog.add(filtro, resultados);
+        dialog.add(filtro, resultados, paginacion[0]);
         cargar.run();
         dialog.open();
         filtro.focus();
@@ -848,6 +870,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                 try {
                     service.validarCantidad(token, terminal.almacenId(), fila.id, nuevaCantidad);
                     fila.cantidad = nuevaCantidad;
+                    fila.recalcularDescuentoCotizado();
                     ventaModificada();
                 } catch (RuntimeException ex) { error(ex, "No fue posible aumentar la cantidad."); }
                 return;
@@ -1042,10 +1065,12 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             guardar.setEnabled(false);
             try {
                 List<LineaVentaGuardadaInput> detalle = filas.stream().map(f ->
-                        new LineaVentaGuardadaInput(f.lineaId, f.id, f.cantidad, f.precio, f.tasa)).toList();
+                        new LineaVentaGuardadaInput(f.lineaId, f.id, f.cantidad, f.precio, f.tasa,
+                                f.cotizacionLineaOrigenId,f.descuento)).toList();
                 VentaGuardadaResultadoDto resultado = ventasGuardadas.guardar(new GuardarVentaInput(ventaGuardadaActivaId,
                         token, terminal.almacenId(), clienteSeleccionado == null ? null : clienteSeleccionado.id(),
-                        referencia.getValue(), nota.getValue(), descuentoVenta, recargoVenta, descuentoActual, recargoActual, detalle));
+                        referencia.getValue(), nota.getValue(), descuentoVenta, recargoVenta, descuentoActual, recargoActual,
+                        cotizacionOrigenId, detalle));
                 dialog.close();
                 Notification.show("Venta " + resultado.numero() + " guardada.");
                 prepararNuevaVenta();
@@ -1090,6 +1115,55 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         dialog.open();
     }
 
+    private void dialogoCargarCotizacion() {
+        reiniciarDobleEnter();
+        if (dialogoCotizacionesActivo != null && dialogoCotizacionesActivo.isOpened()) return;
+        if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
+        if (!puede("cotizaciones.ver")) {
+            Notification.show("No tienes permiso para consultar cotizaciones.");
+            return;
+        }
+        suspenderTecladoNumerico();
+        CargarCotizacionDialog dialog = new CargarCotizacionDialog(cotizacionesService, this::cargarCotizacion);
+        dialogoCotizacionesActivo = dialog;
+        dialog.addOpenedChangeListener(event -> {
+            if (!event.isOpened() && dialogoCotizacionesActivo == dialog) {
+                dialogoCotizacionesActivo = null;
+                enfocarProducto();
+            }
+        });
+        dialog.open();
+    }
+
+    private void cargarCotizacion(UUID id) {
+        if (tieneVentaEnCurso()) {
+            Dialog aviso=dialogo("No se puede cargar la cotización");
+            aviso.add(new Paragraph("Hay una venta en curso. Guárdela o límpiela antes de cargar una cotización."));
+            aviso.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->aviso.close()));
+            aviso.open();
+            return;
+        }
+        try {
+            CotizacionPosCargaDto carga=cotizacionPosService.cargar(token,terminal.almacenId(),id);
+            List<Fila> nuevas=new ArrayList<>();
+            for(CotizacionPosCargaDto.Linea linea:carga.lineas()) {
+                Fila fila=new Fila(UUID.randomUUID(),linea.producto(),linea.cotizacionLineaId(),linea.descuentoUnitario());
+                fila.cantidad=linea.cantidad();
+                fila.descuento=linea.descuentoUnitario().multiply(linea.cantidad()).setScale(4,RoundingMode.HALF_UP);
+                nuevas.add(fila);
+            }
+            filas.clear();filas.addAll(nuevas);cotizacionOrigenId=carga.cotizacionId();
+            seleccionarCliente(carga.cliente());idempotencia=UUID.randomUUID();
+            descuentoVenta=filas.stream().map(f->f.descuento).reduce(BigDecimal.ZERO,BigDecimal::add);
+            refrescar();
+            if(dialogoCotizacionesActivo!=null)dialogoCotizacionesActivo.close();
+            Notification.show("Cotización "+carga.numero()+" cargada.");
+            enfocarProducto();
+        } catch(RuntimeException ex) {
+            error(ex,"No fue posible cargar la cotización.");
+        }
+    }
+
     private void recuperarVentaGuardada(UUID id, Dialog listado) {
         if (!filas.isEmpty()) {
             Notification.show("Hay una venta en curso. Guárdela o límpiela antes de recuperar otra venta.");
@@ -1100,13 +1174,16 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             filas.clear();
             for (VentaGuardadaRecuperadaDto.Producto p : venta.productos()) {
                 Fila fila = new Fila(p.lineaId(), new ProductoPosDto(p.id(), p.codigo(), p.nombre(), null, p.unidad(), p.precio(),
-                        p.tasaImpuesto(), p.existencia(), p.controlaExistencia(), p.permiteNegativo(), p.permiteDescuentos(), p.permiteRecargos()));
+                        p.tasaImpuesto(), p.existencia(), p.controlaExistencia(), p.permiteNegativo(), p.permiteDescuentos(), p.permiteRecargos()),
+                        p.cotizacionLineaOrigenId(),p.cantidad().signum()==0?BigDecimal.ZERO:p.descuento().divide(p.cantidad(),4,RoundingMode.HALF_UP));
                 fila.cantidad = p.cantidad();
+                fila.descuento = p.descuento();
                 filas.add(fila);
             }
             ventaGuardadaActivaId = venta.id();
             ventaGuardadaActivaNumero = venta.numero();
             referenciaVentaGuardada = venta.referencia();
+            cotizacionOrigenId = venta.cotizacionOrigenId();
             idempotencia = UUID.randomUUID();
             descuentoActual = venta.detalleDescuento();
             if (descuentoActual != null) {
@@ -1176,10 +1253,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
         try {
-            List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.lineaId, f.id, f.cantidad, f.precio)).toList();
+            List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.lineaId, f.id, f.cantidad, f.precio,
+                    f.cotizacionLineaOrigenId,f.descuento)).toList();
             FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token, terminal.almacenId(),
                     clienteSeleccionado == null ? null : clienteSeleccionado.id(), observacion.getValue(),
-                    idempotencia, ventaGuardadaActivaId, descuentoActual, recargoActual, lineas, aplicaciones));
+                    idempotencia, ventaGuardadaActivaId, descuentoActual, recargoActual,cotizacionOrigenId,lineas, aplicaciones));
             dialog.close();
             Notification.show("Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
             abrirPdf(resultado);
@@ -1271,11 +1349,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     static String dinero(BigDecimal valor) {
-        return String.format(Locale.US, "%,.2f", valor == null ? BigDecimal.ZERO : valor);
+        return PosNumberFormatter.money(valor);
     }
 
     private static String formatoCantidad(BigDecimal valor) {
-        return valor == null ? "0" : valor.stripTrailingZeros().toPlainString();
+        return PosNumberFormatter.quantity(valor);
     }
 
     private static String valor(String valor, String defecto) {
@@ -1299,6 +1377,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         private final boolean permiteDescuentos;
         private final boolean permiteRecargos;
         private final boolean permiteFracciones;
+        private final UUID cotizacionLineaOrigenId;
+        private final BigDecimal descuentoUnitarioCotizado;
         private BigDecimal cantidad = BigDecimal.ONE;
         private BigDecimal descuento = BigDecimal.ZERO;
         private BigDecimal recargo = BigDecimal.ZERO;
@@ -1308,6 +1388,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
 
         private Fila(UUID lineaId, ProductoPosDto producto) {
+            this(lineaId,producto,null,BigDecimal.ZERO);
+        }
+
+        private Fila(UUID lineaId, ProductoPosDto producto,UUID cotizacionLineaOrigenId,BigDecimal descuentoUnitarioCotizado) {
             this.lineaId = lineaId == null ? UUID.randomUUID() : lineaId;
             id = producto.id();
             codigo = producto.codigo();
@@ -1320,12 +1404,15 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             permiteDescuentos = producto.permiteDescuentos();
             permiteRecargos = producto.permiteRecargos();
             permiteFracciones = permiteFracciones(producto.unidad());
+            this.cotizacionLineaOrigenId=cotizacionLineaOrigenId;
+            this.descuentoUnitarioCotizado=descuentoUnitarioCotizado==null?BigDecimal.ZERO:descuentoUnitarioCotizado;
         }
 
         private String codigo() { return codigo; }
         private String nombre() { return nombre; }
         private String unidad() { return unidad; }
         private BigDecimal base() { return precio.multiply(cantidad).setScale(4, RoundingMode.HALF_UP); }
+        private void recalcularDescuentoCotizado(){if(cotizacionLineaOrigenId!=null)descuento=descuentoUnitarioCotizado.multiply(cantidad).setScale(4,RoundingMode.HALF_UP);}
         private BigDecimal baseImponible() { return base().subtract(descuento).add(recargo).setScale(4, RoundingMode.HALF_UP); }
         private BigDecimal impuesto() { return baseImponible().multiply(tasa).divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP); }
         private BigDecimal total() { return baseImponible().add(impuesto()); }

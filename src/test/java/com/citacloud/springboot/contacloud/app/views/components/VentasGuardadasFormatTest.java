@@ -28,7 +28,7 @@ class VentasGuardadasFormatTest {
 
         assertThat(dialog)
                 .contains("Guardar venta actual", "Recuperar venta", "Descartar venta",
-                        "Buscar por ID, referencia o cliente...", "new AppPagination(r -> cargar(), 10, 10)",
+                        "Buscar por ID, referencia o cliente...", "new PosDialogPagination(r -> cargar())",
                         "No hay ventas guardadas.", "ventaActualGuardada()")
                 .doesNotContain("Factura", "Cobrar");
     }
@@ -51,7 +51,7 @@ class VentasGuardadasFormatTest {
         String css = read("src/main/frontend/themes/contacloud/styles.css");
 
         assertThat(dialog)
-                .contains("grid.setAllRowsVisible(true)", "new AppPagination(r -> cargar(), 10, 10)",
+                .contains("grid.setAllRowsVisible(true)", "new PosDialogPagination(r -> cargar())",
                         "setMaxHeight(\"94vh\")")
                 .doesNotContain("grid.setHeightFull()", "setHeight(\"min(720px, 94vh)\")");
         assertThat(css)

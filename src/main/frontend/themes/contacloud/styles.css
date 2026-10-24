@@ -449,7 +449,7 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-payment-editor > div:last-child { display: flex; align-items: center; justify-content: flex-end; gap: var(--lumo-space-m); }
 .cc-pos-payment-change { margin-right: auto; font-weight: 800; color: var(--lumo-success-text-color); }
 .cc-pos-payment-apply { background: var(--lumo-primary-color); color: var(--lumo-primary-contrast-color); }
-.cc-pos-payment-grid { width: 100%; height: min(210px, 24vh); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); overflow: hidden; }
+.cc-pos-payment-grid { width: 100%; height: auto; min-height: 0; border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); overflow: hidden; }
 .cc-pos-payment-grid::part(row) { min-height: 42px; }
 .cc-pos-payment-summary { display: flex; flex-direction: column; align-self: flex-end; width: min(360px, 100%); padding-top: var(--lumo-space-s); border-top: 1px solid var(--lumo-contrast-20pct); }
 .cc-pos-payment-summary-row { display: flex; justify-content: space-between; gap: var(--lumo-space-xl); padding: 3px 0; }
@@ -601,7 +601,6 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
-    height: 100%;
     min-height: 0;
 }
 
@@ -617,8 +616,10 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 }
 
 .cc-latest-invoices-grid {
-    min-height: 300px;
-    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
 }
 
 .cc-latest-invoice-customer,
@@ -631,6 +632,20 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-latest-invoice-customer {
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.cc-load-quote-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: 100%;
+    min-height: 0;
+}
+
+.cc-load-quote-grid {
+    width: 100%;
+    height: auto;
+    min-height: 0;
 }
 
 .cc-latest-invoice-amount {

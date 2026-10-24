@@ -29,17 +29,17 @@ class UltimasFacturasServiceTest {
 
     @Test void buscaHistoricoNormalizandoIdentificacionConPaginacionFija(){autenticar(false,Set.of(sucursal));
         when(facturas.buscarHistorico(eq(tenant),eq(empresa),eq(false),eq(Set.of(sucursal)),eq("031-0543974-3"),eq("03105439743"),
-                isNull(),isNull(),isNull(),any(Pageable.class))).thenReturn(Page.empty(PageRequest.of(0,10)));
+                isNull(),isNull(),isNull(),any(Pageable.class))).thenReturn(Page.empty(PageRequest.of(0,5)));
         service.buscar(" 031-0543974-3 ",null,null,null,0);
         verify(facturas).buscarHistorico(eq(tenant),eq(empresa),eq(false),eq(Set.of(sucursal)),eq("031-0543974-3"),eq("03105439743"),
-                isNull(),isNull(),isNull(),argThat(p->p.getPageNumber()==0&&p.getPageSize()==10));}
+                isNull(),isNull(),isNull(),argThat(p->p.getPageNumber()==0&&p.getPageSize()==5));}
 
     @Test void noRestringePorCajeroYPermiteAlcanceMultisucursal(){autenticar(true,Set.of());
         when(facturas.buscarHistorico(eq(tenant),eq(empresa),eq(true),anyCollection(),eq("fac-000125"),eq("000125"),isNull(),isNull(),
-                eq(EstadoFacturaVenta.CONFIRMED),any(Pageable.class))).thenReturn(Page.empty(PageRequest.of(2,10)));
+                eq(EstadoFacturaVenta.CONFIRMED),any(Pageable.class))).thenReturn(Page.empty(PageRequest.of(2,5)));
         service.buscar("FAC-000125",null,null,EstadoFacturaVenta.CONFIRMED,2);
         verify(facturas).buscarHistorico(eq(tenant),eq(empresa),eq(true),anyCollection(),eq("fac-000125"),eq("000125"),isNull(),isNull(),
-                eq(EstadoFacturaVenta.CONFIRMED),argThat(p->p.getPageNumber()==2));}
+                eq(EstadoFacturaVenta.CONFIRMED),argThat(p->p.getPageNumber()==2&&p.getPageSize()==5));}
 
     @Test void rechazaRangoInvertidoAntesDeConsultar(){autenticar(true,Set.of());
         assertThatThrownBy(()->service.buscar("",LocalDate.of(2026,10,20),LocalDate.of(2026,10,19),null,0))

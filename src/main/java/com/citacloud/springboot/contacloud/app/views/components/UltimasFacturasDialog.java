@@ -19,7 +19,6 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -27,7 +26,6 @@ import java.util.function.Consumer;
 
 public class UltimasFacturasDialog extends Dialog {
     private static final DateTimeFormatter FECHA_HORA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final DecimalFormat IMPORTE=new DecimalFormat("#,##0.00");
     private final UltimasFacturasService service;
     private final Consumer<UUID> reimprimir;
     private final Runnable devolverFoco;
@@ -36,20 +34,20 @@ public class UltimasFacturasDialog extends Dialog {
     private final Select<EstadoFacturaVenta> estado=new Select<>();
     private final Grid<FacturaVentaResumenDto> grid=new Grid<>();
     private final ProgressBar cargando=new ProgressBar();
-    private final AppPagination paginacion;
+    private final PosDialogPagination paginacion;
     private List<FacturaVentaResumenDto> resultados=List.of();
     private boolean cargandoDatos;
 
     public UltimasFacturasDialog(UltimasFacturasService service,Consumer<UUID> reimprimir,Runnable devolverFoco){
         this.service=Objects.requireNonNull(service);this.reimprimir=Objects.requireNonNull(reimprimir);
         this.devolverFoco=Objects.requireNonNull(devolverFoco);
-        setHeaderTitle("ÚLTIMAS FACTURAS");setWidth("min(1180px, 96vw)");setHeight("min(760px, 94vh)");
+        setHeaderTitle("ÚLTIMAS FACTURAS");setWidth("min(1180px, 96vw)");setMaxHeight("94vh");
         addClassName("cc-latest-invoices-dialog");setCloseOnEsc(true);setCloseOnOutsideClick(false);
         Button cerrarCabecera=new Button(VaadinIcon.CLOSE.create(),e->close());
         cerrarCabecera.addClassName("cc-pos-icon-button");cerrarCabecera.setTooltipText("Cerrar");
         cerrarCabecera.getElement().setAttribute("aria-label","Cerrar últimas facturas");getHeader().add(cerrarCabecera);
         configurarFiltros();configurarGrid();
-        paginacion=new AppPagination(r->cargar(),10,10);
+        paginacion=new PosDialogPagination(r->cargar());
         cargando.setIndeterminate(true);cargando.setVisible(false);cargando.addClassName("cc-latest-invoices-loading");
         Div filtros=new Div(buscar,desde,hasta,estado);filtros.addClassName("cc-latest-invoices-filters");
         Div cuerpo=new Div(filtros,cargando,grid,paginacion);cuerpo.addClassName("cc-latest-invoices-body");add(cuerpo);
@@ -77,14 +75,14 @@ public class UltimasFacturasDialog extends Dialog {
                 .setTextAlign(ColumnTextAlign.END);
         grid.addComponentColumn(f->badge(f.estado())).setHeader("Estado").setWidth("125px").setFlexGrow(0);
         grid.addComponentColumn(this::acciones).setHeader("Acciones").setWidth("105px").setFlexGrow(0);
-        grid.setSelectionMode(Grid.SelectionMode.SINGLE);grid.setAllRowsVisible(false);grid.setHeightFull();
+        grid.setSelectionMode(Grid.SelectionMode.SINGLE);grid.setAllRowsVisible(true);
         grid.setEmptyStateText("No se encontraron facturas.");grid.addItemDoubleClickListener(e->abrirDetalle(e.getItem()));
         grid.addClassName("cc-latest-invoices-grid");
     }
 
     private Component cliente(FacturaVentaResumenDto factura){Span nombre=new Span(valor(factura.cliente()));nombre.addClassName("cc-latest-invoice-customer");
         nombre.getElement().setAttribute("title",valor(factura.cliente()));return nombre;}
-    private Component importe(String moneda,BigDecimal total){Span valor=new Span(valor(moneda)+" "+IMPORTE.format(total));valor.addClassName("cc-latest-invoice-amount");return valor;}
+    private Component importe(String moneda,BigDecimal total){Span valor=new Span(valor(moneda)+" "+PosNumberFormatter.money(total));valor.addClassName("cc-latest-invoice-amount");return valor;}
     private Component acciones(FacturaVentaResumenDto factura){HorizontalLayout acciones=new HorizontalLayout();acciones.addClassName("cc-grid-actions");acciones.setPadding(false);acciones.setSpacing(false);
         acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver factura",e->abrirDetalle(factura)));
         if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PRINT,ButtonSize.GRID_ACTION,"Reimprimir factura",e->reimprimir.accept(factura.id())));
@@ -121,10 +119,10 @@ public class UltimasFacturasDialog extends Dialog {
             cabecera.addClassName("cc-latest-invoice-general");
             Grid<FacturaVentaDetalleDto.Linea> lineas=new Grid<>();lineas.addColumn(FacturaVentaDetalleDto.Linea::producto).setHeader("Producto").setFlexGrow(1);
             lineas.addColumn(FacturaVentaDetalleDto.Linea::unidad).setHeader("Unidad").setWidth("105px").setFlexGrow(0);
-            lineas.addColumn(l->IMPORTE.format(l.cantidad())).setHeader("Cantidad").setWidth("110px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-            lineas.addColumn(l->IMPORTE.format(l.precio())).setHeader("Precio").setWidth("120px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-            lineas.addColumn(l->IMPORTE.format(l.impuesto())).setHeader("Impuesto").setWidth("120px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-            lineas.addColumn(l->IMPORTE.format(l.total())).setHeader("Total").setWidth("130px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+            lineas.addColumn(l->PosNumberFormatter.quantity(l.cantidad())).setHeader("Cantidad").setWidth("110px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+            lineas.addColumn(l->PosNumberFormatter.money(l.precio())).setHeader("Precio").setWidth("120px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+            lineas.addColumn(l->PosNumberFormatter.money(l.impuesto())).setHeader("Impuesto").setWidth("120px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+            lineas.addColumn(l->PosNumberFormatter.money(l.total())).setHeader("Total").setWidth("130px").setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
             lineas.setItems(factura.lineas());lineas.setAllRowsVisible(true);lineas.addClassName("cc-latest-invoice-lines");
             Div totales=totales(factura);Div pagos=pagos(factura);Div contenido=new Div(cabecera,new H3("PRODUCTOS"),lineas,totales,pagos);
             contenido.addClassName("cc-latest-invoice-detail-body");detalle.add(contenido);
@@ -140,12 +138,12 @@ public class UltimasFacturasDialog extends Dialog {
         bloque.add(fila("Impuestos",f.moneda(),f.impuestos()),fila("TOTAL",f.moneda(),f.total()));return bloque;}
     private Div pagos(FacturaVentaDetalleDto f){Div bloque=new Div(new H3("PAGO"));bloque.addClassName("cc-latest-invoice-payments");
         if(f.pagos().isEmpty()){bloque.add(new Span("No hay información de pago disponible."));return bloque;}
-        for(var pago:f.pagos()){StringBuilder texto=new StringBuilder(pago.metodo()).append(" · ").append(f.moneda()).append(' ').append(IMPORTE.format(pago.monto()));
-            if(pago.recibido()!=null)texto.append(" · Recibido ").append(f.moneda()).append(' ').append(IMPORTE.format(pago.recibido()));
-            if(pago.cambio()!=null&&pago.cambio().signum()>0)texto.append(" · Cambio ").append(f.moneda()).append(' ').append(IMPORTE.format(pago.cambio()));
+        for(var pago:f.pagos()){StringBuilder texto=new StringBuilder(pago.metodo()).append(" · ").append(f.moneda()).append(' ').append(PosNumberFormatter.money(pago.monto()));
+            if(pago.recibido()!=null)texto.append(" · Recibido ").append(f.moneda()).append(' ').append(PosNumberFormatter.money(pago.recibido()));
+            if(pago.cambio()!=null&&pago.cambio().signum()>0)texto.append(" · Cambio ").append(f.moneda()).append(' ').append(PosNumberFormatter.money(pago.cambio()));
             if(pago.referencia()!=null&&!pago.referencia().isBlank())texto.append(" · Ref. ").append(pago.referencia());bloque.add(new Span(texto.toString()));}
         return bloque;}
-    private Div fila(String etiqueta,String moneda,BigDecimal importe){Div fila=new Div(new Span(etiqueta),new Span(moneda+" "+IMPORTE.format(importe)));fila.addClassName("cc-latest-invoice-total-row");
+    private Div fila(String etiqueta,String moneda,BigDecimal importe){Div fila=new Div(new Span(etiqueta),new Span(moneda+" "+PosNumberFormatter.money(importe)));fila.addClassName("cc-latest-invoice-total-row");
         if("TOTAL".equals(etiqueta))fila.addClassName("cc-latest-invoice-grand-total");return fila;}
     private static Span badge(EstadoFacturaVenta estado){Span badge=new Span(estado(estado));badge.getElement().getThemeList().add("badge "+(estado==EstadoFacturaVenta.VOIDED?"error":"success"));return badge;}
     static String estado(EstadoFacturaVenta estado){return estado==EstadoFacturaVenta.VOIDED?"Anulada":"Pagada";}

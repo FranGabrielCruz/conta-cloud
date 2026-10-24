@@ -50,6 +50,27 @@ public class CotizacionService {
 
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('cotizaciones.ver')")
+    public Page<CotizacionDto> buscarParaPos(String texto,int pagina){
+        return buscarParaPos(texto,null,null,null,pagina);
+    }
+
+    @Transactional
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('cotizaciones.ver')")
+    public Page<CotizacionDto> buscarParaPos(String texto,LocalDate desde,LocalDate hasta,EstadoCotizacion estado,int pagina){
+        if(pagina<0)throw new ReglaNegocioException("La página solicitada no es válida.");
+        if(desde!=null&&hasta!=null&&hasta.isBefore(desde))throw new ReglaNegocioException("La fecha final no puede ser anterior a la fecha inicial.");
+        if(estado!=null&&estado!=EstadoCotizacion.ENVIADA&&estado!=EstadoCotizacion.ACEPTADA)
+            throw new ReglaNegocioException("El estado seleccionado no está disponible para cargar.");
+        var p=TenantContext.principalActual();cotizaciones.marcarVencidas(p.tenantId(),p.empresaId(),LocalDate.now(),OffsetDateTime.now());
+        Sort orden=Sort.by(Sort.Direction.DESC,"fecha").and(Sort.by(Sort.Direction.DESC,"creadaEn")).and(Sort.by(Sort.Direction.DESC,"id"));
+        String buscar=limpiar(texto);
+        return cotizaciones.buscarParaPos(p.tenantId(),p.empresaId(),buscar,normalizar(buscar),desde,hasta,estado,
+            List.of(EstadoCotizacion.ENVIADA,EstadoCotizacion.ACEPTADA),
+            PageRequest.of(pagina,PosPaginationPolicy.DIALOG_DEFAULT_PAGE_SIZE,orden)).map(mapper::toSummaryDto);
+    }
+
+    @Transactional
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('cotizaciones.ver')")
     public CotizacionDto obtener(UUID id){var p=TenantContext.principalActual();cotizaciones.marcarVencidas(p.tenantId(),p.empresaId(),LocalDate.now(),OffsetDateTime.now());return mapper.toDto(segura(id));}
 
     @Transactional(readOnly=true)
