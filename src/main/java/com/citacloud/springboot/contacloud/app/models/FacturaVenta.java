@@ -29,6 +29,9 @@ public class FacturaVenta {
     @Column(name="currency_code",nullable=false,length=3) private String monedaCodigo;
     @Column(name="currency_symbol",length=10) private String monedaSimbolo;
     @Column(name="payment_condition",nullable=false,length=30) private String condicionPago;
+    @Column(name="payment_term_id") private UUID condicionPagoId;
+    @Column(name="credit_days") private Integer diasCredito;
+    @Column(name="due_date") private LocalDate vencimiento;
     @Column(length=1000) private String note;
     @Column(nullable=false,precision=19,scale=4) private BigDecimal subtotal;
     @Column(name="discount_total",nullable=false,precision=19,scale=4) private BigDecimal descuentoTotal;
@@ -71,6 +74,12 @@ public class FacturaVenta {
     public BigDecimal getCambio(){return cambio;} public EstadoFacturaVenta getStatus(){return status;}
     public BigDecimal getDescuentoTotal(){return descuentoTotal;} public BigDecimal getRecargoTotal(){return recargoTotal;}
     public void aplicarRecargo(BigDecimal recargo){this.recargoTotal=recargo==null?BigDecimal.ZERO:recargo;}
-    public String getCondicionPago(){return condicionPago;} public UUID getConfirmadaPor(){return confirmadaPor;}
+    public void marcarCredito(UUID condicionPagoId,int diasCredito,LocalDate vencimiento){
+        this.condicionPago="Crédito";this.condicionPagoId=condicionPagoId;this.diasCredito=diasCredito;this.vencimiento=vencimiento;
+        this.recibido=BigDecimal.ZERO.setScale(4);this.cambio=BigDecimal.ZERO.setScale(4);
+    }
+    public String getCondicionPago(){return condicionPago;} public UUID getCondicionPagoId(){return condicionPagoId;}
+    public Integer getDiasCredito(){return diasCredito;} public LocalDate getVencimiento(){return vencimiento;}
+    public UUID getConfirmadaPor(){return confirmadaPor;}
     private static String normalizarIdentificacion(String valor){return valor==null?null:valor.replaceAll("\\D","");}
 }

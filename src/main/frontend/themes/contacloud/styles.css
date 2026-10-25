@@ -14,6 +14,11 @@ html {
   --cc-action-view: #0969da;
   --cc-action-neutral: #667085;
   --cc-action-danger: #c92a2a;
+  --cc-payment-cash: #16803d;
+  --cc-payment-credit: #155eef;
+  --cc-payment-debit: #0891b2;
+  --cc-payment-transfer: #7c3aed;
+  --cc-payment-multiple: #d97706;
   --cc-button-main-size: 40px;
   --cc-button-main-icon-size: 22px;
   --cc-button-grid-size: 32px;
@@ -62,6 +67,11 @@ html[theme~="dark"] {
   --cc-action-view: #75b6ff;
   --cc-action-neutral: #aab4c4;
   --cc-action-danger: #ff7676;
+  --cc-payment-cash: #47c477;
+  --cc-payment-credit: #6ea8fe;
+  --cc-payment-debit: #45c7e6;
+  --cc-payment-transfer: #ad8afa;
+  --cc-payment-multiple: #f5ad42;
   color-scheme: dark;
 }
 
@@ -429,8 +439,9 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-cash-label { display: block; color: var(--lumo-secondary-text-color); font-weight: 800; text-align: center; }
 .cc-pos-cash-total { display: block; font-size: var(--lumo-font-size-xxxl); font-weight: 900; margin: var(--lumo-space-xs) 0 var(--lumo-space-m); text-align: center; color: var(--lumo-primary-text-color); }
 .cc-pos-change { display: block; margin-top: var(--lumo-space-s); font-size: var(--lumo-font-size-l); font-weight: 800; text-align: right; }
-.cc-pos-payment-content { gap: var(--lumo-space-s); }
-.cc-pos-payment-dialog::part(content) { max-height: calc(100vh - 180px); overflow: hidden; }
+.cc-pos-payment-content { gap: var(--lumo-space-s); width: 100%; min-height: 0; box-sizing: border-box; }
+.cc-pos-payment-dialog::part(overlay) { max-height: 96dvh; }
+.cc-pos-payment-dialog::part(content) { min-height: 0; max-height: calc(96dvh - 150px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--lumo-space-m); }
 .cc-pos-payment-total { display: flex; flex-direction: column; gap: 6px; width: 100%; box-sizing: border-box; padding: var(--lumo-space-s) var(--lumo-space-m); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); background: var(--lumo-contrast-5pct); font-weight: 800; }
 .cc-pos-payment-total-row, .cc-pos-payment-change-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--lumo-space-l); width: 100%; min-width: 0; }
 .cc-pos-payment-change-row { padding-top: 6px; border-top: 1px solid var(--lumo-contrast-10pct); }
@@ -440,9 +451,22 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
 .cc-pos-payment-change-value { color: var(--lumo-body-text-color); font-size: clamp(1.65rem, 3.2vw, 2.125rem); font-weight: 850; }
 .cc-pos-payment-change-value.cc-pos-payment-change-positive { color: var(--lumo-success-text-color); }
 .cc-pos-payment-heading { margin: var(--lumo-space-s) 0 0; color: var(--lumo-secondary-text-color); font-size: var(--lumo-font-size-s); letter-spacing: .04em; }
+.cc-pos-credit-customer { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: baseline; gap: var(--lumo-space-s); width: 100%; color: var(--lumo-secondary-text-color); }
+.cc-pos-credit-customer-name { color: var(--lumo-body-text-color); font-weight: 800; }
+.cc-pos-credit-toggle { margin: var(--lumo-space-s) 0; font-weight: 800; }
+.cc-pos-credit-panel { display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box; padding: var(--lumo-space-s) var(--lumo-space-m); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); background: var(--lumo-contrast-5pct); }
+.cc-pos-credit-row { display: flex; justify-content: space-between; gap: var(--lumo-space-l); }
+.cc-pos-credit-row span:last-child { font-weight: 800; font-variant-numeric: tabular-nums; }
+.cc-pos-credit-warning { display: block; height: auto; margin-top: var(--lumo-space-m); margin-bottom: var(--lumo-space-m); color: var(--lumo-error-text-color); font-weight: 700; line-height: 1.45; white-space: normal; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; }
 .cc-pos-payment-methods { width: 100%; flex-wrap: wrap; }
-.cc-pos-payment-method { min-height: 42px; margin: 0; background: var(--lumo-primary-color-10pct); color: var(--lumo-primary-text-color); border: 1px solid var(--lumo-primary-color-50pct); }
-.cc-pos-payment-mode { white-space: nowrap; }
+.cc-pos-payment-method { --cc-payment-method-color: var(--cc-payment-credit); min-height: 42px; margin: 0; background: color-mix(in srgb, var(--cc-payment-method-color) 12%, var(--lumo-base-color)); color: var(--cc-payment-method-color); border: 1px solid var(--cc-payment-method-color); font-weight: 750; }
+.cc-pos-payment-method-cash { --cc-payment-method-color: var(--cc-payment-cash); }
+.cc-pos-payment-method-credit_card { --cc-payment-method-color: var(--cc-payment-credit); }
+.cc-pos-payment-method-debit_card { --cc-payment-method-color: var(--cc-payment-debit); }
+.cc-pos-payment-method-bank_transfer { --cc-payment-method-color: var(--cc-payment-transfer); }
+.cc-pos-payment-method.is-selected, .cc-pos-payment-mode.is-selected { background: var(--cc-payment-method-color); color: #fff; box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-payment-method-color) 35%, transparent); }
+.cc-pos-payment-method.is-selected vaadin-icon, .cc-pos-payment-mode.is-selected vaadin-icon { color: currentColor; }
+.cc-pos-payment-mode { --cc-payment-method-color: var(--cc-payment-multiple); white-space: nowrap; background: color-mix(in srgb, var(--cc-payment-multiple) 12%, var(--lumo-base-color)); color: var(--cc-payment-multiple); border: 1px solid var(--cc-payment-multiple); }
 .cc-pos-payment-editor { width: 100%; box-sizing: border-box; padding: var(--lumo-space-s); border: 1px solid var(--lumo-contrast-20pct); border-radius: var(--lumo-border-radius-m); }
 .cc-pos-payment-fields { flex-wrap: wrap; }
 .cc-pos-payment-fields > * { flex: 1 1 185px; }

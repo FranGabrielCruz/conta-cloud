@@ -69,6 +69,10 @@ public interface ClienteRepository extends JpaRepository<Cliente,UUID> {
         @Param("identificacion")String identificacion,@Param("telefono")String telefono,@Param("activo")Boolean activo,Pageable page);
     @EntityGraph(attributePaths={"condicionPago","moneda","tipoComprobantePreferido"})
     Optional<Cliente> findByIdAndTenantIdAndEmpresaId(UUID id,UUID tenant,UUID empresa);
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths={"condicionPago","moneda"})
+    @Query("select c from Cliente c where c.id=:id and c.tenantId=:tenant and c.empresaId=:empresa")
+    Optional<Cliente> bloquear(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);
     boolean existsByTenantIdAndEmpresaIdAndTipoIdentificacionAndIdentificacionNormalizada(UUID tenant,UUID empresa,
         com.citacloud.springboot.contacloud.app.models.TipoIdentificacionCliente tipo,String identificacion);
     boolean existsByTenantIdAndEmpresaIdAndTipoIdentificacionAndIdentificacionNormalizadaAndIdNot(UUID tenant,UUID empresa,

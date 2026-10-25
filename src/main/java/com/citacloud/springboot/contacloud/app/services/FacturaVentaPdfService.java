@@ -44,7 +44,8 @@ public class FacturaVentaPdfService {
         x.put("companyLogo",logo==null?null:new ByteArrayInputStream(logo));x.put("number",f.getNumero());x.put("date",DATE.format(f.getFecha()));
         x.put("confirmedAt",DATE_TIME.format(f.getConfirmadaEn()));x.put("customerName",f.getClienteNombre());
         x.put("customerId",valor(f.getClienteIdentificacion()));x.put("seller",f.getVendedorNombre());x.put("branch",sucursal);
-        x.put("currency",f.getMonedaCodigo());x.put("paymentCondition",f.getCondicionPago());x.put("notes",f.getNota());
+        x.put("currency",f.getMonedaCodigo());x.put("paymentCondition",f.getCondicionPago());
+        x.put("dueDate",f.getVencimiento()==null?null:DATE.format(f.getVencimiento()));x.put("notes",f.getNota());
         x.put("status",f.getStatus().name());
         x.put("subtotal",f.getSubtotal());x.put("discount",f.getDescuentoTotal());x.put("surcharge",f.getRecargoTotal());x.put("tax",f.getImpuestoTotal());x.put("total",f.getTotal());x.put("received",f.getRecibido());x.put("change",f.getCambio());
         try{return new ArchivoPdfDto("Factura_"+f.getNumero()+".pdf",JasperExportManager.exportReportToPdf(

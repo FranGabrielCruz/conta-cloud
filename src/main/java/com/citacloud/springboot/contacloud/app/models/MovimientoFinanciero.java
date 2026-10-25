@@ -109,6 +109,14 @@ public class MovimientoFinanciero {
             TipoOrigenMovimiento.SALES_PAYMENT,aplicacionId,medioPago,
             tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
     }
+    public static MovimientoFinanciero cobroCliente(UUID tenantId,UUID empresaId,LocalDate fecha,
+            TipoCuentaDinero tipoCuenta,UUID cuentaId,UUID monedaId,BigDecimal monto,String numero,
+            UUID medioReciboId,MedioPagoMovimiento medioPago,UUID sesionCajaId,String referencia,UUID usuarioId){
+        return new MovimientoFinanciero(tenantId,empresaId,TipoMovimientoFinanciero.INCOME,fecha,tipoCuenta,
+            cuentaId,monedaId,monto,"Recibo de cobro "+numero,referencia,"Dinero recibido de cliente",
+            TipoOrigenMovimiento.CUSTOMER_RECEIPT,medioReciboId,medioPago,
+            tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
+    }
     private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion,

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -30,7 +31,7 @@ public class FacturacionPosService {
     private final MetodoPagoVentaRepository metodosPago; private final AplicacionPagoVentaRepository aplicacionesPago;
     private final BankAccountRepository cuentasBancarias;
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
-    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;
+    private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;private final CobroClienteRepository cuentasCobrar;
     @Autowired private CotizacionRepository cotizaciones;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
@@ -39,11 +40,11 @@ public class FacturacionPosService {
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
             FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,
-            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc,IdempotentOperationService idempotency){
+            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc,IdempotentOperationService idempotency,CobroClienteRepository cuentasCobrar){
         this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
-        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.recargos=recargos;this.jdbc=jdbc;this.idempotency=idempotency;
+        this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.recargos=recargos;this.jdbc=jdbc;this.idempotency=idempotency;this.cuentasCobrar=cuentasCobrar;
     }
 
     @Transactional(readOnly=true)
@@ -163,6 +164,28 @@ public class FacturacionPosService {
                 c.getMoneda()==null?"":c.getMoneda().getCodigoIso())).toList();
     }
 
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.cobrar')")
+    public CreditoVentaPosDto creditoDisponible(String token,UUID almacenId,UUID clienteId,BigDecimal total){
+        if(clienteId==null)return null;
+        var p=TenantContext.principalActual();
+        if(!p.permisos().contains("facturas.facturar_credito"))return null;
+        ContextoPos ctx=contexto(token,false,almacenId);
+        Cliente cliente=clientes.findByIdAndTenantIdAndEmpresaId(clienteId,p.tenantId(),ctx.empresa).filter(Cliente::isActivo).orElse(null);
+        if(cliente==null||cliente.getCondicionPago()==null||!cliente.getCondicionPago().isActivo()
+                ||cliente.getCondicionPago().getTipo()!=TipoCondicionPago.CREDIT||cliente.getDiasCredito()<=0
+                ||!ctx.caja.getMonedaId().equals(cliente.getMonedaId()))return null;
+        BigDecimal factura=escala(total);BigDecimal saldo=escala(cuentasCobrar.saldoPendiente(p.tenantId(),ctx.empresa,cliente.getId(),ctx.caja.getMonedaId()));
+        BigDecimal proyectado=saldo.add(factura);BigDecimal limite=escala(cliente.getLimiteCredito());
+        boolean sinLimite=cliente.getControlLimite()==ControlLimiteCredito.NO_CONTROLAR&&limite.signum()==0;
+        boolean excede=cliente.getControlLimite()!=ControlLimiteCredito.NO_CONTROLAR
+                &&proyectado.compareTo(limite)>0;
+        LocalDate fecha=ctx.sesion==null?LocalDate.now():ctx.sesion.getFechaOperativa();
+        return new CreditoVentaPosDto(cliente.getId(),nombreCliente(cliente),cliente.getIdentificacion(),cliente.getDiasCredito(),
+                fecha,fecha.plusDays(cliente.getDiasCredito()),sinLimite?null:limite,saldo,factura,proyectado,
+                cliente.getControlLimite(),excede,p.permisos().contains("facturas.exceder_limite_credito"));
+    }
+
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.cobrar')")
     public FacturaVentaResultadoDto confirmar(ConfirmarVentaInput input){
@@ -236,19 +259,35 @@ public class FacturacionPosService {
         Map<UUID,VistaPreviaRecargoDto.Asignacion> asignacionesRecargo=new HashMap<>();recargoValidado.vista().asignaciones().forEach(x->asignacionesRecargo.put(x.lineaId(),x));
         List<CalculoLinea> calculos=new ArrayList<>();BigDecimal subtotal=BigDecimal.ZERO,descuentoTotal=BigDecimal.ZERO,recargoTotal=BigDecimal.ZERO,impuestos=BigDecimal.ZERO,total=BigDecimal.ZERO;
         for(CalculoLinea base:calculosBase){VistaPreviaDescuentoDto.Asignacion a=asignaciones.get(base.lineaId);VistaPreviaRecargoDto.Asignacion r=asignacionesRecargo.get(base.lineaId);if(a==null||r==null)throw new ReglaNegocioException("No fue posible reconciliar los ajustes de la venta.");CalculoLinea c=new CalculoLinea(base.lineaId,base.producto,base.cantidad,base.precio,a.subtotalBruto(),a.descuento(),r.recargo(),r.baseImponible(),base.impuesto,r.impuesto(),r.total(),base.cotizacionLineaOrigenId);calculos.add(c);subtotal=subtotal.add(c.subtotalBruto);descuentoTotal=descuentoTotal.add(c.descuento);recargoTotal=recargoTotal.add(c.recargo);impuestos=impuestos.add(c.impuestoMonto);total=total.add(c.total);}
-        List<AplicacionValidada> cobros=validarAplicaciones(input.aplicaciones(),total,ctx,p.permisos());
-        BigDecimal aplicado=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::monto).toList());
-        BigDecimal cambio=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::cambio).toList());
-        BigDecimal recibido=total.add(cambio);
-        Cliente cliente=input.clienteId()==null?null:clientes.findByIdAndTenantIdAndEmpresaId(input.clienteId(),p.tenantId(),empresa)
-            .filter(Cliente::isActivo).orElseThrow(()->new RecursoNoEncontradoException("Cliente no encontrado."));
+        Cliente cliente;LocalDate vencimiento=null;boolean excesoCreditoAutorizado=false;
+        List<AplicacionValidada> cobros;BigDecimal aplicado,cambio,recibido;
+        if(input.ventaCredito()){
+            if(!p.permisos().contains("facturas.facturar_credito"))throw new ReglaNegocioException("No tienes permiso para facturar a crédito.");
+            if(input.clienteId()==null)throw new ReglaNegocioException("Selecciona un cliente habilitado para crédito.");
+            cliente=clientes.bloquear(input.clienteId(),p.tenantId(),empresa).filter(Cliente::isActivo)
+                .orElseThrow(()->new ReglaNegocioException("El cliente seleccionado no está disponible."));
+            excesoCreditoAutorizado=validarClienteCredito(cliente,ctx,total,p.permisos());
+            if(input.aplicaciones()!=null&&!input.aplicaciones().isEmpty())throw new ReglaNegocioException("Una factura a crédito no puede incluir pagos inmediatos.");
+            vencimiento=ctx.sesion.getFechaOperativa().plusDays(cliente.getDiasCredito());
+            cobros=List.of();aplicado=BigDecimal.ZERO.setScale(SCALE);cambio=BigDecimal.ZERO.setScale(SCALE);recibido=BigDecimal.ZERO.setScale(SCALE);
+        }else{
+            cliente=input.clienteId()==null?null:clientes.findByIdAndTenantIdAndEmpresaId(input.clienteId(),p.tenantId(),empresa)
+                .filter(Cliente::isActivo).orElseThrow(()->new RecursoNoEncontradoException("Cliente no encontrado."));
+            cobros=validarAplicaciones(input.aplicaciones(),total,ctx,p.permisos());
+            aplicado=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::monto).toList());
+            cambio=CobroVentaCalculo.totalAplicado(cobros.stream().map(AplicacionValidada::cambio).toList());
+            recibido=total.add(cambio);
+        }
         String numero=siguienteNumero(p.tenantId(),empresa);
         FacturaVenta factura=new FacturaVenta(p.tenantId(),empresa,numero,ctx.sesion.getFechaOperativa(),p.usuarioId(),
             ctx.terminal.getId(),ctx.caja.getId(),ctx.sesion.getId(),ctx.caja.getSucursalId(),ctx.almacen.getId(),
             cliente==null?null:cliente.getId(),cliente==null?"Consumidor Final":nombreCliente(cliente),cliente==null?null:cliente.getIdentificacion(),
             p.nombre(),ctx.caja.getMonedaId(),ctx.caja.getMoneda().getCodigoIso(),ctx.caja.getMoneda().getSimbolo(),nota(input.nota()),
-            subtotal,descuentoTotal,impuestos,total,recibido,input.idempotencia());
-        factura.aplicarRecargo(recargoTotal);factura=facturas.saveAndFlush(factura);
+            subtotal,descuentoTotal,impuestos,total,input.ventaCredito()?total:recibido,input.idempotencia());
+        factura.aplicarRecargo(recargoTotal);
+        if(input.ventaCredito())factura.marcarCredito(cliente.getCondicionPagoId(),cliente.getDiasCredito(),vencimiento);
+        factura=facturas.saveAndFlush(factura);
+        if(input.ventaCredito())cuentasCobrar.crearCuenta(p.tenantId(),empresa,factura.getId(),cliente.getId(),ctx.caja.getMonedaId(),total,vencimiento);
         int orden=1;
         for(CalculoLinea c:calculos){
             DescuentoVentaInput descriptor=descuentoValidado.descuento();
@@ -263,15 +302,19 @@ public class FacturacionPosService {
             lineas.saveAndFlush(linea);
             inventario.vender(factura,linea,c.producto,p.usuarioId());
         }
-        PagoVenta pago=pagos.saveAndFlush(new PagoVenta(factura,aplicado,cambio,p.usuarioId()));
-        int ordenPago=1;
-        for(AplicacionValidada cobro:cobros){
-            AplicacionPagoVenta aplicacion=aplicacionesPago.saveAndFlush(new AplicacionPagoVenta(pago,cobro.metodo,cobro.monto,
-                cobro.recibido,cobro.cambio,cobro.cuenta==null?null:cobro.cuenta.getId(),cobro.referencia,cobro.banco,ordenPago++));
-            registrarMovimientoCobro(ctx,factura,aplicacion,cobro,p.usuarioId());
+        if(!input.ventaCredito()){
+            PagoVenta pago=pagos.saveAndFlush(new PagoVenta(factura,aplicado,cambio,p.usuarioId()));
+            int ordenPago=1;
+            for(AplicacionValidada cobro:cobros){
+                AplicacionPagoVenta aplicacion=aplicacionesPago.saveAndFlush(new AplicacionPagoVenta(pago,cobro.metodo,cobro.monto,
+                    cobro.recibido,cobro.cambio,cobro.cuenta==null?null:cobro.cuenta.getId(),cobro.referencia,cobro.banco,ordenPago++));
+                registrarMovimientoCobro(ctx,factura,aplicacion,cobro,p.usuarioId());
+            }
         }
         auditoria.registrar("SALES_INVOICE_CONFIRMED","FacturaVenta",factura.getId(),"{\"numero\":\""+numero+"\",\"total\":"+total+
-            ",\"descuento\":"+descuentoTotal+",\"recargo\":"+recargoTotal+",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
+            ",\"descuento\":"+descuentoTotal+",\"recargo\":"+recargoTotal+",\"ventaCredito\":"+input.ventaCredito()+",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");
+        if(excesoCreditoAutorizado)auditoria.registrar("SALES_CREDIT_LIMIT_OVERRIDE","FacturaVenta",factura.getId(),
+                "{\"clienteId\":\""+cliente.getId()+"\",\"total\":"+total+"}");
         descuentos.consumirAutorizacion(descuentoValidado.autorizacionId(),factura.getId());
         recargos.consumirAutorizacion(recargoValidado.autorizacionId(),factura.getId());
         if(cotizacionOrigen!=null&&calculos.stream().anyMatch(c->c.cotizacionLineaOrigenId!=null))
@@ -281,7 +324,24 @@ public class FacturacionPosService {
         return resultado(factura);
     }
 
-    private static String fingerprint(ConfirmarVentaInput i){return CommandFingerprint.sha256(new Object[]{i.token(),i.almacenId(),i.clienteId(),i.nota(),i.ventaGuardadaId(),i.descuento(),i.recargo(),i.cotizacionOrigenId(),i.lineas(),i.aplicaciones()});}
+    private static String fingerprint(ConfirmarVentaInput i){return CommandFingerprint.sha256(new Object[]{i.token(),i.almacenId(),i.clienteId(),i.nota(),i.ventaGuardadaId(),i.descuento(),i.recargo(),i.cotizacionOrigenId(),i.ventaCredito(),i.lineas(),i.aplicaciones()});}
+
+    private boolean validarClienteCredito(Cliente cliente,ContextoPos ctx,BigDecimal total,Set<String> permisos){
+        if(cliente.getCondicionPago()==null||!cliente.getCondicionPago().isActivo()
+                ||cliente.getCondicionPago().getTipo()!=TipoCondicionPago.CREDIT||cliente.getDiasCredito()<=0)
+            throw new ReglaNegocioException("Las condiciones de crédito del cliente cambiaron. Actualice la información antes de continuar.");
+        if(!ctx.caja.getMonedaId().equals(cliente.getMonedaId()))
+            throw new ReglaNegocioException("La moneda configurada para el crédito del cliente no coincide con la venta.");
+        BigDecimal limite=escala(cliente.getLimiteCredito());
+        if(cliente.getControlLimite()==ControlLimiteCredito.NO_CONTROLAR)return false;
+        BigDecimal saldo=escala(cuentasCobrar.saldoPendiente(ctx.principal.tenantId(),ctx.empresa,cliente.getId(),ctx.caja.getMonedaId()));
+        if(saldo.add(escala(total)).compareTo(limite)<=0)return false;
+        if(cliente.getControlLimite()==ControlLimiteCredito.BLOQUEAR)
+            throw new ReglaNegocioException("El cliente excede el límite de crédito permitido.");
+        if(cliente.getControlLimite()==ControlLimiteCredito.ADVERTIR&&!permisos.contains("facturas.exceder_limite_credito"))
+            throw new ReglaNegocioException("El cliente excede su límite de crédito y no tienes permiso para autorizarlo.");
+        return true;
+    }
 
     private List<AplicacionValidada> validarAplicaciones(List<AplicacionCobroInput> entradas,BigDecimal total,ContextoPos ctx,Set<String> permisos){
         if(entradas==null||entradas.isEmpty())throw new ReglaNegocioException("Agrega al menos un método de pago.");

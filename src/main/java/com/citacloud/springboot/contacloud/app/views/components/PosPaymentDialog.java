@@ -5,6 +5,7 @@ import com.citacloud.springboot.contacloud.app.models.TipoMetodoPagoVenta;
 import com.citacloud.springboot.contacloud.app.services.CobroVentaCalculo;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -16,6 +17,7 @@ import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.textfield.*;
 
 import java.math.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -25,6 +27,8 @@ public class PosPaymentDialog extends Dialog {
     private final List<MetodoPagoPosDto> metodos;
     private final List<CuentaBancariaPosDto> cuentas;
     private final Consumer<List<AplicacionCobroInput>> onConfirmar;
+    private final Consumer<ResultadoCobroPosInput> onConfirmarResultado;
+    private final CreditoVentaPosDto creditoDisponible;
     private final VerticalLayout contenido = new VerticalLayout();
 
     private final BigDecimalField recibidoSimple = new BigDecimalField("Recibido");
@@ -38,6 +42,7 @@ public class PosPaymentDialog extends Dialog {
     private final Button exacto = new Button();
 
     private final List<AplicacionTemporal> aplicaciones = new ArrayList<>();
+    private final Map<TipoMetodoPagoVenta,Button> botonesMetodo = new EnumMap<>(TipoMetodoPagoVenta.class);
     private final Grid<AplicacionTemporal> grid = new Grid<>();
     private final PosDialogPagination paginacionPagos = new PosDialogPagination(r -> cargarPaginaPagos());
     private final BigDecimalField monto = new BigDecimalField("Monto aplicado");
@@ -54,6 +59,7 @@ public class PosPaymentDialog extends Dialog {
     private final Button cancelar = new Button("Cancelar", VaadinIcon.CLOSE.create(), e -> cerrar());
     private final Div accionesFooter = new Div();
     private final Button alternarModo = new Button();
+    private final Checkbox marcarCredito = new Checkbox("Marcar a crédito");
     private final DoubleSpaceDetector doubleSpace = new DoubleSpaceDetector();
     private final PosNumericKeypad keypad = new PosNumericKeypad(PosNumericKeypad.Mode.POPOVER);
     private Button tecladoRecibidoSimple;
@@ -68,15 +74,25 @@ public class PosPaymentDialog extends Dialog {
     private boolean modoMultiple;
     private boolean simpleConfigurado;
     private boolean editorMultipleConfigurado;
+    private boolean modoCredito;
+    private static final DateTimeFormatter FECHA=DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public PosPaymentDialog(BigDecimal total, String moneda, List<MetodoPagoPosDto> metodos,
                             List<CuentaBancariaPosDto> cuentas,
                             Consumer<List<AplicacionCobroInput>> onConfirmar) {
+        this(total,moneda,metodos,cuentas,null,resultado->onConfirmar.accept(resultado.aplicaciones()));
+    }
+
+    public PosPaymentDialog(BigDecimal total,String moneda,List<MetodoPagoPosDto> metodos,
+                            List<CuentaBancariaPosDto> cuentas,CreditoVentaPosDto creditoDisponible,
+                            Consumer<ResultadoCobroPosInput> onConfirmarResultado) {
         this.total = escala(total);
         this.moneda = moneda;
         this.metodos = List.copyOf(metodos);
         this.cuentas = List.copyOf(cuentas);
-        this.onConfirmar = onConfirmar;
+        this.creditoDisponible=creditoDisponible;
+        this.onConfirmarResultado=onConfirmarResultado;
+        this.onConfirmar=pagos->onConfirmarResultado.accept(new ResultadoCobroPosInput(false,pagos));
         setHeaderTitle("COBRAR");
         setWidth("min(900px, 96vw)");
         addClassName("cc-pos-payment-dialog");
@@ -97,6 +113,8 @@ public class PosPaymentDialog extends Dialog {
         exacto.addClassNames("cc-pos-cash-exact", "cc-pos-cash-option");
         exacto.setTooltipText("Usar monto exacto (doble espacio)");
         exacto.addClickListener(e -> usarMontoExacto());
+        marcarCredito.addClassName("cc-pos-credit-toggle");
+        marcarCredito.addValueChangeListener(e->{if(e.isFromClient()){if(Boolean.TRUE.equals(e.getValue()))mostrarCredito();else mostrarSimple();}});
         configurarTecladoNumerico();
         normalizarImportesAlPerderFoco();
         registrarDobleEspacio();
@@ -168,8 +186,18 @@ public class PosPaymentDialog extends Dialog {
         reiniciarDobleEspacio();
         setHeaderTitle("COBRAR");
         modoMultiple = false;
+        modoCredito = false;
+        alternarModo.removeClassName("is-selected");
+        alternarModo.getElement().setAttribute("aria-pressed", "false");
+        confirmar.setText("Confirmar cobro");
+        confirmar.setIcon(VaadinIcon.MONEY.create());
+        confirmar.setTooltipText("Confirmar cobro");
+        confirmar.getElement().setAttribute("aria-label", "Confirmar cobro");
         contenido.removeAll();
-        contenido.add(totalBox(true), titulo("MÉTODO DE PAGO"), accesosMetodos(this::seleccionarSimple), construirSimple());
+        agregarEncabezadoCredito();
+        contenido.add(totalBox(true));
+        if(creditoDisponible!=null)contenido.add(marcarCredito);
+        contenido.add(titulo("MÉTODO DE PAGO"), accesosMetodos(this::seleccionarSimple), construirSimple());
         alternarModo.setText("Pago múltiple");
         alternarModo.setIcon(VaadinIcon.CREDIT_CARD.create());
         alternarModo.setTooltipText("Dividir el cobro entre varios métodos de pago");
@@ -179,6 +207,49 @@ public class PosPaymentDialog extends Dialog {
                         .orElse(metodos.isEmpty() ? null : metodos.getFirst()));
         seleccionarSimple(efectivo);
     }
+
+    private void mostrarCredito(){
+        reiniciarDobleEspacio();keypad.clearTarget();modoMultiple=false;modoCredito=true;aplicaciones.clear();
+        setHeaderTitle("COBRAR");contenido.removeAll();agregarEncabezadoCredito();contenido.add(totalBox(false),marcarCredito,
+                titulo("CONDICIONES DE CRÉDITO"),panelCredito());
+        confirmar.setText("Confirmar");confirmar.setIcon(VaadinIcon.CHECK.create());confirmar.setTooltipText("Confirmar factura a crédito");
+        confirmar.getElement().setAttribute("aria-label","Confirmar factura a crédito");
+        confirmar.setEnabled(!creditoBloqueado());actualizarDisponibilidadAtajoExacto();actualizarFooter();
+    }
+
+    private void agregarEncabezadoCredito(){
+        if(creditoDisponible==null)return;
+        Span nombre=new Span(creditoDisponible.clienteNombre());nombre.addClassName("cc-pos-credit-customer-name");
+        Span identificacion=new Span(creditoDisponible.identificacion()==null||creditoDisponible.identificacion().isBlank()?"":creditoDisponible.identificacion());
+        Div cliente=new Div(new Span("Cliente"),nombre,identificacion);cliente.addClassName("cc-pos-credit-customer");contenido.add(cliente);
+    }
+
+    private Component panelCredito(){
+        Div panel=new Div();panel.addClassName("cc-pos-credit-panel");
+        panel.add(filaCredito("Días de crédito",String.valueOf(creditoDisponible.diasCredito())),
+                filaCredito("Fecha de vencimiento",FECHA.format(creditoDisponible.vencimiento())),
+                filaCredito("Límite de crédito",creditoDisponible.limiteCredito()==null?"Sin límite":dinero(creditoDisponible.limiteCredito())),
+                filaCredito("Saldo CxC actual",dinero(creditoDisponible.saldoActual())),
+                filaCredito("Esta factura",dinero(creditoDisponible.totalFactura())),
+                filaCredito("Saldo proyectado",dinero(creditoDisponible.saldoProyectado())));
+        if(creditoDisponible.excedeLimite()){
+            Span aviso=new Span(creditoDisponible.controlLimite()==com.citacloud.springboot.contacloud.app.models.ControlLimiteCredito.BLOQUEAR
+                    ?"El cliente excede el límite de crédito permitido."
+                    :creditoDisponible.puedeAutorizarExceso()?"El saldo proyectado supera el límite de crédito. Se solicitará confirmación."
+                    :"El saldo proyectado supera el límite y no tienes permiso para autorizarlo.");
+            aviso.addClassName("cc-pos-credit-warning");
+            aviso.getElement().setAttribute("role", "alert");
+            aviso.getElement().setAttribute("aria-live", "polite");
+            panel.add(aviso);
+        }
+        return panel;
+    }
+
+    private static Div filaCredito(String etiqueta,String valor){Div fila=new Div(new Span(etiqueta),new Span(valor));fila.addClassName("cc-pos-credit-row");return fila;}
+
+    private boolean creditoBloqueado(){return creditoDisponible==null||creditoDisponible.excedeLimite()
+            &&(creditoDisponible.controlLimite()==com.citacloud.springboot.contacloud.app.models.ControlLimiteCredito.BLOQUEAR
+            ||!creditoDisponible.puedeAutorizarExceso());}
 
     private Component construirSimple() {
         cuentaSimple.setItems(cuentas);
@@ -232,6 +303,7 @@ public class PosPaymentDialog extends Dialog {
         reiniciarDobleEspacio();
         keypad.clearTarget();
         metodoSimple = metodo;
+        actualizarMetodoSeleccionado(metodo);
         recibidoSimple.clear();
         referenciaSimple.clear();
         cuentaSimple.clear();
@@ -273,6 +345,8 @@ public class PosPaymentDialog extends Dialog {
         reiniciarDobleEspacio();
         setHeaderTitle("COBRAR · PAGO MÚLTIPLE");
         modoMultiple = true;
+        alternarModo.addClassName("is-selected");
+        alternarModo.getElement().setAttribute("aria-pressed", "true");
         actualizarDisponibilidadAtajoExacto();
         contenido.removeAll();
         contenido.add(totalBox(false), titulo("DISTRIBUIR PAGO"), accesosMetodos(this::seleccionarMultiple),
@@ -352,14 +426,18 @@ public class PosPaymentDialog extends Dialog {
 
     private Component accesosMetodos(Consumer<MetodoPagoPosDto> seleccionar) {
         HorizontalLayout accesos = new HorizontalLayout();
+        botonesMetodo.clear();
         accesos.addClassName("cc-pos-payment-methods");
         accesos.setPadding(false);
         accesos.setSpacing(true);
         List<MetodoPagoPosDto> principales = metodosPrincipales(metodos);
         principales.forEach(m -> {
             Button boton = new Button(etiquetaCorta(m), icono(m), e -> seleccionar.accept(m));
-            boton.addClassName("cc-pos-payment-method");
+            boton.addClassNames("cc-pos-payment-method", "cc-pos-payment-method-" + m.tipo().name().toLowerCase(Locale.ROOT));
             boton.setTooltipText(m.nombre());
+            boton.getElement().setAttribute("aria-label", m.nombre());
+            boton.getElement().setAttribute("aria-pressed", "false");
+            botonesMetodo.put(m.tipo(), boton);
             accesos.add(boton);
         });
         accesos.add(alternarModo);
@@ -415,6 +493,7 @@ public class PosPaymentDialog extends Dialog {
         if (metodo == null) return;
         keypad.clearTarget();
         metodoActual = metodo;
+        actualizarMetodoSeleccionado(metodo);
         keypad.setOwner(monto, targetMonto(metodo));
         BigDecimal restante = pendiente().max(BigDecimal.ZERO);
         AplicacionTemporal efectivoExistente = metodo.efectivo()
@@ -507,17 +586,26 @@ public class PosPaymentDialog extends Dialog {
         confirmacion.open();
     }
 
+    private void actualizarMetodoSeleccionado(MetodoPagoPosDto seleccionado) {
+        botonesMetodo.forEach((tipo, boton) -> {
+            boolean activo = seleccionado != null && tipo == seleccionado.tipo();
+            boton.getElement().setAttribute("aria-pressed", String.valueOf(activo));
+            boton.setClassName("is-selected", activo);
+        });
+    }
+
     private void actualizarFooter() {
         getFooter().removeAll();
         accionesFooter.removeAll();
         accionesFooter.add(confirmar, cancelar);
         accionesFooter.addClassName("cc-pos-payment-action-group");
         getFooter().add(accionesFooter);
-        if (modoMultiple) actualizarResumen(); else actualizarSimple();
+        if(modoCredito)confirmar.setEnabled(!creditoBloqueado());else if (modoMultiple) actualizarResumen(); else actualizarSimple();
     }
 
     private void confirmar() {
         reiniciarDobleEspacio();
+        if(modoCredito){confirmarCredito();return;}
         confirmar.setEnabled(false);
         if (modoMultiple) {
             if (pendiente().compareTo(BigDecimal.ZERO) != 0 || aplicaciones.size() < 2) {
@@ -537,8 +625,21 @@ public class PosPaymentDialog extends Dialog {
                 referenciaSimple.getValue().trim(), bancoSimple.getValue().trim())));
     }
 
+    private void confirmarCredito(){
+        if(creditoBloqueado())return;
+        Runnable ejecutar=()->{confirmar.setEnabled(false);onConfirmarResultado.accept(new ResultadoCobroPosInput(true,List.of()));};
+        if(creditoDisponible.excedeLimite()
+                &&creditoDisponible.controlLimite()==com.citacloud.springboot.contacloud.app.models.ControlLimiteCredito.ADVERTIR){
+            ConfirmDialog advertencia=new ConfirmDialog();advertencia.setHeader("Límite de crédito");
+            advertencia.setText("El saldo proyectado supera el límite del cliente. ¿Deseas continuar?");
+            advertencia.setCancelable(true);advertencia.setCancelText("Cancelar");advertencia.setConfirmText("Continuar");
+            advertencia.addConfirmListener(e->ejecutar.run());advertencia.open();return;
+        }
+        ejecutar.run();
+    }
+
     public void reactivarConfirmacion() {
-        if (modoMultiple) actualizarResumen(); else actualizarSimple();
+        if(modoCredito)confirmar.setEnabled(!creditoBloqueado());else if (modoMultiple) actualizarResumen(); else actualizarSimple();
     }
 
     private void usarMontoExacto() {
@@ -551,7 +652,7 @@ public class PosPaymentDialog extends Dialog {
     }
 
     private boolean atajoExactoDisponible() {
-        return isOpened() && !modoMultiple && metodoSimple != null && metodoSimple.efectivo();
+        return isOpened() && !modoCredito && !modoMultiple && metodoSimple != null && metodoSimple.efectivo();
     }
 
     private void actualizarDisponibilidadAtajoExacto() {
@@ -644,8 +745,8 @@ public class PosPaymentDialog extends Dialog {
 
     private static String etiquetaCorta(MetodoPagoPosDto metodo) {
         return switch (metodo.tipo()) {
-            case CREDIT_CARD -> "Crédito";
-            case DEBIT_CARD -> "Débito";
+            case CREDIT_CARD -> "T. crédito";
+            case DEBIT_CARD -> "T. débito";
             case BANK_TRANSFER -> "Transferencia";
             default -> metodo.nombre();
         };

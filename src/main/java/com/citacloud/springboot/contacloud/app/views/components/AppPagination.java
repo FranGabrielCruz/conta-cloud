@@ -27,6 +27,11 @@ public class AppPagination extends Div {
     }
 
     public AppPagination(Consumer<PageRequest> onChange, int defaultPageSize, Integer... availablePageSizes) {
+        this(onChange, defaultPageSize, true, availablePageSizes);
+    }
+
+    protected AppPagination(Consumer<PageRequest> onChange, int defaultPageSize,
+                            boolean showPageSizeSelector, Integer... availablePageSizes) {
         this.onChange = Objects.requireNonNull(onChange);
         List<Integer> sizes = List.of(availablePageSizes);
         if (sizes.isEmpty() || !sizes.contains(defaultPageSize)) {
@@ -60,7 +65,8 @@ public class AppPagination extends Div {
         });
         var navigation = new Div(summary, previous, next);
         navigation.addClassName("cc-pagination-navigation");
-        add(pageSize, navigation);
+        if (showPageSizeSelector) add(pageSize, navigation);
+        else add(navigation);
         refresh();
     }
 

@@ -21,6 +21,7 @@ import com.citacloud.springboot.contacloud.app.views.components.CargarCotizacion
 import com.citacloud.springboot.contacloud.app.views.components.PosDialogPagination;
 import com.citacloud.springboot.contacloud.app.views.components.PosNumericKeypad;
 import com.citacloud.springboot.contacloud.app.views.components.PosNumberFormatter;
+import com.citacloud.springboot.contacloud.app.views.components.RecibosCobrosDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -60,6 +61,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final DevolucionVentaPdfService devolucionesPdf;
     private final CotizacionService cotizacionesService;
     private final CotizacionPosService cotizacionPosService;
+    private final CobroClienteService cobrosCliente;
+    private final CobroClientePdfService cobrosPdf;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -86,6 +89,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private Dialog dialogoLimpiarActivo;
     private DevolucionesVentasDialog dialogoDevolucionesActivo;
     private CargarCotizacionDialog dialogoCotizacionesActivo;
+    private RecibosCobrosDialog dialogoRecibosActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -106,6 +110,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               DescuentoVentaService descuentosService, RecargoVentaService recargosService,
                               DevolucionVentaService devolucionesService, DevolucionVentaPdfService devolucionesPdf,
                               CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
+                              CobroClienteService cobrosCliente, CobroClientePdfService cobrosPdf,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -118,6 +123,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.devolucionesPdf = devolucionesPdf;
         this.cotizacionesService = cotizacionesService;
         this.cotizacionPosService = cotizacionPosService;
+        this.cobrosCliente = cobrosCliente;
+        this.cobrosPdf = cobrosPdf;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -632,11 +639,31 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         ContextMenu menu = new ContextMenu(target);
         menu.setOpenOnClick(true);
         if (puede("cotizaciones.ver")) menu.addItem("Cargar cotización", e -> dialogoCargarCotizacion());
-        menu.addItem("Apartados", e -> pendiente("Apartados"));
-        menu.addItem("Recibos / Cobros", e -> pendiente("Recibos / Cobros"));
+        if (puede("recibos.ver")) menu.addItem("Recibos / Cobros", e -> dialogoRecibos());
         if (puede("ventas_guardadas.consultar")) menu.addItem("Ventas guardadas", e -> dialogoVentasGuardadas());
         menu.addItem("Consultar precio", e -> dialogoProductos(true));
         menu.addItem("Cerrar", e -> menu.close());
+    }
+
+    private void dialogoRecibos() {
+        if (dialogoRecibosActivo != null && dialogoRecibosActivo.isOpened()) return;
+        dialogoRecibosActivo = new RecibosCobrosDialog(cobrosCliente, service, terminal,
+                this::abrirPdfRecibo);
+        dialogoRecibosActivo.addOpenedChangeListener(e -> { if (!e.isOpened()) { dialogoRecibosActivo = null; enfocarProducto(); } });
+        dialogoRecibosActivo.open();
+    }
+
+    private void abrirPdfRecibo(UUID reciboId) {
+        try {
+            ArchivoPdfDto archivo = cobrosPdf.generar(reciboId);
+            StreamResource recurso = new StreamResource(archivo.nombreArchivo(),
+                    () -> new ByteArrayInputStream(archivo.contenido()));
+            recurso.setContentType("application/pdf"); recurso.setCacheTime(0);
+            var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
+            UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
+        } catch (RuntimeException ex) {
+            Notification.show("El recibo fue guardado, pero no fue posible abrir el PDF. Puede reimprimirlo desde Recibos / Cobros.");
+        }
     }
 
     private Button tarjeta(String icono, String nombre, String atajo, String tooltip,
@@ -1013,13 +1040,15 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         suspenderTecladoNumerico();
         BigDecimal totalVenta = filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add);
         try {
+            CreditoVentaPosDto credito = service.creditoDisponible(token,terminal.almacenId(),
+                    clienteSeleccionado==null?null:clienteSeleccionado.id(),totalVenta);
             List<MetodoPagoPosDto> metodos = service.metodosPago();
-            if (metodos.isEmpty()) { Notification.show("No existen métodos de pago activos para esta empresa."); return; }
+            if (metodos.isEmpty()&&credito==null) { Notification.show("No existen métodos de pago activos para esta empresa."); return; }
             List<CuentaBancariaPosDto> cuentas = metodos.stream().anyMatch(m -> m.requiereCuentaBancaria())
                     ? service.cuentasBancarias() : List.of();
             final PosPaymentDialog[] referencia = new PosPaymentDialog[1];
             PosPaymentDialog dialog = new PosPaymentDialog(totalVenta, terminal.monedaCodigo(), metodos,
-                    cuentas, aplicaciones -> confirmarCobro(referencia[0], aplicaciones));
+                    cuentas,credito,resultado -> confirmarCobro(referencia[0], resultado));
             referencia[0] = dialog;
             dialogoCobroActivo = dialog;
             dialog.addOpenedChangeListener(event -> {
@@ -1251,20 +1280,22 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         dialog.open();
     }
 
-    private void confirmarCobro(Dialog dialog, List<AplicacionCobroInput> aplicaciones) {
+    private void confirmarCobro(Dialog dialog, ResultadoCobroPosInput cobro) {
         try {
             List<LineaVentaInput> lineas = filas.stream().map(f -> new LineaVentaInput(f.lineaId, f.id, f.cantidad, f.precio,
                     f.cotizacionLineaOrigenId,f.descuento)).toList();
             FacturaVentaResultadoDto resultado = service.confirmar(new ConfirmarVentaInput(token, terminal.almacenId(),
                     clienteSeleccionado == null ? null : clienteSeleccionado.id(), observacion.getValue(),
-                    idempotencia, ventaGuardadaActivaId, descuentoActual, recargoActual,cotizacionOrigenId,lineas, aplicaciones));
+                    idempotencia, ventaGuardadaActivaId, descuentoActual, recargoActual,cotizacionOrigenId,
+                    cobro.ventaCredito(),lineas,cobro.aplicaciones()));
             dialog.close();
-            Notification.show("Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
+            Notification.show(cobro.ventaCredito()?"Factura "+resultado.numero()+" emitida a crédito.":
+                    "Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
             abrirPdf(resultado);
             construirPos();
         } catch (RuntimeException ex) {
             if (dialog instanceof PosPaymentDialog paymentDialog) paymentDialog.reactivarConfirmacion();
-            error(ex, "No fue posible confirmar el cobro.");
+            error(ex, cobro.ventaCredito()?"No fue posible emitir la factura a crédito.":"No fue posible confirmar el cobro.");
         }
     }
 
