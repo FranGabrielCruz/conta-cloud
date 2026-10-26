@@ -35,6 +35,9 @@ public interface CashRegisterRepository extends JpaRepository<Caja, UUID> {
     List<Caja> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombre(
         UUID tenantId, UUID empresaId);
 
+    @EntityGraph(attributePaths = {"sucursal", "moneda"})
+    List<Caja> findAllByTenantIdAndEmpresaIdOrderByNombre(UUID tenantId, UUID empresaId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Caja c where c.id=:id and c.tenantId=:tenant and c.empresaId=:empresa")
     Optional<Caja> bloquearParaOperacion(@Param("id")UUID id,@Param("tenant")UUID tenant,@Param("empresa")UUID empresa);

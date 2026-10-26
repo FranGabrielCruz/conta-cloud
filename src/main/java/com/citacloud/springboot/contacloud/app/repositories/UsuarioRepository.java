@@ -16,6 +16,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     boolean existsByTenantIdAndUsuarioIgnoreCaseAndIdNot(UUID tenantId, String usuario, UUID id);
     long countByEmpresaIdAndActivoTrue(UUID empresaId);
     List<Usuario> findAllByTenantIdAndEmpresaIdAndActivoTrueOrderByNombreAscApellidoAsc(UUID tenantId, UUID empresaId);
+    List<Usuario> findAllByTenantIdAndEmpresaIdOrderByNombreAscApellidoAsc(UUID tenantId, UUID empresaId);
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Usuario u set u.passwordHash=:passwordHash where u.id=:usuarioId and u.tenantId=:tenantId")
     int actualizarPasswordHash(@Param("usuarioId") UUID usuarioId,@Param("tenantId") UUID tenantId,

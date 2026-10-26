@@ -15,6 +15,7 @@ public interface SucursalRepository extends JpaRepository<Sucursal, UUID> {
     long countByEmpresaIdAndActivoTrue(UUID empresaId);
     boolean existsByEmpresaIdAndPrincipalTrue(UUID empresaId);
     List<Sucursal> findAllByEmpresaIdAndActivoTrueOrderByNombre(UUID empresaId);
+    List<Sucursal> findAllByEmpresaIdOrderByNombre(UUID empresaId);
     List<Sucursal> findAllByIdInAndEmpresaId(Collection<UUID> ids, UUID empresaId);
     @Query("""
         select s from Sucursal s where s.empresaId=:empresaId

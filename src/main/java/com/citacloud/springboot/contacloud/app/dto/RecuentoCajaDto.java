@@ -1,0 +1,3 @@
+package com.citacloud.springboot.contacloud.app.dto;
+import com.citacloud.springboot.contacloud.app.models.*; import java.math.BigDecimal; import java.time.OffsetDateTime; import java.util.*;
+public record RecuentoCajaDto(UUID id,String numero,UUID sesionId,String apertura,String caja,String sucursal,String monedaCodigo,String monedaSimbolo,OffsetDateTime contadoEn,String usuario,BigDecimal esperado,BigDecimal contado,BigDecimal diferencia,ResultadoRecuentoCaja resultado,String observacion,List<Detalle> detalles){public record Detalle(BigDecimal denominacion,TipoDenominacionCaja tipo,int cantidad,BigDecimal subtotal){}}

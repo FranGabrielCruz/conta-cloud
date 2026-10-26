@@ -21,4 +21,10 @@ class AppliedMigrationChecksumTest {
         assertEquals(-695281857,ChecksumCalculator.calculate(new StringResource(sql)),
                 "V84 ya fue aplicada; los cambios de sucursal deben permanecer en V85");
     }
+
+    @Test void mantieneIntactaLaMigracionV87YaAplicada() throws Exception {
+        String sql=Files.readString(Path.of("src/main/resources/db/migration/V87__implementar_recuentos_caja.sql"));
+        assertEquals(-460316646,ChecksumCalculator.calculate(new StringResource(sql)),
+                "V87 ya fue aplicada; cualquier ajuste posterior debe permanecer en V88 o una migración nueva");
+    }
 }

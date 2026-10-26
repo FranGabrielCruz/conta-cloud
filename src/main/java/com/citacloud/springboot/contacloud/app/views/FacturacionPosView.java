@@ -22,6 +22,7 @@ import com.citacloud.springboot.contacloud.app.views.components.PosDialogPaginat
 import com.citacloud.springboot.contacloud.app.views.components.PosNumericKeypad;
 import com.citacloud.springboot.contacloud.app.views.components.PosNumberFormatter;
 import com.citacloud.springboot.contacloud.app.views.components.RecibosCobrosDialog;
+import com.citacloud.springboot.contacloud.app.views.components.RecuentoCajaDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -63,6 +64,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final CotizacionPosService cotizacionPosService;
     private final CobroClienteService cobrosCliente;
     private final CobroClientePdfService cobrosPdf;
+    private final RecuentoCajaService recuentosCaja;
+    private final RecuentoCajaPdfService recuentosCajaPdf;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -111,6 +114,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               DevolucionVentaService devolucionesService, DevolucionVentaPdfService devolucionesPdf,
                               CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
                               CobroClienteService cobrosCliente, CobroClientePdfService cobrosPdf,
+                              RecuentoCajaService recuentosCaja, RecuentoCajaPdfService recuentosCajaPdf,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -125,6 +129,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.cotizacionPosService = cotizacionPosService;
         this.cobrosCliente = cobrosCliente;
         this.cobrosPdf = cobrosPdf;
+        this.recuentosCaja = recuentosCaja;
+        this.recuentosCajaPdf = recuentosCajaPdf;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -1336,7 +1342,27 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void enfocarProducto() { if (productoBuscar != null) productoBuscar.focus(); }
 
-    private void pendiente(String funcion) { Notification.show(funcion + " estará disponible próximamente."); }
+    private void pendiente(String funcion) {
+        if ("Recuento de caja".equals(funcion)) {
+            if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) {
+                Notification.show("La caja debe estar abierta para realizar un recuento."); return;
+            }
+            if (!puede("recuentos_caja.crear")) { Notification.show("No tiene permisos para realizar recuentos de caja."); return; }
+            new RecuentoCajaDialog(terminal.sesionCajaId(), recuentosCaja, this::abrirPdfRecuento).open(); return;
+        }
+        Notification.show(funcion + " estará disponible próximamente.");
+    }
+
+    private void abrirPdfRecuento(UUID id) {
+        try {
+            ArchivoPdfDto archivo = recuentosCajaPdf.generar(id);
+            StreamResource recurso = new StreamResource(archivo.nombreArchivo(),
+                    () -> new ByteArrayInputStream(archivo.contenido()));
+            recurso.setContentType("application/pdf"); recurso.setCacheTime(0);
+            var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
+            UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
+        } catch (RuntimeException ex) { error(ex, "No fue posible abrir el PDF del recuento."); }
+    }
 
     private static boolean puede(String permiso) {
         return TenantContext.principalActual().permisos().contains(permiso);
