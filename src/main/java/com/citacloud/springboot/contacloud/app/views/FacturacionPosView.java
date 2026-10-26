@@ -23,6 +23,7 @@ import com.citacloud.springboot.contacloud.app.views.components.PosNumericKeypad
 import com.citacloud.springboot.contacloud.app.views.components.PosNumberFormatter;
 import com.citacloud.springboot.contacloud.app.views.components.RecibosCobrosDialog;
 import com.citacloud.springboot.contacloud.app.views.components.RecuentoCajaDialog;
+import com.citacloud.springboot.contacloud.app.views.components.MovimientosCajaDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -66,6 +67,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final CobroClientePdfService cobrosPdf;
     private final RecuentoCajaService recuentosCaja;
     private final RecuentoCajaPdfService recuentosCajaPdf;
+    private final MovimientoCajaService movimientosCaja;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -93,6 +95,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private DevolucionesVentasDialog dialogoDevolucionesActivo;
     private CargarCotizacionDialog dialogoCotizacionesActivo;
     private RecibosCobrosDialog dialogoRecibosActivo;
+    private MovimientosCajaDialog dialogoMovimientosCajaActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -115,6 +118,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
                               CobroClienteService cobrosCliente, CobroClientePdfService cobrosPdf,
                               RecuentoCajaService recuentosCaja, RecuentoCajaPdfService recuentosCajaPdf,
+                              MovimientoCajaService movimientosCaja,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -131,6 +135,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.cobrosPdf = cobrosPdf;
         this.recuentosCaja = recuentosCaja;
         this.recuentosCajaPdf = recuentosCajaPdf;
+        this.movimientosCaja = movimientosCaja;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -1343,6 +1348,25 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void enfocarProducto() { if (productoBuscar != null) productoBuscar.focus(); }
 
     private void pendiente(String funcion) {
+        if ("Movimientos de caja".equals(funcion)) {
+            if (dialogoMovimientosCajaActivo != null && dialogoMovimientosCajaActivo.isOpened()) return;
+            if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) {
+                Notification.show("La caja debe estar abierta para consultar sus movimientos."); return;
+            }
+            if (!puede("movimientos_caja.ver")) {
+                Notification.show("No tiene permisos para consultar los movimientos de caja."); return;
+            }
+            try {
+                dialogoMovimientosCajaActivo = new MovimientosCajaDialog(terminal.sesionCajaId(), movimientosCaja,
+                        puede("movimientos_caja.crear"), puede("movimientos_caja.revertir"));
+                dialogoMovimientosCajaActivo.addClosedListener(e -> dialogoMovimientosCajaActivo = null);
+                dialogoMovimientosCajaActivo.open();
+            } catch (RuntimeException ex) {
+                dialogoMovimientosCajaActivo = null;
+                error(ex, "No fue posible abrir los movimientos de caja.");
+            }
+            return;
+        }
         if ("Recuento de caja".equals(funcion)) {
             if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) {
                 Notification.show("La caja debe estar abierta para realizar un recuento."); return;

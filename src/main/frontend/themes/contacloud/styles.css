@@ -1249,3 +1249,14 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 @media (max-width:600px) { .cc-cash-count-row { gap:.4rem; } .cc-cash-count-money { min-width:88px; } .cc-cash-count-info { font-size:var(--lumo-font-size-s); } .cc-cash-count-result-grid { grid-template-columns:1fr; row-gap:14px; } .cc-cash-count-truncate { white-space:normal; } }
 @media (max-width:1000px) { .cc-cash-count-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:600px) { .cc-cash-count-filters { grid-template-columns:1fr; } }
+
+/* POS / Caja: historial y registro de movimientos del turno actual. */
+.cc-cash-movements-dialog::part(content) { overflow:auto; }
+.cc-cash-movement-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding-bottom:.65rem; border-bottom:1px solid var(--lumo-contrast-20pct); }
+.cc-cash-movement-heading h3 { margin:0; font-size:var(--lumo-font-size-l); }
+.cc-cash-movement-open { color:var(--lumo-success-text-color); font-weight:700; white-space:nowrap; }
+.cc-cash-movement-closed { color:var(--lumo-error-text-color); font-weight:700; white-space:nowrap; }
+.cc-cash-movement-filters { display:grid; grid-template-columns:minmax(260px,2fr) repeat(2,minmax(150px,1fr)); gap:12px 16px; align-items:end; width:100%; box-sizing:border-box; }
+.cc-cash-movement-form { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; width:100%; box-sizing:border-box; }
+.cc-cash-movement-observation { margin:.2rem 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+@media (max-width:760px) { .cc-cash-movement-filters { grid-template-columns:1fr; } }

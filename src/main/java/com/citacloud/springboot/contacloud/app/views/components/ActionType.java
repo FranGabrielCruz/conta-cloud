@@ -15,6 +15,7 @@ public enum ActionType {
     ACTIVATE("Activar", VaadinIcon.POWER_OFF, "success"),
     DEACTIVATE("Desactivar", VaadinIcon.POWER_OFF, "danger"),
     VOID("Anular", VaadinIcon.BAN, "danger"),
+    REVERSE("Revertir", VaadinIcon.ROTATE_LEFT, "danger"),
     ISSUE("Emitir", VaadinIcon.PAPERPLANE, "success"),
     PRINT("Imprimir", VaadinIcon.PRINT, "view"),
     REFRESH("Actualizar", VaadinIcon.REFRESH, "neutral"),

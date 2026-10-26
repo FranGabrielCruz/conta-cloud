@@ -16,6 +16,7 @@ class RolesViewTest {
         assertThat(RolesView.seccionPermiso(permiso("presupuestos.ver", "presupuestos"))).isEqualTo("Finanzas");
         assertThat(RolesView.seccionPermiso(permiso("reportes_financieros.ver", "reportes_financieros"))).isEqualTo("Reportes");
         assertThat(RolesView.seccionPermiso(permiso("saldos_cuentas.ver", "saldos_cuentas"))).isEqualTo("Caja y Bancos");
+        assertThat(RolesView.seccionPermiso(permiso("movimientos_caja.ver", "movimientos_caja"))).isEqualTo("Caja y Bancos");
     }
     @Test void noAgrupaPermisosDeRecursosDistintosAunqueTenganLaMismaAccion(){
         PermisoDto cajas=permiso("cajas.ver","cajas","ver");

@@ -38,6 +38,10 @@ public class MovimientoFinanciero {
     @Column(name="anulado_en") private OffsetDateTime anuladoEn;
     @Column(name="anulado_por") private UUID anuladoPor;
     @Column(name="motivo_anulacion",length=500) private String motivoAnulacion;
+    @Column(name="cash_movement_number",length=30) private String numeroMovimientoCaja;
+    @Column(name="cash_concept_id") private UUID conceptoCajaId;
+    @Column(name="reversal_of_movement_id") private UUID reversionDeMovimientoId;
+    @Column(name="reversal_reason",length=500) private String motivoReversion;
 
     @ManyToOne(fetch=FetchType.LAZY)
     @JoinColumns({
@@ -117,6 +121,25 @@ public class MovimientoFinanciero {
             TipoOrigenMovimiento.CUSTOMER_RECEIPT,medioReciboId,medioPago,
             tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
     }
+    public static MovimientoFinanciero manualCaja(UUID tenantId,UUID empresaId,TipoMovimientoFinanciero tipo,
+            LocalDate fecha,UUID cajaId,UUID monedaId,BigDecimal monto,String numero,UUID conceptoId,
+            String concepto,String referencia,String observacion,UUID sesionId,UUID usuarioId){
+        MovimientoFinanciero movimiento=new MovimientoFinanciero(tenantId,empresaId,tipo,fecha,
+            TipoCuentaDinero.CASH_REGISTER,cajaId,monedaId,monto,concepto,referencia,observacion,
+            TipoOrigenMovimiento.MANUAL,null,MedioPagoMovimiento.CASH,sesionId,usuarioId);
+        movimiento.numeroMovimientoCaja=numero;movimiento.conceptoCajaId=conceptoId;return movimiento;
+    }
+    public static MovimientoFinanciero reversionCaja(MovimientoFinanciero original,LocalDate fecha,String numero,
+            String motivo,UUID usuarioId){
+        TipoMovimientoFinanciero opuesto=original.tipoMovimiento==TipoMovimientoFinanciero.INCOME
+            ?TipoMovimientoFinanciero.EXPENSE:TipoMovimientoFinanciero.INCOME;
+        MovimientoFinanciero movimiento=new MovimientoFinanciero(original.tenantId,original.empresaId,opuesto,
+            fecha,TipoCuentaDinero.CASH_REGISTER,original.cajaId,original.monedaId,original.monto,
+            "Reversión de "+original.numeroVisibleCaja(),original.numeroVisibleCaja(),motivo,
+            TipoOrigenMovimiento.REVERSAL,original.id,MedioPagoMovimiento.CASH,original.sesionCajaId,usuarioId);
+        movimiento.numeroMovimientoCaja=numero;movimiento.reversionDeMovimientoId=original.id;
+        movimiento.motivoReversion=motivo;return movimiento;
+    }
     private MovimientoFinanciero(UUID tenantId, UUID empresaId, TipoMovimientoFinanciero tipo,
             LocalDate fecha, TipoCuentaDinero tipoCuenta, UUID cuentaId, UUID monedaId,
             BigDecimal monto, String concepto, String referencia, String descripcion,
@@ -173,4 +196,10 @@ public class MovimientoFinanciero {
     public String getMotivoAnulacion(){return motivoAnulacion;} public Caja getCaja(){return caja;}
     public CuentaBancaria getCuentaBancaria(){return cuentaBancaria;} public Moneda getMoneda(){return moneda;}
     public Usuario getUsuarioAnulacion(){return usuarioAnulacion;}
+    public String getNumeroMovimientoCaja(){return numeroMovimientoCaja;}
+    public UUID getConceptoCajaId(){return conceptoCajaId;}
+    public UUID getReversionDeMovimientoId(){return reversionDeMovimientoId;}
+    public String getMotivoReversion(){return motivoReversion;}
+    public String numeroVisibleCaja(){return numeroMovimientoCaja==null||numeroMovimientoCaja.isBlank()
+        ?(referencia==null||referencia.isBlank()?"MOVIMIENTO":referencia):numeroMovimientoCaja;}
 }

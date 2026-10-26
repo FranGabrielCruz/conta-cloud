@@ -7,6 +7,58 @@ import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.*;
 public interface FinancialMovementRepository extends JpaRepository<MovimientoFinanciero,UUID> {
+    String CASH_MOVEMENT_SELECT="""
+      with ordered as (
+        select m.id,coalesce(m.cash_movement_number,nullif(m.referencia,''),'MOVIMIENTO') as numero,
+          m.creado_en as "fechaHora",c.nombre as caja,s.nombre as sucursal,u.usuario as usuario,
+          m.tipo_movimiento as tipo,m.tipo_origen as origen,m.concepto,coalesce(m.referencia,'—') as referencia,
+          m.monto as importe,mo.codigo_iso as "monedaCodigo",m.descripcion as observacion,m.estado,
+          m.reversal_of_movement_id as "reversionDeId",
+          case when m.tipo_origen='MANUAL' and m.estado='REGISTERED' and not exists(
+            select 1 from movimientos_financieros rv where rv.tenant_id=m.tenant_id and rv.empresa_id=m.empresa_id
+              and rv.reversal_of_movement_id=m.id) then true else false end as reversible,
+          cs.opening_amount + sum(case when m.estado='REGISTERED' then
+            case when m.tipo_movimiento='INCOME' then m.monto else -m.monto end else 0 end)
+            over(order by m.creado_en,m.id) as saldo
+        from movimientos_financieros m
+        join cash_register_session cs on cs.id=m.cash_register_session_id and cs.tenant_id=m.tenant_id and cs.empresa_id=m.empresa_id
+        join cajas c on c.id=m.caja_id and c.tenant_id=m.tenant_id and c.empresa_id=m.empresa_id
+        join sucursales s on s.id=cs.branch_id and s.empresa_id=m.empresa_id
+        join monedas mo on mo.id=m.moneda_id and mo.empresa_id=m.empresa_id
+        join usuarios u on u.id=m.creado_por and u.tenant_id=m.tenant_id and u.empresa_id=m.empresa_id
+        where m.tenant_id=:tenant and m.empresa_id=:empresa and m.cash_register_session_id=:sesion
+          and m.tipo_cuenta='CASH_REGISTER' and m.payment_method='CASH'
+      )
+      """;
+
+    @Query(value=CASH_MOVEMENT_SELECT+"""
+      select * from ordered where (:buscar='' or lower(concepto) like lower(concat('%',:buscar,'%'))
+        or lower(referencia) like lower(concat('%',:buscar,'%')) or lower(numero) like lower(concat('%',:buscar,'%')))
+        and (:tipo='ALL' or tipo=:tipo) and (:origen='ALL' or origen=:origen)
+      order by "fechaHora" desc,id desc
+      """,countQuery="""
+      select count(*) from movimientos_financieros m
+      where m.tenant_id=:tenant and m.empresa_id=:empresa and m.cash_register_session_id=:sesion
+        and m.tipo_cuenta='CASH_REGISTER' and m.payment_method='CASH'
+        and (:buscar='' or lower(m.concepto) like lower(concat('%',:buscar,'%'))
+          or lower(coalesce(m.referencia,'')) like lower(concat('%',:buscar,'%'))
+          or lower(coalesce(m.cash_movement_number,'')) like lower(concat('%',:buscar,'%')))
+        and (:tipo='ALL' or m.tipo_movimiento=:tipo) and (:origen='ALL' or m.tipo_origen=:origen)
+      """,nativeQuery=true)
+    Page<MovimientoCajaProjection> buscarMovimientosCaja(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion,@Param("buscar")String buscar,@Param("tipo")String tipo,
+        @Param("origen")String origen,Pageable pageable);
+
+    @Query(value=CASH_MOVEMENT_SELECT+"select * from ordered where id=:movimiento",nativeQuery=true)
+    Optional<MovimientoCajaProjection> detalleMovimientoCaja(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion,@Param("movimiento")UUID movimiento);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from MovimientoFinanciero m where m.id=:id and m.tenantId=:tenant and m.empresaId=:empresa and m.sesionCajaId=:sesion")
+    Optional<MovimientoFinanciero> bloquearMovimientoCaja(@Param("id")UUID id,@Param("tenant")UUID tenant,
+        @Param("empresa")UUID empresa,@Param("sesion")UUID sesion);
+
+    boolean existsByTenantIdAndEmpresaIdAndReversionDeMovimientoId(UUID tenant,UUID empresa,UUID original);
     @EntityGraph(attributePaths={"caja","cuentaBancaria","moneda","usuarioAnulacion"})
     @Query("""
       select m from MovimientoFinanciero m
