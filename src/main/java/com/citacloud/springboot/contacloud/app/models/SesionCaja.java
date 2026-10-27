@@ -61,8 +61,11 @@ public class SesionCaja {
     }
     @PreUpdate void actualizarMarca(){actualizadoEn=OffsetDateTime.now();}
     public void cerrar(BigDecimal esperado,BigDecimal contado,String nota,UUID usuarioId){
+        cerrar(esperado,contado,nota,usuarioId,OffsetDateTime.now());
+    }
+    public void cerrar(BigDecimal esperado,BigDecimal contado,String nota,UUID usuarioId,OffsetDateTime instante){
         efectivoEsperado=esperado;efectivoContado=contado;diferencia=contado.subtract(esperado);
-        observacionCierre=nota;cerradoPor=usuarioId;cerradoEn=OffsetDateTime.now();status=EstadoSesionCaja.CLOSED;
+        observacionCierre=nota;cerradoPor=usuarioId;cerradoEn=instante;status=EstadoSesionCaja.CLOSED;
         estadoRevision=EstadoRevisionCaja.PENDING;
     }
     public void revisar(EstadoRevisionCaja estado,String nota,UUID usuarioId){estadoRevision=estado;

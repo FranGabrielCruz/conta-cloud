@@ -25,6 +25,7 @@ import com.citacloud.springboot.contacloud.app.views.components.RecibosCobrosDia
 import com.citacloud.springboot.contacloud.app.views.components.RecuentoCajaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.MovimientosCajaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.ValesCajaDialog;
+import com.citacloud.springboot.contacloud.app.views.components.CierreCajaDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -71,6 +72,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final MovimientoCajaService movimientosCaja;
     private final ValeCajaService valesCaja;
     private final ValeCajaPdfService valesCajaPdf;
+    private final CierreCajaService cierresCaja;
+    private final CierreCajaPdfService cierresCajaPdf;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -100,6 +103,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private RecibosCobrosDialog dialogoRecibosActivo;
     private MovimientosCajaDialog dialogoMovimientosCajaActivo;
     private ValesCajaDialog dialogoValesCajaActivo;
+    private CierreCajaDialog dialogoCierreCajaActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -123,7 +127,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               CobroClienteService cobrosCliente, CobroClientePdfService cobrosPdf,
                               RecuentoCajaService recuentosCaja, RecuentoCajaPdfService recuentosCajaPdf,
                               MovimientoCajaService movimientosCaja,ValeCajaService valesCaja,ValeCajaPdfService valesCajaPdf,
-                              ModuleAuthorization authorization) {
+                              CierreCajaService cierresCaja,CierreCajaPdfService cierresCajaPdf,ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
         this.documentos = documentos;
@@ -141,6 +145,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.recuentosCajaPdf = recuentosCajaPdf;
         this.movimientosCaja = movimientosCaja;
         this.valesCaja=valesCaja;this.valesCajaPdf=valesCajaPdf;
+        this.cierresCaja=cierresCaja;
+        this.cierresCajaPdf=cierresCajaPdf;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -1386,6 +1392,18 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             if (!puede("recuentos_caja.crear")) { Notification.show("No tiene permisos para realizar recuentos de caja."); return; }
             new RecuentoCajaDialog(terminal.sesionCajaId(), recuentosCaja, this::abrirPdfRecuento).open(); return;
         }
+        if ("Cerrar caja".equals(funcion)) {
+            if (dialogoCierreCajaActivo != null && dialogoCierreCajaActivo.isOpened()) return;
+            if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) {
+                Notification.show("La caja debe estar abierta para realizar el cierre."); return;
+            }
+            if (!puede("cierres_caja.ejecutar") && !puede("operaciones_caja.cerrar")) {
+                Notification.show("No tiene permisos para cerrar la caja."); return;
+            }
+            dialogoCierreCajaActivo=new CierreCajaDialog(terminal.sesionCajaId(),cierresCaja,c->{ inicializar(); },this::abrirPdfCierre);
+            dialogoCierreCajaActivo.addClosedListener(e->dialogoCierreCajaActivo=null);
+            dialogoCierreCajaActivo.open(); return;
+        }
         Notification.show(funcion + " estará disponible próximamente.");
     }
 
@@ -1398,6 +1416,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
             UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
         } catch (RuntimeException ex) { error(ex, "No fue posible abrir el PDF del recuento."); }
+    }
+
+    private void abrirPdfCierre(UUID id) {
+        try { ArchivoPdfDto archivo=cierresCajaPdf.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank"); }
+        catch(RuntimeException ex){error(ex,"No fue posible abrir el PDF del cierre de caja.");}
     }
 
     private void abrirPdfVale(UUID id) {

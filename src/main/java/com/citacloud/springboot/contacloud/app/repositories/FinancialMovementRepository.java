@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 public interface FinancialMovementRepository extends JpaRepository<MovimientoFinanciero,UUID> {
     String CASH_MOVEMENT_SELECT="""
@@ -125,6 +126,15 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
       """)
     List<MovimientoFinanciero> movimientosValidosSesion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
         @Param("sesion")UUID sesion);
+
+    @Query("""
+      select m from MovimientoFinanciero m where m.tenantId=:tenant and m.empresaId=:empresa
+        and m.sesionCajaId=:sesion
+        and m.estado=com.citacloud.springboot.contacloud.app.models.EstadoMovimientoFinanciero.REGISTERED
+        and m.creadoEn<=:corte order by m.creadoEn,m.id
+      """)
+    List<MovimientoFinanciero> movimientosValidosSesionHasta(@Param("tenant")UUID tenant,
+        @Param("empresa")UUID empresa,@Param("sesion")UUID sesion,@Param("corte")OffsetDateTime corte);
 
     @Query("""
       select m from MovimientoFinanciero m where m.tenantId=:tenant and m.empresaId=:empresa

@@ -1,0 +1,3 @@
+package com.citacloud.springboot.contacloud.app.migration;
+import org.junit.jupiter.api.Test; import java.nio.charset.StandardCharsets; import static org.junit.jupiter.api.Assertions.*;
+class CierreCajaMigrationContractTest {@Test void cierreEsUnicoPorTurnoYConservaSnapshots() throws Exception {try(var in=getClass().getResourceAsStream("/db/migration/V94__implementar_cierre_ciego_caja.sql")){assertNotNull(in);String sql=new String(in.readAllBytes(),StandardCharsets.UTF_8);assertTrue(sql.contains("uk_cash_closure_session"));assertTrue(sql.contains("cash_closure_details"));assertTrue(sql.contains("cash_closure_payment_summary"));assertTrue(sql.contains("company_logo_object_key"));assertTrue(sql.contains("cierres_caja.ejecutar"));}}}

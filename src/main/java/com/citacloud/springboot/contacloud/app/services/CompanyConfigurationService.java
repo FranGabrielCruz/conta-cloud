@@ -8,6 +8,7 @@ import com.citacloud.springboot.contacloud.app.repositories.DatosEmpresaReposito
 import com.citacloud.springboot.contacloud.app.repositories.MonedaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.EmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.ValeCajaRepository;
+import com.citacloud.springboot.contacloud.app.repositories.CierreCajaRepository;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,7 @@ public class CompanyConfigurationService {
     private final MonedaRepository monedas;
     private final ConfiguracionEmpresaMapper mapper;
     private final ValeCajaRepository valesCaja;
+    private final CierreCajaRepository cierresCaja;
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Set<String> ALLOWED_IMAGE_MIMES = Set.of(
         "image/png", "image/jpeg", "image/webp", "application/octet-stream");
@@ -43,7 +45,7 @@ public class CompanyConfigurationService {
     public CompanyConfigurationService(EmpresaRepository empresas, LocalFileStorageService storage,
                                        AuditoriaService auditoria, DatosEmpresaRepository datosEmpresa,
                                        MonedaRepository monedas, ConfiguracionEmpresaMapper mapper,
-                                       ValeCajaRepository valesCaja) {
+                                       ValeCajaRepository valesCaja,CierreCajaRepository cierresCaja) {
         this.empresas = empresas;
         this.storage = storage;
         this.auditoria = auditoria;
@@ -51,6 +53,7 @@ public class CompanyConfigurationService {
         this.monedas = monedas;
         this.mapper = mapper;
         this.valesCaja = valesCaja;
+        this.cierresCaja = cierresCaja;
     }
 
     @Transactional @PreAuthorize("hasAuthority('EMPRESA_VER')")
@@ -133,6 +136,8 @@ public class CompanyConfigurationService {
             @Override public void afterCommit() {
                 if (oldKey != null && ownedByCompany(empresa, oldKey)
                     && !valesCaja.existsByTenantIdAndEmpresaIdAndEmpresaLogoObjectKey(
+                        empresa.getTenantId(), empresa.getId(), oldKey)
+                    && !cierresCaja.existsByTenantIdAndEmpresaIdAndEmpresaLogo(
                         empresa.getTenantId(), empresa.getId(), oldKey)) {
                     try { storage.delete(oldKey); }
                     catch (RuntimeException ex) { log.error("No se pudo eliminar el logo anterior de empresa {}", empresa.getId(), ex); }

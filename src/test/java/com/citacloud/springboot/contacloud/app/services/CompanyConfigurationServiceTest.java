@@ -5,6 +5,7 @@ import com.citacloud.springboot.contacloud.app.repositories.EmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.DatosEmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.MonedaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.ValeCajaRepository;
+import com.citacloud.springboot.contacloud.app.repositories.CierreCajaRepository;
 import com.citacloud.springboot.contacloud.app.mappers.ConfiguracionEmpresaMapper;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +40,7 @@ class CompanyConfigurationServiceTest {
     @Mock DatosEmpresaRepository datosEmpresa;
     @Mock MonedaRepository monedas;
     @Mock ValeCajaRepository valesCaja;
+    @Mock CierreCajaRepository cierresCaja;
     private LocalFileStorageService storage;
     private CompanyConfigurationService service;
     private Empresa empresa;
@@ -47,7 +49,7 @@ class CompanyConfigurationServiceTest {
     @BeforeEach void setup() {
         storage = new LocalFileStorageService(temp.toString());
         service = new CompanyConfigurationService(repository, storage, auditoria, datosEmpresa, monedas,
-            new ConfiguracionEmpresaMapper(), valesCaja);
+            new ConfiguracionEmpresaMapper(), valesCaja, cierresCaja);
         empresaId = UUID.randomUUID();
         empresa = new Empresa("A", "Empresa A");
         ReflectionTestUtils.setField(empresa, "id", empresaId);

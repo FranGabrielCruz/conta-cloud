@@ -174,11 +174,14 @@ public class CashRegisterSessionService {
         auditoria.registrar(evento,"SesionCaja",s.getId(),detalle(s));return mapper.toDto(s);
     }
 
-    @Transactional(readOnly=true)
+    @Transactional
     public UUID requerirSesionAbierta(UUID cajaId){
-        var p=TenantContext.principalActual();SesionCaja s=sessions.findByTenantIdAndEmpresaIdAndCajaIdAndStatus(
-            p.tenantId(),EmpresaContext.requerirEmpresaId(),cajaId,EstadoSesionCaja.OPEN)
+        var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();SesionCaja lectura=sessions.findByTenantIdAndEmpresaIdAndCajaIdAndStatus(
+            p.tenantId(),empresa,cajaId,EstadoSesionCaja.OPEN)
             .orElseThrow(()->new ReglaNegocioException("La caja seleccionada está cerrada. Debes abrirla antes de registrar movimientos."));
+        SesionCaja s=sessions.bloquear(lectura.getId(),p.tenantId(),empresa)
+            .orElseThrow(()->new ReglaNegocioException("La caja seleccionada está cerrada. Debes abrirla antes de registrar movimientos."));
+        if(s.getStatus()!=EstadoSesionCaja.OPEN)throw new ReglaNegocioException("La caja seleccionada está cerrada. Debes abrirla antes de registrar movimientos.");
         validarSucursal(s);return s.getId();
     }
 
