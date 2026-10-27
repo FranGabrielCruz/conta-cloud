@@ -6,7 +6,6 @@ import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +24,13 @@ public class MovimientoCajaService {
     private final ConceptoMovimientoCajaRepository conceptos;
     private final IdempotentOperationService idempotencia;
     private final AuditoriaService auditoria;
-    private final JdbcTemplate jdbc;
+    private final MovimientoCajaNumeroService numeros;
 
     public MovimientoCajaService(CashRegisterSessionRepository sesiones,FinancialMovementRepository movimientos,
             ConceptoMovimientoCajaRepository conceptos,
-            IdempotentOperationService idempotencia,AuditoriaService auditoria,JdbcTemplate jdbc){
+            IdempotentOperationService idempotencia,AuditoriaService auditoria,MovimientoCajaNumeroService numeros){
         this.sesiones=sesiones;this.movimientos=movimientos;this.conceptos=conceptos;
-        this.idempotencia=idempotencia;this.auditoria=auditoria;this.jdbc=jdbc;
+        this.idempotencia=idempotencia;this.auditoria=auditoria;this.numeros=numeros;
     }
 
     @Transactional(readOnly=true)
@@ -75,7 +74,7 @@ public class MovimientoCajaService {
         if(concepto.getTipo()!=input.tipo())throw new ReglaNegocioException("El concepto seleccionado no está disponible para este tipo de movimiento.");
         String observacion=opcional(input.observacion(),500);
         if(concepto.isRequiereObservacion()&&observacion==null)throw new ReglaNegocioException("La observación es obligatoria para el concepto seleccionado.");
-        String referencia=referenciaManual(input.referencia());String numero=siguiente(p.tenantId(),p.empresaId());
+        String referencia=referenciaManual(input.referencia());String numero=numeros.siguiente(p.tenantId(),p.empresaId());
         MovimientoFinanciero movimiento=MovimientoFinanciero.manualCaja(p.tenantId(),p.empresaId(),input.tipo(),
             sesion.getFechaOperativa(),sesion.getCajaId(),sesion.getMonedaId(),
             escala(input.importe()),numero,concepto.getId(),concepto.getNombre(),referencia,observacion,sesion.getId(),p.usuarioId());
@@ -102,7 +101,7 @@ public class MovimientoCajaService {
         if(movimientos.existsByTenantIdAndEmpresaIdAndReversionDeMovimientoId(p.tenantId(),p.empresaId(),original.getId()))
             throw new ReglaNegocioException("El movimiento ya fue revertido.");
         MovimientoFinanciero reverso=MovimientoFinanciero.reversionCaja(original,
-            sesion.getFechaOperativa(),siguiente(p.tenantId(),p.empresaId()),motivo,p.usuarioId());
+            sesion.getFechaOperativa(),numeros.siguiente(p.tenantId(),p.empresaId()),motivo,p.usuarioId());
         try{reverso=movimientos.saveAndFlush(reverso);}catch(DataIntegrityViolationException ex){
             throw new ReglaNegocioException("El estado de la caja cambió. Actualice la información e intente nuevamente.",ex);}
         auditoria.registrar("CASH_MOVEMENT_REVERSED","MovimientoFinanciero",reverso.getId(),
@@ -131,11 +130,6 @@ public class MovimientoCajaService {
         return new MovimientoCajaDto(x.getId(),x.getNumero(),fechaHora,x.getCaja(),x.getSucursal(),x.getUsuario(),
             TipoMovimientoFinanciero.valueOf(x.getTipo()),origen,x.getConcepto(),x.getReferencia(),x.getImporte(),x.getSaldo(),
             x.getMonedaCodigo(),x.getObservacion(),estado,x.getReversionDeId(),x.isReversible());}
-    private String siguiente(UUID tenant,UUID empresa){Long valor=jdbc.queryForObject("""
-        INSERT INTO cash_movement_sequence(tenant_id,empresa_id,current_value) VALUES(?,?,1)
-        ON CONFLICT(tenant_id,empresa_id) DO UPDATE SET current_value=cash_movement_sequence.current_value+1
-        RETURNING current_value
-        """,Long.class,tenant,empresa);return "MOV-"+String.format(Locale.ROOT,"%06d",valor);}
     private static void validarEntrada(MovimientoCajaInput i){if(i==null||i.sesionId()==null||i.tipo()==null||i.conceptoId()==null||i.idempotencia()==null)
         throw new ReglaNegocioException("Complete los datos obligatorios del movimiento.");if(i.importe()==null||i.importe().signum()<=0)
         throw new ReglaNegocioException("El importe debe ser mayor que cero.");if(i.importe().scale()>4||i.importe().precision()-i.importe().scale()>15)

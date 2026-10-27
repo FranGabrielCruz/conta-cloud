@@ -7,6 +7,7 @@ import com.citacloud.springboot.contacloud.app.models.DatosEmpresa;
 import com.citacloud.springboot.contacloud.app.repositories.DatosEmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.MonedaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.EmpresaRepository;
+import com.citacloud.springboot.contacloud.app.repositories.ValeCajaRepository;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,19 +35,22 @@ public class CompanyConfigurationService {
     private final DatosEmpresaRepository datosEmpresa;
     private final MonedaRepository monedas;
     private final ConfiguracionEmpresaMapper mapper;
+    private final ValeCajaRepository valesCaja;
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Set<String> ALLOWED_IMAGE_MIMES = Set.of(
         "image/png", "image/jpeg", "image/webp", "application/octet-stream");
 
     public CompanyConfigurationService(EmpresaRepository empresas, LocalFileStorageService storage,
                                        AuditoriaService auditoria, DatosEmpresaRepository datosEmpresa,
-                                       MonedaRepository monedas, ConfiguracionEmpresaMapper mapper) {
+                                       MonedaRepository monedas, ConfiguracionEmpresaMapper mapper,
+                                       ValeCajaRepository valesCaja) {
         this.empresas = empresas;
         this.storage = storage;
         this.auditoria = auditoria;
         this.datosEmpresa = datosEmpresa;
         this.monedas = monedas;
         this.mapper = mapper;
+        this.valesCaja = valesCaja;
     }
 
     @Transactional @PreAuthorize("hasAuthority('EMPRESA_VER')")
@@ -127,7 +131,9 @@ public class CompanyConfigurationService {
         String newKey = storage.store(logoDirectory(empresa), extension, bytes);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
-                if (oldKey != null && ownedByCompany(empresa, oldKey)) {
+                if (oldKey != null && ownedByCompany(empresa, oldKey)
+                    && !valesCaja.existsByTenantIdAndEmpresaIdAndEmpresaLogoObjectKey(
+                        empresa.getTenantId(), empresa.getId(), oldKey)) {
                     try { storage.delete(oldKey); }
                     catch (RuntimeException ex) { log.error("No se pudo eliminar el logo anterior de empresa {}", empresa.getId(), ex); }
                 }

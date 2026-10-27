@@ -4,6 +4,7 @@ import com.citacloud.springboot.contacloud.app.models.Empresa;
 import com.citacloud.springboot.contacloud.app.repositories.EmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.DatosEmpresaRepository;
 import com.citacloud.springboot.contacloud.app.repositories.MonedaRepository;
+import com.citacloud.springboot.contacloud.app.repositories.ValeCajaRepository;
 import com.citacloud.springboot.contacloud.app.mappers.ConfiguracionEmpresaMapper;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +38,7 @@ class CompanyConfigurationServiceTest {
     @Mock AuditoriaService auditoria;
     @Mock DatosEmpresaRepository datosEmpresa;
     @Mock MonedaRepository monedas;
+    @Mock ValeCajaRepository valesCaja;
     private LocalFileStorageService storage;
     private CompanyConfigurationService service;
     private Empresa empresa;
@@ -45,7 +47,7 @@ class CompanyConfigurationServiceTest {
     @BeforeEach void setup() {
         storage = new LocalFileStorageService(temp.toString());
         service = new CompanyConfigurationService(repository, storage, auditoria, datosEmpresa, monedas,
-            new ConfiguracionEmpresaMapper());
+            new ConfiguracionEmpresaMapper(), valesCaja);
         empresaId = UUID.randomUUID();
         empresa = new Empresa("A", "Empresa A");
         ReflectionTestUtils.setField(empresa, "id", empresaId);
@@ -98,6 +100,22 @@ class CompanyConfigurationServiceTest {
         assertFalse(service.currentLogoAvailable());
         verify(repository, atLeastOnce()).findById(empresaId);
         verify(repository, never()).findById(other);
+    }
+
+    @Test void conservaLogoAnteriorSiUnValeHistoricoLoReferencia() {
+        begin();
+        service.replaceCompanyLogo(new ByteArrayInputStream(PNG), "logo.png", "image/png");
+        String anterior = empresa.getLogoObjectKey();
+        complete(true);
+        when(valesCaja.existsByTenantIdAndEmpresaIdAndEmpresaLogoObjectKey(
+            empresa.getTenantId(), empresaId, anterior)).thenReturn(true);
+
+        begin();
+        service.replaceCompanyLogo(new ByteArrayInputStream(PNG), "nuevo.png", "image/png");
+        complete(true);
+
+        assertTrue(storage.exists(anterior));
+        assertTrue(storage.exists(empresa.getLogoObjectKey()));
     }
 
     @Test void archivoFaltanteDevuelveFallbackSinRomperLaPantalla() {

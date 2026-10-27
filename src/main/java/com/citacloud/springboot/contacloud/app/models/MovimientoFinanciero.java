@@ -129,6 +129,15 @@ public class MovimientoFinanciero {
             TipoOrigenMovimiento.MANUAL,null,MedioPagoMovimiento.CASH,sesionId,usuarioId);
         movimiento.numeroMovimientoCaja=numero;movimiento.conceptoCajaId=conceptoId;return movimiento;
     }
+    public static MovimientoFinanciero valeCaja(UUID tenantId,UUID empresaId,LocalDate fecha,
+            UUID cajaId,UUID monedaId,BigDecimal monto,String numeroMovimiento,String numeroVale,
+            String concepto,String beneficiario,String observacion,UUID valeId,UUID sesionId,UUID usuarioId){
+        String descripcion="Beneficiario: "+beneficiario+(observacion==null||observacion.isBlank()?"":". "+observacion);
+        MovimientoFinanciero movimiento=new MovimientoFinanciero(tenantId,empresaId,TipoMovimientoFinanciero.EXPENSE,
+            fecha,TipoCuentaDinero.CASH_REGISTER,cajaId,monedaId,monto,concepto,numeroVale,descripcion,
+            TipoOrigenMovimiento.CASH_VOUCHER,valeId,MedioPagoMovimiento.CASH,sesionId,usuarioId);
+        movimiento.numeroMovimientoCaja=numeroMovimiento;return movimiento;
+    }
     public static MovimientoFinanciero reversionCaja(MovimientoFinanciero original,LocalDate fecha,String numero,
             String motivo,UUID usuarioId){
         TipoMovimientoFinanciero opuesto=original.tipoMovimiento==TipoMovimientoFinanciero.INCOME

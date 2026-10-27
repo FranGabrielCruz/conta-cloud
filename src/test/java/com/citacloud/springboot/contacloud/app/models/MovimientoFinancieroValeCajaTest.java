@@ -1,0 +1,5 @@
+package com.citacloud.springboot.contacloud.app.models;
+import org.junit.jupiter.api.Test;import java.math.BigDecimal;import java.time.LocalDate;import java.util.UUID;import static org.assertj.core.api.Assertions.*;
+class MovimientoFinancieroValeCajaTest {
+ @Test void creaSalidaEfectivaVinculadaAlVale(){UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),caja=UUID.randomUUID(),moneda=UUID.randomUUID(),vale=UUID.randomUUID(),sesion=UUID.randomUUID(),usuario=UUID.randomUUID();MovimientoFinanciero m=MovimientoFinanciero.valeCaja(tenant,empresa,LocalDate.of(2026,10,26),caja,moneda,new BigDecimal("250.0000"),"MOV-000001","VAL-000001","Compra menor","María","Soporte",vale,sesion,usuario);assertThat(m.getTipoMovimiento()).isEqualTo(TipoMovimientoFinanciero.EXPENSE);assertThat(m.getTipoOrigen()).isEqualTo(TipoOrigenMovimiento.CASH_VOUCHER);assertThat(m.getOrigenId()).isEqualTo(vale);assertThat(m.getSesionCajaId()).isEqualTo(sesion);assertThat(m.getMedioPago()).isEqualTo(MedioPagoMovimiento.CASH);assertThat(m.getReferencia()).isEqualTo("VAL-000001");}
+}

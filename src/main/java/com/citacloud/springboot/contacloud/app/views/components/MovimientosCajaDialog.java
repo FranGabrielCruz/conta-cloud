@@ -133,5 +133,5 @@ public class MovimientosCajaDialog extends Dialog {
     static String origen(TipoOrigenMovimiento origen){if(origen==null)return "Todos";return switch(origen){
         case OPENING_BALANCE->"Apertura";case SALES_INVOICE->"Venta";case SALES_PAYMENT,CUSTOMER_RECEIPT->"Recibo/Cobro";
         case SUPPLIER_PAYMENT->"Pago a proveedor";case TRANSFER->"Transferencia";case MANUAL->"Movimiento manual";
-        case REVERSAL->"Reversión";case ADJUSTMENT->"Ajuste";case OTHER->"Otro";};}
+        case REVERSAL->"Reversión";case CASH_VOUCHER->"Vale de caja";case ADJUSTMENT->"Ajuste";case OTHER->"Otro";};}
 }

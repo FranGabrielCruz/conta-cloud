@@ -5,7 +5,6 @@ import com.citacloud.springboot.contacloud.app.models.*;
 import com.citacloud.springboot.contacloud.app.repositories.*;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
 import org.junit.jupiter.api.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -22,8 +21,8 @@ class MovimientoCajaServiceTest {
     private final ConceptoMovimientoCajaRepository conceptos=mock(ConceptoMovimientoCajaRepository.class);
     private final IdempotentOperationService idempotencia=mock(IdempotentOperationService.class);
     private final AuditoriaService auditoria=mock(AuditoriaService.class);
-    private final JdbcTemplate jdbc=mock(JdbcTemplate.class);
-    private final MovimientoCajaService service=new MovimientoCajaService(sesiones,movimientos,conceptos,idempotencia,auditoria,jdbc);
+    private final MovimientoCajaNumeroService numeros=mock(MovimientoCajaNumeroService.class);
+    private final MovimientoCajaService service=new MovimientoCajaService(sesiones,movimientos,conceptos,idempotencia,auditoria,numeros);
     private final UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),usuario=UUID.randomUUID();
     private final UUID sesionId=UUID.randomUUID(),cajaId=UUID.randomUUID(),monedaId=UUID.randomUUID(),sucursalId=UUID.randomUUID();
 
@@ -32,7 +31,7 @@ class MovimientoCajaServiceTest {
             Set.of("movimientos_caja.ver","movimientos_caja.crear","movimientos_caja.revertir"));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
         when(idempotencia.begin(any(),any(),anyString(),any(),anyString())).thenReturn(new IdempotentOperationService.Start(true,null,null));
-        when(jdbc.queryForObject(anyString(),eq(Long.class),any(),any())).thenReturn(1L);
+        when(numeros.siguiente(any(),any())).thenReturn("MOV-000001");
         when(movimientos.saveAndFlush(any())).thenAnswer(i->{MovimientoFinanciero m=i.getArgument(0);
             ReflectionTestUtils.setField(m,"id",UUID.randomUUID());return m;});
     }

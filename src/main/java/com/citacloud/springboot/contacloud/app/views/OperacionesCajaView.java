@@ -36,6 +36,8 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private final CashRegisterSessionService service;
     private final RecuentoCajaConsultaService consultaRecuentos;
     private final RecuentoCajaPdfService pdfRecuentos;
+    private final ValeCajaService valesCaja;
+    private final ValeCajaPdfService pdfVales;
     private final EmpresaModuloService modulos;
     private final TextField buscar=new TextField("Buscar caja");
     private final ComboBox<CajaCatalogosDto.SucursalOpcion> sucursal=new ComboBox<>("Sucursal");
@@ -57,19 +59,31 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private final AppPagination paginacionRecuentos;
     private final VerticalLayout panelRecuentos=new VerticalLayout();
     private RecuentoCajaCatalogosDto catalogosRecuento;
+    private RecuentoCajaCatalogosDto catalogosVale;
+    private final TextField buscarVale=new TextField("Buscar");
+    private final ComboBox<RecuentoCajaCatalogosDto.SucursalOpcion> sucursalVale=new ComboBox<>("Sucursal");
+    private final ComboBox<RecuentoCajaCatalogosDto.CajaOpcion> cajaVale=new ComboBox<>("Caja");
+    private final ComboBox<RecuentoCajaCatalogosDto.UsuarioOpcion> usuarioVale=new ComboBox<>("Usuario");
+    private final Select<EstadoValeCaja> estadoVale=new Select<>();
+    private final DatePicker desdeVale=new DatePicker("Desde"),hastaVale=new DatePicker("Hasta");
+    private final AppGrid<ValeCajaDto> vales=new AppGrid<>(ValeCajaDto.class);
+    private final AppPagination paginacionVales;
+    private final VerticalLayout panelVales=new VerticalLayout();
 
     public OperacionesCajaView(CashRegisterSessionService service,EmpresaModuloService modulos,
-            RecuentoCajaConsultaService consultaRecuentos,RecuentoCajaPdfService pdfRecuentos){
-        this.service=service;this.modulos=modulos;this.consultaRecuentos=consultaRecuentos;this.pdfRecuentos=pdfRecuentos;addClassName("cc-page");setPadding(false);setSpacing(false);setWidthFull();
+            RecuentoCajaConsultaService consultaRecuentos,RecuentoCajaPdfService pdfRecuentos,
+            ValeCajaService valesCaja,ValeCajaPdfService pdfVales){
+        this.service=service;this.modulos=modulos;this.consultaRecuentos=consultaRecuentos;this.pdfRecuentos=pdfRecuentos;this.valesCaja=valesCaja;this.pdfVales=pdfVales;addClassName("cc-page");setPadding(false);setSpacing(false);setWidthFull();
         add(new AppPageHeader("OPERACIONES DE CAJA","Abre turnos, consulta el efectivo esperado y realiza cierres de caja."));
-        configurarOperaciones();configurarHistorial();configurarRecuentos();
-        paginacionCajas=new AppPagination(r->cargarCajas());paginacionHistorial=new AppPagination(r->cargarHistorial());paginacionRecuentos=new AppPagination(r->cargarRecuentos(),10,10,20,50);
+        configurarOperaciones();configurarHistorial();configurarRecuentos();configurarVales();
+        paginacionCajas=new AppPagination(r->cargarCajas());paginacionHistorial=new AppPagination(r->cargarHistorial());paginacionRecuentos=new AppPagination(r->cargarRecuentos(),10,10,20,50);paginacionVales=new AppPagination(r->cargarVales(),10,10,20,50);
         panelOperaciones.setPadding(false);panelOperaciones.setSpacing(false);panelOperaciones.add(filtrosOperaciones(),cajas,paginacionCajas);
         panelHistorial.setPadding(false);panelHistorial.setSpacing(false);panelHistorial.add(filtrosHistorial(),historial,paginacionHistorial);panelHistorial.setVisible(false);
         panelRecuentos.setPadding(false);panelRecuentos.setSpacing(false);panelRecuentos.add(filtrosRecuentos(),recuentos,paginacionRecuentos);panelRecuentos.setVisible(false);
-        Tab actual=new Tab("Estado actual"),historico=new Tab("Historial de cierres"),tabRecuentos=new Tab("Recuentos");Tabs tabs=new Tabs(actual,historico,tabRecuentos);
-        tabs.addSelectedChangeListener(e->{boolean esActual=e.getSelectedTab()==actual,esHistorial=e.getSelectedTab()==historico;panelOperaciones.setVisible(esActual);panelHistorial.setVisible(esHistorial);panelRecuentos.setVisible(!esActual&&!esHistorial);if(esActual)cargarCajas();else if(esHistorial)cargarHistorial();else cargarRecuentos();});
-        add(tabs,panelOperaciones,panelHistorial,panelRecuentos);
+        panelVales.setPadding(false);panelVales.setSpacing(false);panelVales.add(filtrosVales(),vales,paginacionVales);panelVales.setVisible(false);
+        Tab actual=new Tab("Estado actual"),historico=new Tab("Historial de cierres"),tabRecuentos=new Tab("Recuentos"),tabVales=new Tab("Vales de caja");tabVales.setVisible(puede("vales_caja.ver"));Tabs tabs=new Tabs(actual,historico,tabRecuentos,tabVales);
+        tabs.addSelectedChangeListener(e->{boolean esActual=e.getSelectedTab()==actual,esHistorial=e.getSelectedTab()==historico,esRecuento=e.getSelectedTab()==tabRecuentos;panelOperaciones.setVisible(esActual);panelHistorial.setVisible(esHistorial);panelRecuentos.setVisible(esRecuento);panelVales.setVisible(e.getSelectedTab()==tabVales);if(esActual)cargarCajas();else if(esHistorial)cargarHistorial();else if(esRecuento)cargarRecuentos();else cargarVales();});
+        add(tabs,panelOperaciones,panelHistorial,panelRecuentos,panelVales);
     }
 
     @Override public void beforeEnter(BeforeEnterEvent event){
@@ -139,9 +153,21 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
         recuentos.setEmptyStateText("No se encontraron recuentos de caja.");
     }
 
+    private void configurarVales(){
+        buscarVale.setPlaceholder("Número, beneficiario, concepto o referencia...");buscarVale.setClearButtonVisible(true);buscarVale.setValueChangeMode(ValueChangeMode.LAZY);buscarVale.setValueChangeTimeout(400);
+        sucursalVale.setPlaceholder("Todas");sucursalVale.setClearButtonVisible(true);sucursalVale.setItemLabelGenerator(RecuentoCajaCatalogosDto.SucursalOpcion::nombre);
+        cajaVale.setPlaceholder("Todas");cajaVale.setClearButtonVisible(true);cajaVale.setItemLabelGenerator(RecuentoCajaCatalogosDto.CajaOpcion::nombre);
+        usuarioVale.setPlaceholder("Todos");usuarioVale.setClearButtonVisible(true);usuarioVale.setItemLabelGenerator(RecuentoCajaCatalogosDto.UsuarioOpcion::nombre);
+        estadoVale.setLabel("Estado");estadoVale.setItems(EstadoValeCaja.values());estadoVale.setEmptySelectionAllowed(true);estadoVale.setEmptySelectionCaption("Todos");estadoVale.setItemLabelGenerator(x->x==EstadoValeCaja.VOIDED?"Anulado":"Confirmado");
+        desdeVale.setLocale(new Locale("es","DO"));hastaVale.setLocale(new Locale("es","DO"));
+        buscarVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});sucursalVale.addValueChangeListener(e->{if(e.isFromClient()){actualizarCajasVale();reiniciarVales();}});cajaVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});usuarioVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});estadoVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});desdeVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});hastaVale.addValueChangeListener(e->{if(e.isFromClient())reiniciarVales();});
+        vales.addColumn(ValeCajaDto::numero).setHeader("Número").setAutoWidth(true);vales.addColumn(x->x.fechaHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).setHeader("Fecha/Hora").setAutoWidth(true);vales.addColumn(ValeCajaDto::caja).setHeader("Caja").setFlexGrow(1);vales.addColumn(ValeCajaDto::sucursal).setHeader("Sucursal").setFlexGrow(1);vales.addColumn(ValeCajaDto::usuario).setHeader("Usuario").setFlexGrow(1);vales.addColumn(ValeCajaDto::beneficiario).setHeader("Beneficiario").setFlexGrow(1);vales.addColumn(ValeCajaDto::concepto).setHeader("Concepto").setFlexGrow(1);vales.addColumn(x->x.monedaCodigo()+" "+PosNumberFormatter.money(x.importe())).setHeader("Importe").setAutoWidth(true).setTextAlign(com.vaadin.flow.component.grid.ColumnTextAlign.END);vales.addComponentColumn(x->badge(x.estado()==EstadoValeCaja.VOIDED?"Anulado":"Confirmado",x.estado()==EstadoValeCaja.VOIDED?"error":"success")).setHeader("Estado").setAutoWidth(true);vales.addComponentColumn(x->new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver vale",e->verVale(x.id()))).setHeader("Acc.").setAutoWidth(true).setFlexGrow(0);vales.setEmptyStateText("No se encontraron vales de caja.");
+    }
+
     private HorizontalLayout filtrosOperaciones(){HorizontalLayout h=new HorizontalLayout(buscar,sucursal,estado);h.addClassName("cc-filter-bar");h.setAlignItems(Alignment.END);return h;}
     private HorizontalLayout filtrosHistorial(){HorizontalLayout h=new HorizontalLayout(desde,hasta,revision);h.addClassName("cc-filter-bar");h.setAlignItems(Alignment.END);return h;}
     private Div filtrosRecuentos(){Div d=new Div(buscarRecuento,sucursalRecuento,cajaRecuento,usuarioRecuento,desdeRecuento,hastaRecuento,resultadoRecuento);d.addClassNames("cc-filter-bar","cc-cash-count-filters");return d;}
+    private Div filtrosVales(){Div d=new Div(buscarVale,sucursalVale,cajaVale,usuarioVale,estadoVale,desdeVale,hastaVale);d.addClassNames("cc-filter-bar","cc-cash-voucher-filters");return d;}
     private Component accionesCaja(OperacionCajaDto item){HorizontalLayout h=acciones();
         if(item.estadoOperativo()==EstadoSesionCaja.OPEN){h.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver turno",e->detalle(item.sesionId())));
             if(puede("operaciones_caja.cerrar"))h.add(new AppActionButton(ActionType.CLOSE_CASH,ButtonSize.GRID_ACTION,"Cerrar caja",e->cerrar(item.sesionId())));
@@ -167,6 +193,9 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
         }catch(RuntimeException ex){recuentos.setItems(List.of());paginacionRecuentos.setTotal(0);UiErrorHandler.show(ex,"No fue posible consultar los recuentos de caja.");}
         finally{recuentos.getElement().removeAttribute("aria-busy");recuentos.setEnabled(true);}
     }
+    private void cargarVales(){if(!puede("vales_caja.ver")){vales.setItems(List.of());paginacionVales.setTotal(0);return;}try{if(catalogosVale==null)catalogosVale=valesCaja.catalogos();sucursalVale.setItems(catalogosVale.sucursales());usuarioVale.setItems(catalogosVale.usuarios());actualizarCajasVale();var r=paginacionVales.currentRequest();var page=valesCaja.buscarAdmin(buscarVale.getValue(),id(sucursalVale.getValue()),id(cajaVale.getValue()),id(usuarioVale.getValue()),estadoVale.getValue(),desdeVale.getValue(),hastaVale.getValue(),r.page(),r.size());vales.setItems(page.getContent());paginacionVales.setTotal(page.getTotalElements());}catch(RuntimeException ex){vales.setItems(List.of());paginacionVales.setTotal(0);UiErrorHandler.show(ex,"No fue posible consultar los vales de caja.");}}
+    private void reiniciarVales(){paginacionVales.reset();cargarVales();}
+    private void actualizarCajasVale(){if(catalogosVale==null)return;UUID sid=id(sucursalVale.getValue()),seleccion=id(cajaVale.getValue());var disponibles=catalogosVale.cajas().stream().filter(x->sid==null||sid.equals(x.sucursalId())).toList();cajaVale.setItems(disponibles);if(seleccion!=null&&disponibles.stream().noneMatch(x->seleccion.equals(x.id())))cajaVale.clear();}
     private void reiniciarRecuentos(){paginacionRecuentos.reset();cargarRecuentos();}
     private void actualizarCajasRecuento(){if(catalogosRecuento==null)return;UUID sucursalId=id(sucursalRecuento.getValue());UUID seleccion=id(cajaRecuento.getValue());var disponibles=catalogosRecuento.cajas().stream().filter(x->sucursalId==null||sucursalId.equals(x.sucursalId())).toList();cajaRecuento.setItems(disponibles);if(seleccion!=null&&disponibles.stream().noneMatch(x->seleccion.equals(x.id())))cajaRecuento.clear();}
     private boolean tieneFiltrosRecuento(){return !buscarRecuento.getValue().isBlank()||sucursalRecuento.getValue()!=null||cajaRecuento.getValue()!=null||usuarioRecuento.getValue()!=null||desdeRecuento.getValue()!=null||hastaRecuento.getValue()!=null||resultadoRecuento.getValue()!=null;}
@@ -179,6 +208,9 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
 
     private void verRecuento(UUID id){try{new DetalleRecuentoCajaDialog(consultaRecuentos.obtener(id),puede("recuentos_caja.imprimir"),this::imprimirRecuento).open();}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible cargar el recuento.");}}
     private void imprimirRecuento(UUID id){try{ArchivoPdfDto archivo=pdfRecuentos.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el comprobante de recuento.");}}
+    private void verVale(UUID id){try{ValeCajaDto v=valesCaja.obtener(id);Dialog d=dialog("VALE DE CAJA "+v.numero());d.add(new AppDetailSection("Información").field("Estado",v.estado()==EstadoValeCaja.VOIDED?"Anulado":"Confirmado").field("Fecha/Hora",v.fechaHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).field("Caja",v.caja()).field("Sucursal",v.sucursal()).field("Usuario",v.usuario()).field("Beneficiario",v.beneficiario()).field("Concepto",v.concepto()).field("Referencia",v.referencia()==null?"—":v.referencia()).field("Importe",v.monedaCodigo()+" "+PosNumberFormatter.money(v.importe())).field("Observación",v.observacion()==null?"—":v.observacion()).field("Motivo de anulación",v.motivoAnulacion()==null?"—":v.motivoAnulacion()));if(puede("vales_caja.imprimir"))d.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Reimprimir vale",e->imprimirVale(v.id())));if(puede("vales_caja.anular")&&v.anulable())d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular",e->anularVale(d,v.id())));d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible cargar el vale de caja.");}}
+    private void imprimirVale(UUID id){try{ArchivoPdfDto archivo=pdfVales.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el comprobante del vale.");}}
+    private void anularVale(Dialog detalle,UUID id){Dialog d=dialog("ANULAR VALE");TextArea motivo=new TextArea("Motivo de anulación");motivo.setRequiredIndicatorVisible(true);motivo.setMaxLength(500);motivo.setWidthFull();d.add(motivo);UUID clave=UUID.randomUUID();d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular vale",e->{try{valesCaja.anular(new AnulacionValeCajaInput(id,motivo.getValue(),clave));d.close();detalle.close();cargarVales();Notification.show("Vale de caja anulado correctamente.");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible anular el vale de caja.");}}),new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->d.close()));d.open();}
 
     private static HorizontalLayout acciones(){HorizontalLayout h=new HorizontalLayout();h.addClassName("cc-grid-actions");h.setPadding(false);h.setSpacing(false);return h;}
     private static Dialog dialog(String titulo){Dialog d=new Dialog();d.setHeaderTitle(titulo);d.setWidth("min(800px, 96vw)");return d;}

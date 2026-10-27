@@ -24,6 +24,7 @@ import com.citacloud.springboot.contacloud.app.views.components.PosNumberFormatt
 import com.citacloud.springboot.contacloud.app.views.components.RecibosCobrosDialog;
 import com.citacloud.springboot.contacloud.app.views.components.RecuentoCajaDialog;
 import com.citacloud.springboot.contacloud.app.views.components.MovimientosCajaDialog;
+import com.citacloud.springboot.contacloud.app.views.components.ValesCajaDialog;
 import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -68,6 +69,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final RecuentoCajaService recuentosCaja;
     private final RecuentoCajaPdfService recuentosCajaPdf;
     private final MovimientoCajaService movimientosCaja;
+    private final ValeCajaService valesCaja;
+    private final ValeCajaPdfService valesCajaPdf;
     private final ModuleAuthorization authorization;
     private final List<Fila> filas = new ArrayList<>();
     private final Grid<Fila> grid = new Grid<>();
@@ -96,6 +99,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private CargarCotizacionDialog dialogoCotizacionesActivo;
     private RecibosCobrosDialog dialogoRecibosActivo;
     private MovimientosCajaDialog dialogoMovimientosCajaActivo;
+    private ValesCajaDialog dialogoValesCajaActivo;
     private ClientePosDto clienteSeleccionado;
     private ComboBox<ProductoPosDto> productoBuscar;
     private UUID idempotencia = UUID.randomUUID();
@@ -118,7 +122,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                               CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
                               CobroClienteService cobrosCliente, CobroClientePdfService cobrosPdf,
                               RecuentoCajaService recuentosCaja, RecuentoCajaPdfService recuentosCajaPdf,
-                              MovimientoCajaService movimientosCaja,
+                              MovimientoCajaService movimientosCaja,ValeCajaService valesCaja,ValeCajaPdfService valesCajaPdf,
                               ModuleAuthorization authorization) {
         this.service = service;
         this.cajaService = cajaService;
@@ -136,6 +140,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.recuentosCaja = recuentosCaja;
         this.recuentosCajaPdf = recuentosCajaPdf;
         this.movimientosCaja = movimientosCaja;
+        this.valesCaja=valesCaja;this.valesCajaPdf=valesCajaPdf;
         this.authorization = authorization;
         addClassNames("cc-page", "cc-pos-page");
         setPadding(false);
@@ -1348,6 +1353,13 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void enfocarProducto() { if (productoBuscar != null) productoBuscar.focus(); }
 
     private void pendiente(String funcion) {
+        if ("Vale de caja".equals(funcion)) {
+            if (dialogoValesCajaActivo != null && dialogoValesCajaActivo.isOpened()) return;
+            if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) { Notification.show("La caja debe estar abierta para consultar los vales."); return; }
+            if (!puede("vales_caja.ver")) { Notification.show("No tiene permisos para consultar los vales de caja."); return; }
+            try { dialogoValesCajaActivo=new ValesCajaDialog(terminal.sesionCajaId(),valesCaja,this::abrirPdfVale,puede("vales_caja.crear"),puede("vales_caja.imprimir"),puede("vales_caja.anular"));dialogoValesCajaActivo.addClosedListener(e->dialogoValesCajaActivo=null);dialogoValesCajaActivo.open(); }
+            catch(RuntimeException ex){dialogoValesCajaActivo=null;error(ex,"No fue posible abrir los vales de caja.");}return;
+        }
         if ("Movimientos de caja".equals(funcion)) {
             if (dialogoMovimientosCajaActivo != null && dialogoMovimientosCajaActivo.isOpened()) return;
             if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) {
@@ -1386,6 +1398,11 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             var registro = VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);
             UI.getCurrent().getPage().open(registro.getResourceUri().toString(), "_blank");
         } catch (RuntimeException ex) { error(ex, "No fue posible abrir el PDF del recuento."); }
+    }
+
+    private void abrirPdfVale(UUID id) {
+        try { ArchivoPdfDto archivo=valesCajaPdf.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank"); }
+        catch(RuntimeException ex){error(ex,"No fue posible abrir el PDF del vale de caja.");}
     }
 
     private static boolean puede(String permiso) {
