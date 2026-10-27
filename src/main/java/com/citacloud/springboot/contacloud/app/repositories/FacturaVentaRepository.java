@@ -77,4 +77,24 @@ public interface FacturaVentaRepository extends JpaRepository<FacturaVenta,UUID>
         @Param("todasSucursales") boolean todasSucursales,@Param("sucursales") Collection<UUID> sucursales,
         @Param("texto") String texto,@Param("identificacion") String identificacion,
         @Param("desde") LocalDate desde,@Param("hasta") LocalDate hasta,@Param("estado") EstadoFacturaVenta estado,Pageable pageable);
+
+    @Query("""
+        select f from FacturaVenta f
+        where f.tenantId=:tenant and f.empresaId=:empresa and f.sesionCajaId=:sesion
+          and (:estado is null or f.status=:estado)
+          and (:texto='' or lower(f.numero) like concat('%',:texto,'%')
+            or lower(f.clienteNombre) like concat('%',:texto,'%')
+            or (:identificacion<>'' and f.clienteIdentificacionNormalizada=:identificacion))
+        """)
+    Page<FacturaVenta> buscarPorSesion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion,@Param("texto")String texto,@Param("identificacion")String identificacion,
+        @Param("estado")EstadoFacturaVenta estado,Pageable pageable);
+
+    @Query("""
+        select coalesce(sum(f.total),0) from FacturaVenta f
+        where f.tenantId=:tenant and f.empresaId=:empresa and f.sesionCajaId=:sesion
+          and f.status=com.citacloud.springboot.contacloud.app.models.EstadoFacturaVenta.CONFIRMED
+        """)
+    java.math.BigDecimal totalConfirmadoPorSesion(@Param("tenant")UUID tenant,@Param("empresa")UUID empresa,
+        @Param("sesion")UUID sesion);
 }

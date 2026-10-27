@@ -84,6 +84,29 @@ public class CobroClienteRepository {
         return new PageImpl<>(rows,PageRequest.of(page,size),total==null?0:total);
     }
 
+    public Page<CobroClienteDto> buscarPorSesion(UUID tenant,UUID empresa,UUID sesion,String texto,
+            String identificacion,int page,int size){
+        String sql="""
+            FROM customer_receipt r
+            WHERE r.tenant_id=? AND r.empresa_id=?
+              AND EXISTS(SELECT 1 FROM customer_receipt_payment p
+                WHERE p.tenant_id=r.tenant_id AND p.empresa_id=r.empresa_id
+                  AND p.customer_receipt_id=r.id AND p.cash_register_session_id=?)
+              AND (?='' OR lower(r.internal_number) LIKE concat('%',lower(?),'%')
+                OR lower(r.customer_name_snapshot) LIKE concat('%',lower(?),'%')
+                OR (?<>'' AND r.customer_identification_normalized LIKE concat('%',?,'%'))
+                OR EXISTS(SELECT 1 FROM customer_receipt_application a
+                  WHERE a.tenant_id=r.tenant_id AND a.empresa_id=r.empresa_id
+                    AND a.customer_receipt_id=r.id
+                    AND lower(a.invoice_number_snapshot) LIKE concat('%',lower(?),'%')))
+            """;
+        Object[] args={tenant,empresa,sesion,texto,texto,texto,identificacion,identificacion,texto};
+        Long total=jdbc.queryForObject("SELECT count(*) "+sql,Long.class,args);
+        List<CobroClienteDto> rows=jdbc.query("SELECT r.* "+sql+" ORDER BY r.confirmed_at DESC,r.id DESC LIMIT ? OFFSET ?",
+            (rs,n)->resumen(rs),append(args,size,page*size));
+        return new PageImpl<>(rows,PageRequest.of(page,size),total==null?0:total);
+    }
+
     public Optional<CobroClienteDto> buscarIdempotencia(UUID tenant,UUID empresa,UUID key){
         return jdbc.query("SELECT * FROM customer_receipt WHERE tenant_id=? AND empresa_id=? AND idempotency_key=?",(rs,n)->resumen(rs),tenant,empresa,key).stream().findFirst();
     }
