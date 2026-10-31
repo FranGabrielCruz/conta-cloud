@@ -25,6 +25,7 @@ public enum ActionType {
     REJECT("Rechazar", VaadinIcon.CLOSE, "danger"),
     CREATE_INVOICE("Crear factura", VaadinIcon.FILE_TEXT_O, "success"),
     MATCH("Conciliar", VaadinIcon.CONNECT, "success"),
+    LINK("Generar código de vinculación", VaadinIcon.LINK, "new"),
     UNMATCH("Desconciliar", VaadinIcon.UNLINK, "danger"),
     FINALIZE("Finalizar", VaadinIcon.LOCK, "danger"),
     OPEN_CASH("Abrir caja", VaadinIcon.UNLOCK, "success"),

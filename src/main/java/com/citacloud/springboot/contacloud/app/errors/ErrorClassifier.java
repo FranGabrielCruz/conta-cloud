@@ -2,6 +2,7 @@ package com.citacloud.springboot.contacloud.app.errors;
 
 import com.citacloud.springboot.contacloud.app.services.RecursoNoEncontradoException;
 import com.citacloud.springboot.contacloud.app.services.ReglaNegocioException;
+import com.citacloud.springboot.contacloud.app.services.VinculacionAgenteException;
 import io.micrometer.core.instrument.Metrics;
 import java.io.UncheckedIOException;
 import java.util.Locale;
@@ -20,6 +21,10 @@ public final class ErrorClassifier {
 
     public static ClassifiedError classify(Throwable error) {
         Throwable root = root(error);
+        if (error instanceof VinculacionAgenteException) {
+            return expected(ErrorCategory.AUTHENTICATION_ERROR, ErrorCode.AUTHENTICATION_ERROR,
+                HttpStatus.BAD_REQUEST, "No fue posible vincular el dispositivo.");
+        }
         if (error instanceof IdempotencyConflictException) {
             return expected(ErrorCategory.IDEMPOTENCY_CONFLICT, ErrorCode.IDEMPOTENCY_KEY_CONFLICT,
                 HttpStatus.CONFLICT, safe(error.getMessage(), "La clave de idempotencia ya fue utilizada por otra operación."));

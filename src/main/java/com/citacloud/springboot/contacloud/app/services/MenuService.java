@@ -54,6 +54,8 @@ public class MenuService {
                 || permisos.contains("PERIODO_VER"));
         if (contabilidad) configuracion.add(new OpcionMenu(
             "Configuración contable", "configuracion-contable", "BOOK_DOLLAR"));
+        if (habilitados.contains("CONFIGURACION") && permisos.contains("agentes_impresion.ver"))
+            configuracion.add(new OpcionMenu("Agentes de impresión", "configuracion/impresion-pos/agentes", "PRINT"));
         if (!configuracion.isEmpty()) grupos.add(new GrupoMenu("CONFIGURACIÓN", List.copyOf(configuracion)));
 
         List<OpcionMenu> infraestructura=new ArrayList<>();
