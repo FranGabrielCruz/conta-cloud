@@ -3,16 +3,29 @@ package com.citacloud.springboot.contacloud.app.models;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.Collections;
 
-@Entity @Table(name="print_agents")
+@Entity @Table(name="print_agents",uniqueConstraints=@UniqueConstraint(columnNames={"tenant_id","empresa_id","sucursal_id","id"}))
 public class AgenteImpresion {
     @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
     @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;
     @Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
-    @Column(name="sucursal_id",nullable=false,updatable=false) private UUID sucursalId;
-    @Column(name="cash_register_id") private UUID cajaId;
-    public UUID getCajaId(){return cajaId;}
-    public void asignarCaja(UUID caja){cajaId=caja;actualizadoEn=OffsetDateTime.now();}
+    @Column(name="sucursal_id",nullable=false) private UUID sucursalId;
+    @ManyToMany(fetch=FetchType.LAZY)
+    @JoinTable(name="print_agent_cash_registers",joinColumns={
+        @JoinColumn(name="tenant_id",referencedColumnName="tenant_id"),
+        @JoinColumn(name="empresa_id",referencedColumnName="empresa_id"),
+        @JoinColumn(name="sucursal_id",referencedColumnName="sucursal_id"),
+        @JoinColumn(name="agent_id",referencedColumnName="id")
+    },inverseJoinColumns=@JoinColumn(name="cash_register_id",referencedColumnName="id"))
+    private Set<Caja> cajas=new LinkedHashSet<>();
+    @Column(name="show_pdf_on_print",nullable=false) private boolean mostrarPdfAlImprimir=true;
+    public Set<Caja> getCajas(){return Collections.unmodifiableSet(cajas);}
+    public boolean isMostrarPdfAlImprimir(){return mostrarPdfAlImprimir;}
+    public void reemplazarCajas(Set<Caja> seleccion){cajas.clear();cajas.addAll(seleccion);actualizadoEn=OffsetDateTime.now();}
+    public void configurar(String nombre,UUID sucursal,boolean mostrarPdf){this.nombre=nombre;this.sucursalId=sucursal;this.mostrarPdfAlImprimir=mostrarPdf;actualizadoEn=OffsetDateTime.now();}
     public void prepararRevinculacion(){if(estado==EstadoAgenteImpresion.REVOKED){estado=EstadoAgenteImpresion.PENDING;actualizadoEn=OffsetDateTime.now();}}
     @Column(name="display_code",nullable=false,updatable=false,length=30) private String codigoVisible;
     @Column(name="name",nullable=false,length=150) private String nombre;

@@ -17,6 +17,7 @@ public enum ActionType {
     VOID("Anular", VaadinIcon.BAN, "danger"),
     REVERSE("Revertir", VaadinIcon.ROTATE_LEFT, "danger"),
     ISSUE("Emitir", VaadinIcon.PAPERPLANE, "success"),
+    PDF("Ver PDF", VaadinIcon.FILE_TEXT_O, "view"),
     PRINT("Imprimir", VaadinIcon.PRINT, "view"),
     REFRESH("Actualizar", VaadinIcon.REFRESH, "neutral"),
     DUPLICATE("Duplicar", VaadinIcon.COPY, "neutral"),

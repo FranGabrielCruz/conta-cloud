@@ -16,6 +16,7 @@ import java.util.*;
 
 @Service
 public class FacturaVentaPdfService {
+    @org.springframework.beans.factory.annotation.Autowired private FacturaPosDocumentoService documentosPos;
     private static final DateTimeFormatter DATE=DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final FacturaVentaRepository facturas;private final LineaFacturaVentaRepository lineas;
@@ -34,6 +35,7 @@ public class FacturaVentaPdfService {
         var p=TenantContext.principalActual();FacturaVenta f=facturas.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())
             .orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada."));
         if(!EmpresaContext.permiteSucursal(f.getSucursalId()))throw new RecursoNoEncontradoException("Factura no encontrada.");
+        if(ticket)return documentosPos.generar(f);
         Empresa e=empresas.findByIdAndTenantId(p.empresaId(),p.tenantId()).orElseThrow();DatosEmpresa d=datos.findByEmpresaId(p.empresaId()).orElse(null);
         String sucursal=sucursales.findByIdAndEmpresaId(f.getSucursalId(),p.empresaId()).map(Sucursal::getNombre).orElse("—");
         byte[] logo=e.getLogoObjectKey()==null?null:storage.load(e.getLogoObjectKey(),5L*1024*1024).orElse(null);
@@ -52,11 +54,9 @@ public class FacturaVentaPdfService {
         x.put("status",f.getStatus().name());
         x.put("subtotal",f.getSubtotal());x.put("discount",f.getDescuentoTotal());x.put("surcharge",f.getRecargoTotal());x.put("tax",f.getImpuestoTotal());x.put("total",f.getTotal());x.put("received",f.getRecibido());x.put("change",f.getCambio());
         try{return new ArchivoPdfDto("Factura_"+f.getNumero()+".pdf",JasperExportManager.exportReportToPdf(
-            JasperFillManager.fillReport(ticket?reporteTicket():reporte(),x,new JRBeanCollectionDataSource(detalle))));}
+            JasperFillManager.fillReport(reporte(),x,new JRBeanCollectionDataSource(detalle))));}
         catch(JRException ex){throw new ReglaNegocioException("No fue posible generar el PDF de la factura.",ex);}
     }
-    private volatile JasperReport ticketReport;
-    private JasperReport reporteTicket() throws JRException{if(ticketReport==null){synchronized(this){if(ticketReport==null)ticketReport=JasperCompileManager.compileReport(getClass().getResourceAsStream("/reports/sales-invoice/sales-invoice-80mm.jrxml"));}}return ticketReport;}
     private JasperReport reporte() throws JRException{JasperReport r=report;if(r!=null)return r;synchronized(this){if(report==null){
         InputStream in=getClass().getResourceAsStream("/reports/sales-invoice/sales-invoice.jrxml");if(in==null)throw new ReglaNegocioException("No se encontró la plantilla de factura.");report=JasperCompileManager.compileReport(in);}return report;}}
     private static String primero(String a,String b){return a==null||a.isBlank()?b:a.trim();}private static String valor(String v){return v==null||v.isBlank()?"—":v;}

@@ -42,6 +42,12 @@ public class FacturaVenta {
     @Column(name="change_amount",nullable=false,precision=19,scale=4) private BigDecimal cambio;
     @Column(name="idempotency_key",nullable=false,updatable=false) private UUID claveIdempotencia;
     @Column(name="created_at",nullable=false,insertable=false,updatable=false) private OffsetDateTime creadoEn;
+    @Embedded private EmisorFacturaPos emisorPos;
+    public EmisorFacturaPos getEmisorPos(){return emisorPos;}
+    public void conservarEmisorPos(EmisorFacturaPos snapshot){
+        if(emisorPos!=null)throw new IllegalStateException("La identidad histórica ya está conservada.");
+        emisorPos=java.util.Objects.requireNonNull(snapshot);
+    }
     protected FacturaVenta(){}
     public FacturaVenta(UUID tenant,UUID empresa,String numero,LocalDate fecha,UUID usuario,UUID terminal,UUID caja,UUID sesion,
             UUID sucursal,UUID almacen,UUID cliente,String clienteNombre,String clienteIdentificacion,String vendedor,

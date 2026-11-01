@@ -1323,7 +1323,15 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
     }
 
-    private void imprimirFactura(UUID id,UUID intento){boolean mostrar=true;try{mostrar=printing.mostrarPdf();printing.solicitar(id,intento);Notification.show("Impresión pendiente del agente de esta caja.");}catch(RuntimeException ex){Notification.show("La factura está confirmada, pero no pudo enviarse a la impresora.");}if(mostrar)abrirPdf(id);}
+    private void imprimirFactura(UUID id,UUID intento){
+        try{
+            var salida=printing.solicitar(id,intento);
+            if(salida.mostrarPdfAlImprimir())abrirPdf(id);
+            else Notification.show("Impresión pendiente del agente de esta caja.");
+        }catch(RuntimeException ex){
+            Notification.show("No fue posible procesar la salida de la factura. Intente nuevamente.");
+        }
+    }
     private void abrirPdf(FacturaVentaResultadoDto factura) {
         abrirPdf(factura.id());
     }

@@ -28,9 +28,11 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+        <contacloud.buildDirectory>${project.basedir}/target</contacloud.buildDirectory>
 		<vaadin.version>25.2.8</vaadin.version>
 	</properties>
 	<dependencies>
+		<dependency><groupId>org.apache.pdfbox</groupId><artifactId>pdfbox</artifactId><version>3.0.8</version></dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-h2console</artifactId>
@@ -151,6 +153,7 @@
 	</dependencyManagement>
 
 	<build>
+        <directory>${contacloud.buildDirectory}</directory>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

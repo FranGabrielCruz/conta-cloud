@@ -33,6 +33,15 @@ class MenuServiceTest {
     }
 
     @Test
+    void preferenciaPdfPermaneceDentroDelAgenteSinMenuIndependiente() {
+        when(modules.habilitadosActuales()).thenReturn(Set.of("CONFIGURACION","VENTAS"));
+        autenticar(Set.of("agentes_impresion.ver","facturas.configurar_impresion"));
+        var opciones=service.obtener().stream().flatMap(g->g.opciones().stream()).toList();
+        assertThat(opciones).extracting(MenuService.OpcionMenu::titulo).contains("Agentes de impresión").doesNotContain("Impresión de Facturación");
+        assertThat(opciones).extracting(MenuService.OpcionMenu::ruta).doesNotContain("configuracion/facturacion/impresion");
+    }
+
+    @Test
     void muestraSoloOpcionesPermitidasDelTenant() {
         autenticar(Set.of("USUARIO_VER", "IMPUESTO_VER"));
 

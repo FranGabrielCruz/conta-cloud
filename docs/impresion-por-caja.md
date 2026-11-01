@@ -1,26 +1,52 @@
-# Impresión de Facturación por caja
+# Agentes de impresión: varias cajas y preferencia de PDF
 
-La empresa y el tenant se obtienen de la autenticación. La caja procede de la factura confirmada; el destino se resuelve por tenant, empresa, sucursal y caja. Un destino ausente o ambiguo produce un error funcional. No existe fallback entre cajas.
+## Configuración
 
-Las migraciones V96 y V97 agregan caja opcional para agentes históricos, claves foráneas compuestas, configuración por empresa y trabajos persistentes. Los nuevos agentes requieren caja activa de una sucursal autorizada. Los históricos deben asignarse administrativamente. Se admiten varios agentes por caja; mientras no se configure un mecanismo de principal, más de un agente activo se considera ambiguo.
+Nuevo y Editar agente permiten seleccionar una o varias cajas de la misma sucursal mediante un MultiSelectComboBox. Debe seleccionarse al menos una caja activa de una sucursal autorizada. Cambiar la sucursal limpia las cajas incompatibles. Todas las cajas de un agente comparten la impresora física configurada localmente en contaCloudPrint.
 
-## Revinculación
+Mostrar PDF al imprimir es una propiedad persistente de cada agente. El checkbox aparece en Nuevo/Editar y como dato de solo lectura en el detalle. Cambiar la preferencia requiere facturas.configurar_impresion; editar nombre y cajas requiere agentes_impresion.editar. El formulario conserva el valor anterior si el usuario solo tiene permiso de consulta. No existe una pantalla independiente de impresión de Facturación.
 
-Generar otro código conserva las credenciales del equipo actual. Completar el pairing consume el código y revoca las credenciales anteriores en la misma transacción. Revocar tiene efecto inmediato en la siguiente petición. Generar un código después de revocar prepara el agente para una nueva vinculación sin recuperar credenciales revocadas. Los bloqueos se toman primero sobre el agente y después sobre códigos o credenciales. Los códigos se conservan únicamente como hashes y no se reutilizan desde su histórico.
+El listado muestra las dos primeras cajas y +N para las restantes, con el listado completo en un tooltip. Nombre, Sucursal y Cajas son flexibles; las acciones se dimensionan por contenido y quedan fijadas al borde derecho.
 
-## Contrato de trabajos
+## Integridad y migraciones
 
-- POST /api/print-agents/jobs/claim: devuelve 204 sin trabajo o un objeto con id, claimId y pdf (Base64).
-- POST /api/print-agents/jobs/{id}/complete: recibe claimId y printed.
+V99 crea print_agent_cash_registers y migra cada asignación anterior. Las claves compuestas validan tenant, empresa, sucursal, agente y caja. Una caja no puede tener dos destinos activos de Facturación: un índice único parcial lo impide incluso frente a escrituras concurrentes. El estado de la asociación se deriva del agente mediante un trigger y una FK con ON UPDATE CASCADE; no puede ser elegido libremente por un cliente. Los agentes pendientes se validan de nuevo al completar el pairing antes de activar su destino.
 
-El agente se identifica con Bearer; no se aceptan tenant, empresa, caja o agente desde parámetros de consulta. El trabajo queda reservado a una sola instancia. Una descarga no cambia su estado a PRINTED. El cliente reintenta la confirmación sin volver a imprimir durante la misma sesión. No se redistribuyen automáticamente reservas con resultado incierto tras una caída del equipo: revisar el resultado físico antes de una reimpresión explícita.
+El backend bloquea primero el agente y después las cajas en un orden determinista. La edición tiene control de versión para evitar sobrescribir cambios de otro administrador. La paginación del listado permanece en base de datos; las cajas se consultan por lote únicamente para los agentes de la página, evitando N+1 y paginación de colecciones en memoria.
 
-## PDF y transacciones
+V99 copia la preferencia de empresa anterior a cada agente y utiliza true cuando no había configuración, conservando el comportamiento existente. V100 verifica que las relaciones anteriores estén copiadas y retira print_agents.cash_register_id. La tabla anterior billing_print_settings se conserva como historial de migración; el código ya no la consulta ni la modifica.
 
-Configuración → Impresión de Facturación permite Mostrar PDF al imprimir (inicialmente activado). La lectura es inmediata en cada solicitud. Imprimir y Ver PDF son acciones separadas. El PDF de consulta conserva su plantilla original; el documento para impresora utiliza una plantilla de 80 mm. El fallo de impresión no revierte la factura.
+El permiso agentes_impresion.editar se asigna a ADMINISTRADOR y a los roles que ya podían crear agentes. Las sesiones que conservan permisos antiguos necesitan iniciar sesión de nuevo para cargar ese permiso.
 
-La cola se solicita desde la interfaz después de completar la transacción de confirmación. Una interrupción entre confirmar y solicitar requiere una impresión explícita desde el historial; no se garantiza entrega automática mediante outbox en esta versión.
+## Autorización y trabajos
 
-## Verificación en entorno
+La caja se obtiene de la factura confirmada. El backend resuelve su agente activo a partir de las asociaciones y aplica la preferencia de ese mismo agente. La solicitud resuelve el modo bajo bloqueo del agente antes de generar el ticket o insertar un trabajo. En modo PDF devuelve mostrarPdfAlImprimir=true sin ID de trabajo. En modo impresora devuelve el ID del único trabajo y mostrarPdfAlImprimir=false. Un reintento de un trabajo existente conserva el destino físico incluso si cambia la configuración; los trabajos históricos nunca provocan también apertura de PDF. Una nueva impresión explícita consulta la configuración actual.
 
-Se deben aplicar las migraciones con Flyway y validar integración contra PostgreSQL, dos cajas simultáneas y una impresora física de 80 mm. No se considera validado el resultado físico mediante pruebas unitarias. Los trabajos PROCESSING con resultado incierto requieren revisión antes de reimprimir.
+POST /api/print-agents/jobs/claim obtiene la identidad del Bearer autenticado. Su consulta exige una asociación actual con la caja y no admite un agentId o cashRegisterId arbitrario para seleccionar trabajos. La reserva usa FOR UPDATE SKIP LOCKED. Descargar un documento no lo marca como impreso.
+
+POST /api/print-agents/jobs/{id}/complete exige el mismo agente, tenant, empresa y claimId. Es idempotente. Un trabajo que ya estaba PROCESSING puede registrar su resultado después de retirar una caja: conserva el destino original y no se entrega a otro agente. La edición cancela los trabajos PENDING de las cajas retiradas dentro de la misma transacción.
+
+No hay fallback entre agentes, redundancia ni balanceo. Revocar un agente invalida sus credenciales; el diálogo advierte cuántas cajas perderán ese destino. Agregar o quitar cajas no cambia las credenciales y no requiere pairing.
+
+## Identidad de contaCloudPrint
+
+GET /api/print-agents/me devuelve cashRegisters con objetos {id, name}. Esa colección es la identidad autorizada y se actualiza con la sincronización del cliente. Los alias cashRegisterId (solo si hay una caja) y cashRegister (texto de las cajas) se mantienen por compatibilidad de lectura con clientes instalados; no se utilizan para autorizar ni enrutar.
+
+contaCloudPrint muestra Cajas como una lista de solo lectura con wrapping. No existe selector local de cajas. Printer-config.txt y SecretStore conservan sus responsabilidades anteriores.
+
+## PDF y transacción de venta
+
+El checkbox define dos salidas mutuamente excluyentes en Facturación y Últimas facturas:
+
+- Marcado: abre el PDF normal mediante FacturaVentaPdfService.generar. No genera ticket POS de 80 mm, no crea trabajo y no envía nada a contaCloudPrint. La falta de heartbeat del agente no bloquea esta salida.
+- Desmarcado: genera el ticket POS y crea un único trabajo para contaCloudPrint; no abre PDF automáticamente. Se mantienen las reglas de cola cuando el agente está desconectado, sin fallback a PDF.
+
+Ver PDF siempre utiliza el generador normal y nunca crea trabajos, independientemente del checkbox. Imprimir se deshabilita en el cliente durante la solicitud; la cola conserva su idempotencia backend. La configuración permanece en el agente, sin cambios en printer-config.txt. Un fallo de salida no revierte la venta.
+
+La solicitud de cola se realiza desde la interfaz después de confirmar la transacción de venta. Una caída entre confirmar y solicitar requiere una impresión explícita desde el historial; no se implementa un outbox financiero en esta versión. Las reservas PROCESSING con resultado físico incierto requieren revisión antes de reimprimir.
+
+## Validación
+
+Las pruebas de PostgreSQL son opt-in mediante CONTACLOUD_POSTGRES_TESTS=true y las variables DB_URL/DB_USERNAME/DB_PASSWORD del entorno; usan la base existente conta_cloud y registros temporales con IDs aleatorios, que se eliminan al finalizar. Hibernate valida el esquema; estas pruebas no crean tablas ni bases de datos. Cubren integridad compuesta, activación y asignación concurrentes, JPA, cambios de sucursal, consumo concurrente y autorización de cajas. Las pruebas de cliente cubren la identidad de varias cajas y el reintento de confirmación sin doble impresión.
+
+La verificación de componentes Vaadin cubre las resoluciones 1366×768, 1600×900 y 1920×1080 con escalados de 100 %, 125 % y 150 %. No se ejecutan impresiones físicas como parte de esas pruebas.

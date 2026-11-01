@@ -47,7 +47,6 @@ public class MenuService {
         agregarSiModulo(permisos,habilitados,configuracion,"CONDICION_PAGO_VER","condiciones_pago.ver","CONDICIONES_PAGO","Condiciones de pago","condiciones-pago","CLOCK");
         if(habilitados.contains("VENTAS")&&(permisos.contains("descuentos_configuracion.ver")||permisos.contains("recargos_configuracion.ver")))
             configuracion.add(new OpcionMenu("Descuentos y recargos","configuracion/facturacion/descuentos-recargos","PERCENT"));
-        if(habilitados.contains("VENTAS")&&permisos.contains("facturas.configurar_impresion"))configuracion.add(new OpcionMenu("Impresión de Facturación","configuracion/facturacion/impresion","PRINT"));
         boolean contabilidad = habilitados.contains("CONFIGURACION_CONTABLE")
             && (permisos.contains("configuracion_contable.ver")
                 || permisos.contains("CONFIGURACION_CONTABLE_VER")

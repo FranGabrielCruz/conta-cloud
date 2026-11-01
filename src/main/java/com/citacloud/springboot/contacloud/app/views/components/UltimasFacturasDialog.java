@@ -70,13 +70,13 @@ public class UltimasFacturasDialog extends Dialog {
     }
 
     private void configurarGrid(){
-        grid.addColumn(FacturaVentaResumenDto::numero).setHeader("Factura").setWidth("150px").setFlexGrow(0);
-        grid.addColumn(f->fechaHora(f.fechaHora())).setHeader("Fecha/Hora").setWidth("175px").setFlexGrow(0);
+        grid.addColumn(FacturaVentaResumenDto::numero).setHeader("Factura").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(f->fechaHora(f.fechaHora())).setHeader("Fecha/Hora").setAutoWidth(true).setFlexGrow(0);
         grid.addComponentColumn(this::cliente).setHeader("Cliente").setFlexGrow(1);
-        grid.addComponentColumn(f->importe(f.moneda(),f.total())).setHeader("Total").setWidth("155px").setFlexGrow(0)
+        grid.addComponentColumn(f->importe(f.moneda(),f.total())).setHeader("Total").setAutoWidth(true).setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        grid.addComponentColumn(f->badge(f.estado())).setHeader("Estado").setWidth("125px").setFlexGrow(0);
-        grid.addComponentColumn(this::acciones).setHeader("Acciones").setWidth("105px").setFlexGrow(0);
+        grid.addComponentColumn(f->badge(f.estado())).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
+        grid.addComponentColumn(this::acciones).setHeader("Acciones").setAutoWidth(true).setFlexGrow(0).setFrozenToEnd(true);
         grid.setSelectionMode(Grid.SelectionMode.SINGLE);grid.setAllRowsVisible(true);
         grid.setEmptyStateText("No se encontraron facturas.");grid.addItemDoubleClickListener(e->abrirDetalle(e.getItem()));
         grid.addClassName("cc-latest-invoices-grid");
@@ -85,11 +85,19 @@ public class UltimasFacturasDialog extends Dialog {
     private Component cliente(FacturaVentaResumenDto factura){Span nombre=new Span(valor(factura.cliente()));nombre.addClassName("cc-latest-invoice-customer");
         nombre.getElement().setAttribute("title",valor(factura.cliente()));return nombre;}
     private Component importe(String moneda,BigDecimal total){Span valor=new Span(valor(moneda)+" "+PosNumberFormatter.money(total));valor.addClassName("cc-latest-invoice-amount");return valor;}
-    private Component acciones(FacturaVentaResumenDto factura){HorizontalLayout acciones=new HorizontalLayout();acciones.addClassName("cc-grid-actions");acciones.setPadding(false);acciones.setSpacing(false);
+    private Component acciones(FacturaVentaResumenDto factura){HorizontalLayout acciones=new HorizontalLayout();acciones.addClassNames("cc-grid-actions","cc-latest-invoice-actions");acciones.setPadding(false);acciones.setSpacing(false);
         acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver factura",e->abrirDetalle(factura)));
-        if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver PDF",e->reimprimir.accept(factura.id())));
-        if(imprimir!=null&&puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PRINT,ButtonSize.GRID_ACTION,"Imprimir",e->imprimir.accept(factura.id())));
+        if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PDF,ButtonSize.GRID_ACTION,"Ver PDF",e->reimprimir.accept(factura.id())));
+        if(imprimir!=null&&puede("facturas.pdf"))acciones.add(botonImprimir(factura.id(),ButtonSize.GRID_ACTION));
         return acciones;}
+
+    AppActionButton botonImprimir(UUID facturaId,ButtonSize size){
+        AppActionButton boton=new AppActionButton(ActionType.PRINT,size,"Imprimir",e->{
+            try{imprimir.accept(facturaId);}finally{e.getSource().setEnabled(true);}
+        });
+        boton.setDisableOnClick(true);
+        return boton;
+    }
 
     private void cargar(){
         if(cargandoDatos)return;
@@ -97,7 +105,7 @@ public class UltimasFacturasDialog extends Dialog {
             Notification.show("La fecha inicial no puede ser posterior a la fecha final.");return;}
         cargandoDatos=true;cargando.setVisible(true);grid.setEnabled(false);
         try{var pagina=paginacion.currentRequest();var resultado=service.buscar(buscar.getValue(),desde.getValue(),hasta.getValue(),estado.getValue(),pagina.page());
-            resultados=resultado.getContent();grid.setItems(resultados);paginacion.setTotal(resultado.getTotalElements());
+            resultados=resultado.getContent();grid.setItems(resultados);grid.recalculateColumnWidths();paginacion.setTotal(resultado.getTotalElements());
             if(!resultados.isEmpty())grid.deselectAll();
         }catch(RuntimeException ex){Notification.show(mensaje(ex,"No fue posible consultar las facturas. Intente nuevamente."));}
         finally{grid.setEnabled(true);cargando.setVisible(false);cargandoDatos=false;}
@@ -129,8 +137,8 @@ public class UltimasFacturasDialog extends Dialog {
             lineas.setItems(factura.lineas());lineas.setAllRowsVisible(true);lineas.addClassName("cc-latest-invoice-lines");
             Div totales=totales(factura);Div pagos=pagos(factura);Div contenido=new Div(cabecera,new H3("PRODUCTOS"),lineas,totales,pagos);
             contenido.addClassName("cc-latest-invoice-detail-body");detalle.add(contenido);
-            if(puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.VIEW,ButtonSize.MAIN,"Ver PDF",e->reimprimir.accept(factura.id())));
-            if(imprimir!=null&&puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir",e->imprimir.accept(factura.id())));
+            if(puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->reimprimir.accept(factura.id())));
+            if(imprimir!=null&&puede("facturas.pdf"))detalle.getFooter().add(botonImprimir(factura.id(),ButtonSize.MAIN));
             detalle.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->detalle.close()));
             detalle.addClosedListener(e->buscar.focus());detalle.open();
         }catch(RuntimeException ex){Notification.show(mensaje(ex,"No fue posible consultar la factura."));}

@@ -621,7 +621,31 @@ html[theme~="dark"] .login-card input:-webkit-autofill:focus {
   .cc-balance-updated { text-align: left; }
   .cc-balance-value { font-size: var(--lumo-font-size-xl); }
 }
+/* The dialog owns vertical scrolling; its stable gutter stays outside the Grid. */
+vaadin-dialog-overlay.cc-latest-invoices-dialog::part(content),
+vaadin-dialog.cc-latest-invoices-dialog::part(content) {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    max-height: calc(94dvh - 145px);
+    box-sizing: border-box;
+}
+
+.cc-latest-invoice-actions {
+    display: inline-flex;
+    width: max-content;
+    min-width: max-content;
+    flex-wrap: nowrap;
+    gap: var(--cc-spacing-xs, 4px);
+}
+
+.cc-latest-invoice-actions > vaadin-button {
+    flex: 0 0 var(--cc-button-grid-size);
+}
+
 .cc-latest-invoices-body {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 0.65rem;
@@ -1260,3 +1284,5 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 .cc-cash-movement-form { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; width:100%; box-sizing:border-box; }
 .cc-cash-movement-observation { margin:.2rem 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
 @media (max-width:760px) { .cc-cash-movement-filters { grid-template-columns:1fr; } }
+
+.cc-agent-register-summary { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

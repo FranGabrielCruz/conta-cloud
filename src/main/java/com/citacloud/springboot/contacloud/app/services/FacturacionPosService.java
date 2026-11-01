@@ -33,6 +33,7 @@ public class FacturacionPosService {
     private final FinancialMovementRepository movimientos; private final InventoryMovementService inventario;
     private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;private final CobroClienteRepository cuentasCobrar;
     @Autowired private CotizacionRepository cotizaciones;
+    @Autowired private FacturaPosDocumentoService documentosPos;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
@@ -286,6 +287,7 @@ public class FacturacionPosService {
             subtotal,descuentoTotal,impuestos,total,input.ventaCredito()?total:recibido,input.idempotencia());
         factura.aplicarRecargo(recargoTotal);
         if(input.ventaCredito())factura.marcarCredito(cliente.getCondicionPagoId(),cliente.getDiasCredito(),vencimiento);
+        documentosPos.conservarEmisor(factura,ctx.caja.getNombre());
         factura=facturas.saveAndFlush(factura);
         if(input.ventaCredito())cuentasCobrar.crearCuenta(p.tenantId(),empresa,factura.getId(),cliente.getId(),ctx.caja.getMonedaId(),total,vencimiento);
         int orden=1;
