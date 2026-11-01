@@ -30,7 +30,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/favicon.svg").permitAll()
             .requestMatchers("/api/print-agents/pair", "/api/print-agents/refresh").permitAll()
-            .requestMatchers("/api/print-agents/me", "/api/print-agents/heartbeat").hasAuthority("PRINT_AGENT")
+            .requestMatchers("/api/print-agents/me", "/api/print-agents/heartbeat", "/api/print-agents/jobs/**").hasAuthority("PRINT_AGENT")
             .requestMatchers("/api/company/logo").authenticated());
         http.with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer.loginView(LoginView.class));
         return http.build();

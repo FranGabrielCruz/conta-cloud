@@ -10,6 +10,10 @@ public class AgenteImpresion {
     @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;
     @Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
     @Column(name="sucursal_id",nullable=false,updatable=false) private UUID sucursalId;
+    @Column(name="cash_register_id") private UUID cajaId;
+    public UUID getCajaId(){return cajaId;}
+    public void asignarCaja(UUID caja){cajaId=caja;actualizadoEn=OffsetDateTime.now();}
+    public void prepararRevinculacion(){if(estado==EstadoAgenteImpresion.REVOKED){estado=EstadoAgenteImpresion.PENDING;actualizadoEn=OffsetDateTime.now();}}
     @Column(name="display_code",nullable=false,updatable=false,length=30) private String codigoVisible;
     @Column(name="name",nullable=false,length=150) private String nombre;
     @Enumerated(EnumType.STRING) @Column(name="status",nullable=false,length=20) private EstadoAgenteImpresion estado;

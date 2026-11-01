@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface AgenteImpresionRepository extends JpaRepository<AgenteImpresion,UUID>{
+    List<AgenteImpresion> findAllByTenantIdAndEmpresaIdAndSucursalIdAndCajaIdAndEstado(UUID tenant,UUID empresa,UUID sucursal,UUID caja,EstadoAgenteImpresion estado);
     @Query("""
       select a from AgenteImpresion a where a.tenantId=:tenant and a.empresaId=:empresa
       and (:buscar='' or lower(a.nombre) like lower(concat('%',:buscar,'%')) or lower(a.codigoVisible) like lower(concat('%',:buscar,'%')))

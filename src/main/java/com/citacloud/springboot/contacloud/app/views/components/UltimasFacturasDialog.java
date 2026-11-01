@@ -28,6 +28,7 @@ public class UltimasFacturasDialog extends Dialog {
     private static final DateTimeFormatter FECHA_HORA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final UltimasFacturasService service;
     private final Consumer<UUID> reimprimir;
+    private Consumer<UUID> imprimir;
     private final Runnable devolverFoco;
     private final TextField buscar=new TextField();
     private final DatePicker desde=new DatePicker("Desde"),hasta=new DatePicker("Hasta");
@@ -57,6 +58,7 @@ public class UltimasFacturasDialog extends Dialog {
         addClosedListener(e->devolverFoco.run());
     }
 
+    public UltimasFacturasDialog(UltimasFacturasService service,Consumer<UUID> verPdf,Consumer<UUID> imprimir,Runnable foco){this(service,verPdf,foco);this.imprimir=imprimir;}
     private void configurarFiltros(){
         buscar.setPlaceholder("Buscar por cliente, RNC/Cédula o ID de factura...");buscar.setClearButtonVisible(true);
         buscar.setPrefixComponent(VaadinIcon.SEARCH.create());buscar.setValueChangeMode(ValueChangeMode.LAZY);buscar.setValueChangeTimeout(300);
@@ -85,7 +87,8 @@ public class UltimasFacturasDialog extends Dialog {
     private Component importe(String moneda,BigDecimal total){Span valor=new Span(valor(moneda)+" "+PosNumberFormatter.money(total));valor.addClassName("cc-latest-invoice-amount");return valor;}
     private Component acciones(FacturaVentaResumenDto factura){HorizontalLayout acciones=new HorizontalLayout();acciones.addClassName("cc-grid-actions");acciones.setPadding(false);acciones.setSpacing(false);
         acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver factura",e->abrirDetalle(factura)));
-        if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PRINT,ButtonSize.GRID_ACTION,"Reimprimir factura",e->reimprimir.accept(factura.id())));
+        if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver PDF",e->reimprimir.accept(factura.id())));
+        if(imprimir!=null&&puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PRINT,ButtonSize.GRID_ACTION,"Imprimir",e->imprimir.accept(factura.id())));
         return acciones;}
 
     private void cargar(){
@@ -126,7 +129,8 @@ public class UltimasFacturasDialog extends Dialog {
             lineas.setItems(factura.lineas());lineas.setAllRowsVisible(true);lineas.addClassName("cc-latest-invoice-lines");
             Div totales=totales(factura);Div pagos=pagos(factura);Div contenido=new Div(cabecera,new H3("PRODUCTOS"),lineas,totales,pagos);
             contenido.addClassName("cc-latest-invoice-detail-body");detalle.add(contenido);
-            if(puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Reimprimir",e->reimprimir.accept(factura.id())));
+            if(puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.VIEW,ButtonSize.MAIN,"Ver PDF",e->reimprimir.accept(factura.id())));
+            if(imprimir!=null&&puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir",e->imprimir.accept(factura.id())));
             detalle.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->detalle.close()));
             detalle.addClosedListener(e->buscar.focus());detalle.open();
         }catch(RuntimeException ex){Notification.show(mensaje(ex,"No fue posible consultar la factura."));}

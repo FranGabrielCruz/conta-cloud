@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface CredencialAgenteImpresionRepository extends JpaRepository<CredencialAgenteImpresion,UUID>{
+    interface Referencia {UUID getAgenteId();}
+    Optional<Referencia> findByHashRenovacion(String hash);
     Optional<CredencialAgenteImpresion> findByHashAcceso(String hash);
     @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select c from CredencialAgenteImpresion c where c.hashRenovacion=:hash")
     Optional<CredencialAgenteImpresion> bloquearPorRenovacion(@Param("hash")String hash);

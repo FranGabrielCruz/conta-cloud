@@ -8,7 +8,7 @@ class UltimasFacturasDialogFormatTest {
     private static final Path ROOT=Path.of("").toAbsolutePath();
     @Test void mantieneConsultaReimpresionYTecladoSinDevoluciones() throws Exception {
         String source=Files.readString(ROOT.resolve("src/main/java/com/citacloud/springboot/contacloud/app/views/components/UltimasFacturasDialog.java"));
-        assertThat(source).contains("Buscar por cliente, RNC/Cédula o ID de factura...","Ver factura","Reimprimir factura",KeyMarker.ENTER);
+        assertThat(source).contains("Buscar por cliente, RNC/Cédula o ID de factura...","Ver factura","Ver PDF","Imprimir",KeyMarker.ENTER);
         assertThat(source).doesNotContain("Devolver factura","Crear devolución");
     }
     @Test void f7AbreElDialogoRealDesdeElPos() throws Exception {

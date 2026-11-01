@@ -6,4 +6,4 @@ import java.util.UUID;
 
 public record AgenteImpresionDto(UUID id,String codigo,String nombre,UUID sucursalId,String sucursal,
     EstadoAgenteImpresion estado,OffsetDateTime ultimaConexion,boolean conectado,String versionAplicacion,
-    String nombreMaquina,String sistemaOperativo,long version){}
+    String nombreMaquina,String sistemaOperativo,long version,UUID cajaId){}

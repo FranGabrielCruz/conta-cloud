@@ -56,6 +56,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private static final String TOKEN_KEY = "contacloud.pos.terminal.token";
     private final FacturacionPosService service;
     private final CashRegisterSessionService cajaService;
+    private final BillingPrintService printing;
     private final FacturaVentaPdfService documentos;
     private final UltimasFacturasService ultimasFacturas;
     private final VentaGuardadaService ventasGuardadas;
@@ -120,7 +121,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private Button limpiarVentaRapida;
 
     public FacturacionPosView(FacturacionPosService service, CashRegisterSessionService cajaService,
-                              FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
+                              BillingPrintService printing, FacturaVentaPdfService documentos, UltimasFacturasService ultimasFacturas, VentaGuardadaService ventasGuardadas,
                               DescuentoVentaService descuentosService, RecargoVentaService recargosService,
                               DevolucionVentaService devolucionesService, DevolucionVentaPdfService devolucionesPdf,
                               CotizacionService cotizacionesService, CotizacionPosService cotizacionPosService,
@@ -136,6 +137,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         this.descuentosService = descuentosService;
         this.recargosService = recargosService;
         this.devolucionesService = devolucionesService;
+        this.printing=printing;
         this.devolucionesPdf = devolucionesPdf;
         this.cotizacionesService = cotizacionesService;
         this.cotizacionPosService = cotizacionPosService;
@@ -1276,7 +1278,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
         suspenderTecladoNumerico();
-        UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, this::enfocarProducto);
+        UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, id->imprimirFactura(id,UUID.randomUUID()),this::enfocarProducto);
         dialogoUltimasActivo = dialog;
         dialog.addOpenedChangeListener(event -> {
             if (!event.isOpened() && dialogoUltimasActivo == dialog) dialogoUltimasActivo = null;
@@ -1313,7 +1315,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             dialog.close();
             Notification.show(cobro.ventaCredito()?"Factura "+resultado.numero()+" emitida a crédito.":
                     "Factura " + resultado.numero() + " confirmada. Cambio: " + dinero(resultado.cambio()));
-            abrirPdf(resultado);
+            imprimirFactura(resultado.id(),resultado.id());
             construirPos();
         } catch (RuntimeException ex) {
             if (dialog instanceof PosPaymentDialog paymentDialog) paymentDialog.reactivarConfirmacion();
@@ -1321,6 +1323,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
     }
 
+    private void imprimirFactura(UUID id,UUID intento){boolean mostrar=true;try{mostrar=printing.mostrarPdf();printing.solicitar(id,intento);Notification.show("Impresión pendiente del agente de esta caja.");}catch(RuntimeException ex){Notification.show("La factura está confirmada, pero no pudo enviarse a la impresora.");}if(mostrar)abrirPdf(id);}
     private void abrirPdf(FacturaVentaResultadoDto factura) {
         abrirPdf(factura.id());
     }

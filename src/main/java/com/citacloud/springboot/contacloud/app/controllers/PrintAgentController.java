@@ -13,12 +13,15 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/print-agents")
 public class PrintAgentController {
-    private final PrintAgentPairingService service;private final PrintAgentRateLimiter limiter;private final PrintAgentTokenService tokens;private final boolean requireHttps;
-    public PrintAgentController(PrintAgentPairingService service,PrintAgentRateLimiter limiter,PrintAgentTokenService tokens,@Value("${contacloud.print-agents.require-https:true}")boolean requireHttps){this.service=service;this.limiter=limiter;this.tokens=tokens;this.requireHttps=requireHttps;}
+    private final BillingPrintService printing;private final PrintAgentPairingService service;private final PrintAgentRateLimiter limiter;private final PrintAgentTokenService tokens;private final boolean requireHttps;
+    public PrintAgentController(BillingPrintService printing,PrintAgentPairingService service,PrintAgentRateLimiter limiter,PrintAgentTokenService tokens,@Value("${contacloud.print-agents.require-https:true}")boolean requireHttps){this.printing=printing;this.service=service;this.limiter=limiter;this.tokens=tokens;this.requireHttps=requireHttps;}
     @PostMapping("/pair") public TokenAgenteImpresionDto pair(@Valid @RequestBody PairingAgenteImpresionInput input,HttpServletRequest request){secure(request);limiter.verificar(request.getRemoteAddr());return service.vincular(input);}
     @PostMapping("/refresh") public TokenAgenteImpresionDto refresh(@Valid @RequestBody RenovarAgenteImpresionInput input,HttpServletRequest request){secure(request);limiter.verificar(request.getRemoteAddr());var tenant=tokens.tenantDelToken(input.refreshToken());try(var ignored=TenantRoutingContext.use(tenant)){return service.renovar(input.refreshToken());}}
     @GetMapping("/me") public IdentidadAgenteImpresionDto me(Authentication authentication){return service.identidad(principal(authentication));}
     @PostMapping("/heartbeat") public ResponseEntity<Void> heartbeat(@Valid @RequestBody(required=false) HeartbeatAgenteImpresionInput input,Authentication authentication){service.heartbeat(principal(authentication),input==null?null:input.applicationVersion());return ResponseEntity.noContent().build();}
+    @PostMapping("/jobs/claim") public ResponseEntity<TrabajoImpresionDto> claim(Authentication auth){return printing.siguiente(principal(auth)).map(ResponseEntity::ok).orElseGet(()->ResponseEntity.noContent().build());}
+    public record ResultadoTrabajo(@jakarta.validation.constraints.NotNull java.util.UUID claimId,boolean printed){}
+    @PostMapping("/jobs/{id}/complete") public ResponseEntity<Void> complete(@PathVariable java.util.UUID id,@Valid @RequestBody ResultadoTrabajo result,Authentication auth){printing.completar(principal(auth),id,result.claimId(),result.printed());return ResponseEntity.noContent().build();}
     private void secure(HttpServletRequest request){if(requireHttps&&!request.isSecure())throw new VinculacionAgenteException();}
     private static PrintAgentPrincipal principal(Authentication auth){if(auth==null||!(auth.getPrincipal() instanceof PrintAgentPrincipal p))throw new VinculacionAgenteException();return p;}
 }

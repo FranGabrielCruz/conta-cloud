@@ -21,7 +21,7 @@ public class PrintAgentAuthenticationFilter extends OncePerRequestFilter {
     private final PrintAgentPairingService service;
     private final PrintAgentTokenService tokens;
     public PrintAgentAuthenticationFilter(PrintAgentPairingService service,PrintAgentTokenService tokens){this.service=service;this.tokens=tokens;}
-    @Override protected boolean shouldNotFilter(HttpServletRequest request){String path=request.getRequestURI();return !path.equals("/api/print-agents/me")&&!path.equals("/api/print-agents/heartbeat");}
+    @Override protected boolean shouldNotFilter(HttpServletRequest request){String path=request.getRequestURI();return !path.equals("/api/print-agents/me")&&!path.equals("/api/print-agents/heartbeat")&&!path.startsWith("/api/print-agents/jobs/");}
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws ServletException,IOException{
         String header=request.getHeader("Authorization");
         if(header==null||!header.startsWith("Bearer ")){unauthorized(response);return;}
