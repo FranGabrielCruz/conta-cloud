@@ -13,7 +13,10 @@ import java.util.function.Consumer;
 public final class DetalleRecuentoCajaDialog extends Dialog {
     private static final DateTimeFormatter FECHA_HORA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    public DetalleRecuentoCajaDialog(RecuentoCajaDto recuento,boolean puedeImprimir,Consumer<java.util.UUID> imprimir){
+
+    public DetalleRecuentoCajaDialog(RecuentoCajaDto recuento,boolean puedeImprimir,java.util.function.BiFunction<java.util.UUID,java.util.UUID,Boolean> imprimir){this(recuento,puedeImprimir,imprimir,null); }
+    public DetalleRecuentoCajaDialog(RecuentoCajaDto recuento,boolean puedeImprimir,java.util.function.BiFunction<java.util.UUID,java.util.UUID,Boolean> imprimir,Consumer<java.util.UUID> verPdf){
+
         setHeaderTitle("VER RECUENTO");setWidth("min(800px,96vw)");setMaxHeight("92vh");addClassName("cc-cash-count-dialog");
         Div generales=new Div(info("Número",recuento.numero()),info("Caja",recuento.caja()+" · "+recuento.sucursal()),
             infoLargo("Apertura",recuento.apertura()),info("Fecha/Hora",FECHA_HORA.format(recuento.contadoEn())),
@@ -39,7 +42,8 @@ public final class DetalleRecuentoCajaDialog extends Dialog {
             Paragraph texto=new Paragraph(recuento.observacion());texto.addClassName("cc-cash-count-observation");cuerpo.add(titulo,texto);
         }
         add(cuerpo);
-        if(puedeImprimir)getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir recuento",e->imprimir.accept(recuento.id())));
+        if(puedeImprimir&&verPdf!=null)getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->verPdf.accept(recuento.id())));
+        if(puedeImprimir)getFooter().add(new BillingPrintActionButton(recuento.id(),ButtonSize.MAIN,"Imprimir recuento",imprimir));
         getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->close()));
     }
 

@@ -1,4 +1,4 @@
-// Rendering core mirrored from contaCloudPrint; see docs/REDISENO-POS-80MM.md.
+// Rendering core mirrored from contaCloudPrint; see docs/DEVOLUCION-POS-80MM.md.
 package com.citacloud.springboot.contacloud.app.reports.pos;
 
 public final class InvoicePrintFailure extends RuntimeException {

@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.BiFunction;
 
 /** Gestión paginada de recibos y cobros sin abandonar el punto de venta. */
 public final class RecibosCobrosDialog extends Dialog {
@@ -32,7 +33,8 @@ public final class RecibosCobrosDialog extends Dialog {
     private final CobroClienteService service;
     private final FacturacionPosService pos;
     private final TerminalPosDto terminal;
-    private final Consumer<UUID> print;
+    private final BiFunction<UUID,UUID,Boolean> print;
+    private final Consumer<UUID> verPdf;
     private final Grid<CobroClienteDto> grid = new Grid<>();
     private final TextField search = new TextField("Buscar");
     private final DatePicker from = new DatePicker("Desde");
@@ -41,7 +43,12 @@ public final class RecibosCobrosDialog extends Dialog {
     private final PosDialogPagination pagination = new PosDialogPagination(request -> load());
 
     public RecibosCobrosDialog(CobroClienteService service, FacturacionPosService pos,
-                               TerminalPosDto terminal, Consumer<UUID> print) {
+                               TerminalPosDto terminal, BiFunction<UUID,UUID,Boolean> print) {
+        this(service,pos,terminal,print,null);
+    }
+    public RecibosCobrosDialog(CobroClienteService service, FacturacionPosService pos,
+                               TerminalPosDto terminal, BiFunction<UUID,UUID,Boolean> print,Consumer<UUID> verPdf) {
+        this.verPdf=verPdf;
         this.service = service;
         this.pos = pos;
         this.terminal = terminal;
@@ -196,7 +203,7 @@ public final class RecibosCobrosDialog extends Dialog {
                     CobroClienteResultadoDto result = service.confirmar(new CobroClienteInput(customer.getValue().id(),
                             service.monedaBase(), terminal.sucursalId(), date.getValue(), scale(received.getValue()), reference.getValue(),
                             observation.getValue(), terminal.cajaId(), terminal.sesionCajaId(), idempotency, apps, methods));
-                    paymentHolder[0].close(); dialog.close(); reloadFirst(); print.accept(result.id());
+                    paymentHolder[0].close(); dialog.close(); reloadFirst(); imprimirConfirmado(result.id(),idempotency);
                     Notification.show("Recibo " + result.numero() + " confirmado.");
                 } catch (RuntimeException ex) { paymentHolder[0].reactivarConfirmacion(); UiErrorHandler.show(ex,"No fue posible confirmar el recibo."); }
             });
@@ -237,17 +244,26 @@ public final class RecibosCobrosDialog extends Dialog {
                     new Div(new Span("Recibido: " + money(x.moneda(), x.recibido()) + " · Aplicado: " + money(x.moneda(), x.aplicado())
                             + " · Disponible: " + money(x.moneda(), x.disponible()))));
             dialog.add(new VerticalLayout(summary, new H4("APLICACIONES"), apps, new H4("MEDIOS DE PAGO"), methods));
-            Button pdf = new AppActionButton(ActionType.PRINT, ButtonSize.MAIN, "Imprimir recibo", e -> print.accept(x.id()));
+            Button pdf = botonImprimir(x.id());
             pdf.setVisible(hasPermission("recibos.imprimir"));
             Button apply = new AppActionButton(ActionType.APPLY_CREDIT, ButtonSize.MAIN, "Aplicar saldo disponible", e -> openApply(dialog, x));
             apply.setVisible(hasPermission("recibos.aplicar") && x.estado() != EstadoReciboCliente.VOIDED
                     && x.disponible().signum() > 0);
             Button voidButton = new AppActionButton(ActionType.VOID, ButtonSize.MAIN, "Anular recibo", e -> askVoid(dialog, x.id()));
             voidButton.setVisible(hasPermission("recibos.anular") && x.estado() != EstadoReciboCliente.VOIDED);
+            if(verPdf!=null&&hasPermission("recibos.imprimir"))dialog.getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->verPdf.accept(x.id())));
             dialog.getFooter().add(apply, pdf, voidButton,
                     new AppActionButton(ActionType.CLOSE, ButtonSize.MAIN, "Cerrar", e -> dialog.close()));
             dialog.open();
         } catch (RuntimeException ex) { notifyError("No fue posible abrir el recibo."); }
+    }
+
+    Button botonImprimir(UUID id){
+        return new BillingPrintActionButton(id,ButtonSize.MAIN,"Imprimir recibo",this::imprimirConfirmado);
+    }
+    private boolean imprimirConfirmado(UUID id,UUID intento){
+        try{return Boolean.TRUE.equals(print.apply(id,intento));}
+        catch(RuntimeException ex){UiErrorHandler.show(ex,"El cobro permanece confirmado. No fue posible solicitar su impresión. Puede reintentar.");return false;}
     }
 
     private void openApply(Dialog detail, CobroClienteDto receipt) {

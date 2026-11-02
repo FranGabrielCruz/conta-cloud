@@ -43,7 +43,7 @@ public class ExpedienteCierreCajaDialog extends Dialog {
 
     public ExpedienteCierreCajaDialog(CierreCajaDto cierre,ExpedienteCierreCajaService service,
             boolean puedeVentas,boolean puedeCobros,boolean puedeMovimientos,boolean puedeRecuentos,
-            boolean puedeImprimir,Consumer<UUID> imprimir,Consumer<UUID> verFactura,Consumer<UUID> verRecibo,
+            boolean puedeImprimir,java.util.function.BiFunction<UUID,UUID,Boolean> imprimir,Consumer<UUID> verFactura,Consumer<UUID> verRecibo,
             Consumer<UUID> verMovimiento,Consumer<UUID> verRecuento){
         this.cierre=Objects.requireNonNull(cierre);this.service=Objects.requireNonNull(service);
         this.verFactura=Objects.requireNonNull(verFactura);this.verRecibo=Objects.requireNonNull(verRecibo);
@@ -55,7 +55,9 @@ public class ExpedienteCierreCajaDialog extends Dialog {
         Tab tabCierre=new Tab("Cierre"),tabVentas=new Tab("Ventas"),tabCobros=new Tab("Cobros"),
             tabMovimientos=new Tab("Movimientos"),tabRecuentos=new Tab("Recuentos");
         Tabs tabs=new Tabs(tabCierre,tabVentas,tabCobros,tabMovimientos,tabRecuentos);tabs.setSelectedTab(tabCierre);
-        AppActionButton print=new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir cierre",e->imprimir.accept(cierre.id()));
+
+        AppActionButton print=new BillingPrintActionButton(cierre.id(),ButtonSize.MAIN,"Imprimir cierre",imprimir);
+        print.setDisableOnClick(true);
         print.setVisible(puedeImprimir);
         restringir(panelVentas,puedeVentas,"No tienes permiso para consultar las facturas del turno.");
         restringir(panelCobros,puedeCobros,"No tienes permiso para consultar los cobros del turno.");

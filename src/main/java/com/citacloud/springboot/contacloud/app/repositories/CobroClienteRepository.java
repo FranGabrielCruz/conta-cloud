@@ -16,6 +16,14 @@ public class CobroClienteRepository {
     private final JdbcTemplate jdbc;
     public CobroClienteRepository(JdbcTemplate jdbc){this.jdbc=jdbc;}
 
+    /** Serialize customer mutations so the captured balance belongs to this confirmed operation. */
+    public void bloquearClienteImpresion(UUID tenant,UUID empresa,UUID cliente) {
+        jdbc.queryForObject("SELECT id FROM customer WHERE tenant_id=? AND empresa_id=? AND id=? FOR UPDATE",UUID.class,tenant,empresa,cliente);
+    }
+    public void conservarImpresion(UUID id,UUID tenant,UUID empresa,UUID caja,BigDecimal anterior,BigDecimal pendiente) {
+        new PaymentReceiptSnapshotRepository(jdbc).conservar(detalle(id,tenant,empresa),tenant,empresa,caja,anterior,pendiente);
+    }
+
     public void prepararCuentas(UUID tenant,UUID empresa,UUID cliente){
         jdbc.update("""
             INSERT INTO customer_accounts_receivable(tenant_id,empresa_id,sales_invoice_id,customer_id,currency_id,original_amount,applied_amount,due_date,status)

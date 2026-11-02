@@ -20,6 +20,7 @@ import java.util.*;
 public class DevolucionVentaService {
     public static final int TAMANO_PAGINA=PosPaginationPolicy.DIALOG_DEFAULT_PAGE_SIZE;
     private static final UUID SUCURSAL_MARCADOR=new UUID(0L,0L);
+    @org.springframework.beans.factory.annotation.Autowired private DevolucionPosDocumentoService documentosPos;
     private static final String OPERATION="SALES_RETURN_CONFIRM";
     private final FacturaVentaRepository facturas; private final LineaFacturaVentaRepository lineasFactura;
     private final DevolucionVentaRepository devoluciones; private final LineaDevolucionVentaRepository lineasDevolucion;
@@ -75,7 +76,13 @@ public class DevolucionVentaService {
 
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('devoluciones_venta.confirmar')")
-    public DevolucionVentaResultadoDto confirmar(ConfirmarDevolucionVentaInput input){
+    public DevolucionVentaResultadoDto confirmar(ConfirmarDevolucionVentaInput input){return confirmarDocumento(input,null);}
+
+    @Transactional
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('devoluciones_venta.confirmar')")
+    public DevolucionVentaResultadoDto confirmar(ConfirmarDevolucionVentaInput input,String terminalToken){return confirmarDocumento(input,terminalToken);}
+
+    private DevolucionVentaResultadoDto confirmarDocumento(ConfirmarDevolucionVentaInput input,String terminalToken){
         if(input==null||input.claveOperacion()==null||input.facturaId()==null)throw error(ErrorCode.VALIDATION_ERROR,"No fue posible identificar la devolución.");
         var p=TenantContext.principalActual();String huella=CommandFingerprint.sha256(input);
         var inicio=idempotencia.begin(p.tenantId(),p.empresaId(),OPERATION,input.claveOperacion(),huella);
@@ -109,9 +116,11 @@ public class DevolucionVentaService {
         calculadas.sort(Comparator.comparing(c->c.original.getId()));
         BigDecimal bruto=suma(calculadas,Calculada::bruto),descuento=suma(calculadas,Calculada::descuento),recargo=suma(calculadas,Calculada::recargo),impuesto=suma(calculadas,Calculada::impuesto),total=suma(calculadas,Calculada::total);
         if(total.signum()<=0)throw error(ErrorCode.RETURN_NOTHING_SELECTED,"El total de la devolución debe ser mayor que cero.");
-        DevolucionVenta devolucion=devoluciones.saveAndFlush(new DevolucionVenta(p.tenantId(),p.empresaId(),siguiente("sales_return_sequence","DEV-"),factura,motivo,
+        DevolucionVenta devolucion=new DevolucionVenta(p.tenantId(),p.empresaId(),siguiente("sales_return_sequence","DEV-"),factura,motivo,
                 observacion.isBlank()?null:observacion,input.retornaInventario(),almacen==null?null:almacen.getId(),
-                almacen==null?null:almacen.getNombre(),bruto,descuento,recargo,impuesto,total,input.claveOperacion(),p.usuarioId()));
+                almacen==null?null:almacen.getNombre(),bruto,descuento,recargo,impuesto,total,input.claveOperacion(),p.usuarioId());
+        documentosPos.conservarIdentidad(devolucion,factura,terminalToken);
+        devolucion=devoluciones.saveAndFlush(devolucion);
         int orden=1;List<LineaDevolucionVenta>creadas=new ArrayList<>();for(Calculada c:calculadas){LineaDevolucionVenta linea=lineasDevolucion.save(new LineaDevolucionVenta(devolucion,c.original,c.cantidad,c.bruto,c.descuento,c.recargo,c.base,c.impuesto,c.total,orden++));creadas.add(linea);}lineasDevolucion.flush();
         NotaCreditoVenta nota=notas.saveAndFlush(new NotaCreditoVenta(p.tenantId(),p.empresaId(),siguiente("sales_credit_note_sequence","NCV-"),devolucion,total,p.usuarioId()));
         if(devolucion.getClienteId()!=null&&nota.getCreditoCliente().signum()>0)creditos.save(new CreditoCliente(p.tenantId(),p.empresaId(),devolucion.getClienteId(),devolucion.getMonedaId(),nota.getId(),nota.getCreditoCliente(),p.usuarioId()));
@@ -122,6 +131,17 @@ public class DevolucionVentaService {
         idempotencia.complete(p.tenantId(),p.empresaId(),OPERATION,input.claveOperacion(),"SALES_RETURN",devolucion.getId());
         metricas.counter("contacloud.sales.return","result","confirmed").increment();
         return new DevolucionVentaResultadoDto(devolucion.getId(),devolucion.getNumero(),nota.getNumero(),devolucion.getTotal(),devolucion.getMonedaCodigo());
+    }
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('devoluciones_venta.pdf')")
+    public Page<DevolucionVentaImpresionResumenDto> historialImpresion(UUID facturaId,int pagina){
+        if(pagina<0)throw new ReglaNegocioException("La página solicitada no es válida.");
+        var p=TenantContext.principalActual();facturas.findByIdAndTenantIdAndEmpresaId(facturaId,p.tenantId(),p.empresaId())
+            .filter(f->EmpresaContext.permiteSucursal(f.getSucursalId())).orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada."));
+        Collection<UUID> sucursales=p.accesoTodasSucursales()||p.sucursalIds().isEmpty()?List.of(SUCURSAL_MARCADOR):p.sucursalIds();
+        return devoluciones.buscarParaImpresion(facturaId,p.tenantId(),p.empresaId(),p.accesoTodasSucursales(),sucursales,PageRequest.of(pagina,TAMANO_PAGINA))
+            .map(d->new DevolucionVentaImpresionResumenDto(d.getId(),d.getNumero(),d.getConfirmadaEn(),d.getClienteNombre(),d.getTotal(),d.getMonedaCodigo()));
     }
 
     private DevolucionVentaResultadoDto resultadoExistente(UUID id,TenantPrincipal p){DevolucionVenta d=devoluciones.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())

@@ -1,44 +1,35 @@
 package com.citacloud.springboot.contacloud.app.views;
-
 import com.citacloud.springboot.contacloud.app.dto.*;
+import com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion;
 import com.citacloud.springboot.contacloud.app.services.*;
+import com.citacloud.springboot.contacloud.app.views.components.BillingPrintUi;
 import com.vaadin.flow.component.UI;
 import java.util.UUID;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.mockito.Mockito.*;
-
 class FacturacionSalidaTest {
-    final UI ui=new UI();
-    final BillingPrintService printing=mock(BillingPrintService.class);
-    final FacturaVentaPdfService documentos=mock(FacturaVentaPdfService.class);
-    final FacturacionPosView view=mock(FacturacionPosView.class,CALLS_REAL_METHODS);
-    final UUID id=UUID.randomUUID(),intento=UUID.randomUUID();
-    @BeforeEach void preparar(){
-        UI.setCurrent(ui);
-        ReflectionTestUtils.setField(view,"printing",printing);
-        ReflectionTestUtils.setField(view,"documentos",documentos);
-        when(documentos.generar(id)).thenReturn(new ArchivoPdfDto("normal.pdf",new byte[]{1}));
-    }
-    @AfterEach void limpiar(){UI.setCurrent(null);}
-    @Test void modoPdfUtilizaGeneradorNormalDeFacturacion(){
-        when(printing.solicitar(id,intento)).thenReturn(new SolicitudImpresionResultadoDto(null,true));
-        ReflectionTestUtils.invokeMethod(view,"imprimirFactura",id,intento);
-        verify(documentos).generar(id);verify(documentos,never()).generarParaImpresion(any());
-        verify(printing).solicitar(id,intento);verifyNoMoreInteractions(printing);
-    }
-    @Test void modoImpresoraNoAbreDocumento(){
-        when(printing.solicitar(id,intento)).thenReturn(new SolicitudImpresionResultadoDto(UUID.randomUUID(),false));
-        ReflectionTestUtils.invokeMethod(view,"imprimirFactura",id,intento);
-        verifyNoInteractions(documentos);
-    }
-    @Test void falloNoAbrePdfComoFallback(){
-        when(printing.solicitar(id,intento)).thenThrow(new ReglaNegocioException("No disponible"));
-        ReflectionTestUtils.invokeMethod(view,"imprimirFactura",id,intento);
-        verifyNoInteractions(documentos);
-    }
-    @Test void verPdfManualEsIndependienteDeConfiguracionYCola(){
-        ReflectionTestUtils.invokeMethod(view,"abrirPdf",id);
-        verify(documentos).generar(id);verifyNoInteractions(printing);
-    }
+ final UI ui=new UI();final FacturacionPosView view=mock(FacturacionPosView.class,CALLS_REAL_METHODS);final BillingPrintUi actions=mock(BillingPrintUi.class);
+ final UUID id=UUID.randomUUID(),attempt=UUID.randomUUID();
+ @BeforeEach void setup(){UI.setCurrent(ui);ReflectionTestUtils.setField(view,"billingPrintUi",actions);}
+ @AfterEach void clear(){UI.setCurrent(null);}
+ @ParameterizedTest @EnumSource(TipoDocumentoImpresion.class) void todasLasAccionesImprimirDeleganSinInterpretarSalida(TipoDocumentoImpresion type){
+  String method=switch(type){case SALES_INVOICE->"imprimirFactura";case SALES_RETURN->"imprimirDevolucion";case PAYMENT_RECEIPT->"imprimirRecibo";case CASH_COUNT->"imprimirRecuento";case CASH_VOUCHER->"imprimirVale";case CASH_CLOSING->"imprimirCierre";};
+  ReflectionTestUtils.invokeMethod(view,method,id,attempt);verify(actions).imprimir(type,id,attempt);verifyNoMoreInteractions(actions);
+ }
+ @ParameterizedTest @EnumSource(TipoDocumentoImpresion.class) void verPdfExplicitoNuncaEntraALaCola(TipoDocumentoImpresion type){
+  var file=new ArchivoPdfDto("manual.pdf",new byte[]{1});String method;
+  switch(type){
+   case SALES_INVOICE->{var pdf=mock(FacturaVentaPdfService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"documentos",pdf);method="abrirPdf";}
+   case SALES_RETURN->{var pdf=mock(DevolucionVentaPdfService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"devolucionesPdf",pdf);method="abrirPdfDevolucion";}
+   case PAYMENT_RECEIPT->{var pdf=mock(PaymentReceiptPrintService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"recibosImpresion",pdf);method="abrirPdfRecibo";}
+   case CASH_COUNT->{var pdf=mock(RecuentoCajaPdfService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"recuentosCajaPdf",pdf);method="abrirPdfRecuento";}
+   case CASH_VOUCHER->{var pdf=mock(ValeCajaPdfService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"valesCajaPdf",pdf);method="abrirPdfVale";}
+   case CASH_CLOSING->{var pdf=mock(CierreCajaPdfService.class);when(pdf.generar(id)).thenReturn(file);ReflectionTestUtils.setField(view,"cierresCajaPdf",pdf);method="abrirPdfCierre";}
+   default->throw new AssertionError(type);
+  }
+  ReflectionTestUtils.invokeMethod(view,method,id);verifyNoInteractions(actions);
+ }
 }

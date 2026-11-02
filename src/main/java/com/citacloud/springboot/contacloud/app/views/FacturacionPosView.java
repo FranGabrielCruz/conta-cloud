@@ -6,6 +6,7 @@ import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import com.citacloud.springboot.contacloud.app.services.*;
 import com.citacloud.springboot.contacloud.app.views.components.PosChargeButton;
+import com.citacloud.springboot.contacloud.app.views.components.BillingPrintUi;
 import com.citacloud.springboot.contacloud.app.views.components.PosCustomerLine;
 import com.citacloud.springboot.contacloud.app.views.components.DoubleEnterDetector;
 import com.citacloud.springboot.contacloud.app.views.components.PosPaymentDialog;
@@ -54,6 +55,7 @@ import java.util.stream.Stream;
 @PermitAll
 public class FacturacionPosView extends VerticalLayout implements BeforeEnterObserver {
     private static final String TOKEN_KEY = "contacloud.pos.terminal.token";
+    @org.springframework.beans.factory.annotation.Autowired private BillingPrintUi billingPrintUi;
     private final FacturacionPosService service;
     private final CashRegisterSessionService cajaService;
     private final BillingPrintService printing;
@@ -64,12 +66,15 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final RecargoVentaService recargosService;
     private final DevolucionVentaService devolucionesService;
     private final DevolucionVentaPdfService devolucionesPdf;
+    @org.springframework.beans.factory.annotation.Autowired private com.citacloud.springboot.contacloud.app.services.DevolucionVentaPrintService devolucionesImpresion;
     private final CotizacionService cotizacionesService;
     private final CotizacionPosService cotizacionPosService;
     private final CobroClienteService cobrosCliente;
     private final CobroClientePdfService cobrosPdf;
+    @org.springframework.beans.factory.annotation.Autowired private com.citacloud.springboot.contacloud.app.services.PaymentReceiptPrintService recibosImpresion;
     private final RecuentoCajaService recuentosCaja;
     private final RecuentoCajaPdfService recuentosCajaPdf;
+    @org.springframework.beans.factory.annotation.Autowired private CashCountPrintService recuentosImpresion;
     private final MovimientoCajaService movimientosCaja;
     private final ValeCajaService valesCaja;
     private final ValeCajaPdfService valesCajaPdf;
@@ -672,14 +677,17 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private void dialogoRecibos() {
         if (dialogoRecibosActivo != null && dialogoRecibosActivo.isOpened()) return;
         dialogoRecibosActivo = new RecibosCobrosDialog(cobrosCliente, service, terminal,
-                this::abrirPdfRecibo);
+                this::imprimirRecibo,this::abrirPdfRecibo);
         dialogoRecibosActivo.addOpenedChangeListener(e -> { if (!e.isOpened()) { dialogoRecibosActivo = null; enfocarProducto(); } });
         dialogoRecibosActivo.open();
     }
 
+    private boolean imprimirRecibo(UUID reciboId,UUID intento) {
+        return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.PAYMENT_RECEIPT,reciboId,intento);
+    }
     private void abrirPdfRecibo(UUID reciboId) {
         try {
-            ArchivoPdfDto archivo = cobrosPdf.generar(reciboId);
+            ArchivoPdfDto archivo = recibosImpresion.generar(reciboId);
             StreamResource recurso = new StreamResource(archivo.nombreArchivo(),
                     () -> new ByteArrayInputStream(archivo.contenido()));
             recurso.setContentType("application/pdf"); recurso.setCacheTime(0);
@@ -1278,7 +1286,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (dialogoClienteActivo != null && dialogoClienteActivo.isOpened()) return;
         suspenderTecladoNumerico();
-        UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, id->imprimirFactura(id,UUID.randomUUID()),this::enfocarProducto);
+        UltimasFacturasDialog dialog = new UltimasFacturasDialog(ultimasFacturas, this::abrirPdf, this::imprimirFactura,this::enfocarProducto);
         dialogoUltimasActivo = dialog;
         dialog.addOpenedChangeListener(event -> {
             if (!event.isOpened() && dialogoUltimasActivo == dialog) dialogoUltimasActivo = null;
@@ -1296,7 +1304,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
         suspenderTecladoNumerico();
         DevolucionesVentasDialog dialog = new DevolucionesVentasDialog(devolucionesService,
-                this::abrirPdfDevolucion, this::enfocarProducto);
+                this::abrirPdfDevolucion, this::enfocarProducto, this::imprimirDevolucion, token);
         dialogoDevolucionesActivo = dialog;
         dialog.addOpenedChangeListener(event -> {
             if (!event.isOpened() && dialogoDevolucionesActivo == dialog) dialogoDevolucionesActivo = null;
@@ -1323,14 +1331,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         }
     }
 
-    private void imprimirFactura(UUID id,UUID intento){
-        try{
-            var salida=printing.solicitar(id,intento);
-            if(salida.mostrarPdfAlImprimir())abrirPdf(id);
-            else Notification.show("Impresión pendiente del agente de esta caja.");
-        }catch(RuntimeException ex){
-            Notification.show("No fue posible procesar la salida de la factura. Intente nuevamente.");
-        }
+    private boolean imprimirFactura(UUID id,UUID intento){
+        return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.SALES_INVOICE,id,intento);
     }
     private void abrirPdf(FacturaVentaResultadoDto factura) {
         abrirPdf(factura.id());
@@ -1348,6 +1350,10 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         } catch (RuntimeException ex) {
             Notification.show("No fue posible abrir el PDF de la factura. Intente nuevamente.");
         }
+    }
+
+    private boolean imprimirDevolucion(UUID devolucionId,UUID intento){
+        return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.SALES_RETURN,devolucionId,intento);
     }
 
     private void abrirPdfDevolucion(UUID devolucionId) {
@@ -1374,7 +1380,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             if (dialogoValesCajaActivo != null && dialogoValesCajaActivo.isOpened()) return;
             if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) { Notification.show("La caja debe estar abierta para consultar los vales."); return; }
             if (!puede("vales_caja.ver")) { Notification.show("No tiene permisos para consultar los vales de caja."); return; }
-            try { dialogoValesCajaActivo=new ValesCajaDialog(terminal.sesionCajaId(),valesCaja,this::abrirPdfVale,puede("vales_caja.crear"),puede("vales_caja.imprimir"),puede("vales_caja.anular"));dialogoValesCajaActivo.addClosedListener(e->dialogoValesCajaActivo=null);dialogoValesCajaActivo.open(); }
+            try { dialogoValesCajaActivo=new ValesCajaDialog(terminal.sesionCajaId(),valesCaja,this::imprimirVale,puede("vales_caja.crear"),puede("vales_caja.imprimir"),puede("vales_caja.anular"));dialogoValesCajaActivo.addClosedListener(e->dialogoValesCajaActivo=null);dialogoValesCajaActivo.open(); }
             catch(RuntimeException ex){dialogoValesCajaActivo=null;error(ex,"No fue posible abrir los vales de caja.");}return;
         }
         if ("Movimientos de caja".equals(funcion)) {
@@ -1401,7 +1407,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
                 Notification.show("La caja debe estar abierta para realizar un recuento."); return;
             }
             if (!puede("recuentos_caja.crear")) { Notification.show("No tiene permisos para realizar recuentos de caja."); return; }
-            new RecuentoCajaDialog(terminal.sesionCajaId(), recuentosCaja, this::abrirPdfRecuento).open(); return;
+            new RecuentoCajaDialog(terminal.sesionCajaId(), recuentosCaja, this::imprimirRecuento,this::abrirPdfRecuento).open(); return;
         }
         if ("Cerrar caja".equals(funcion)) {
             if (dialogoCierreCajaActivo != null && dialogoCierreCajaActivo.isOpened()) return;
@@ -1411,13 +1417,20 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             if (!puede("cierres_caja.ejecutar") && !puede("operaciones_caja.cerrar")) {
                 Notification.show("No tiene permisos para cerrar la caja."); return;
             }
-            dialogoCierreCajaActivo=new CierreCajaDialog(terminal.sesionCajaId(),cierresCaja,c->{ inicializar(); },this::abrirPdfCierre);
+            dialogoCierreCajaActivo=new CierreCajaDialog(terminal.sesionCajaId(),cierresCaja,c->{ inicializar(); },this::imprimirCierre);
             dialogoCierreCajaActivo.addClosedListener(e->dialogoCierreCajaActivo=null);
             dialogoCierreCajaActivo.open(); return;
         }
         Notification.show(funcion + " estará disponible próximamente.");
     }
 
+    private boolean imprimirRecuento(UUID id,UUID intento) {
+        return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_COUNT,id,intento);
+    }
+    private void abrirRecuentoPantalla(UUID id) {
+        try{ArchivoPdfDto archivo=recuentosImpresion.pantalla(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank");}
+        catch(RuntimeException ex){error(ex,"No fue posible abrir el PDF del recuento.");}
+    }
     private void abrirPdfRecuento(UUID id) {
         try {
             ArchivoPdfDto archivo = recuentosCajaPdf.generar(id);
@@ -1429,6 +1442,8 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
         } catch (RuntimeException ex) { error(ex, "No fue posible abrir el PDF del recuento."); }
     }
 
+    private boolean imprimirCierre(UUID id,UUID intento){return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_CLOSING,id,intento);}
+    private boolean imprimirVale(UUID id,UUID intento){return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_VOUCHER,id,intento);}
     private void abrirPdfCierre(UUID id) {
         try { ArchivoPdfDto archivo=cierresCajaPdf.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank"); }
         catch(RuntimeException ex){error(ex,"No fue posible abrir el PDF del cierre de caja.");}

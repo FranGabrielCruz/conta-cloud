@@ -87,7 +87,7 @@ public class AgentesImpresionView extends VerticalLayout implements BeforeEnterO
         cajas.setItemLabelGenerator(CajaAgenteImpresionDto::nombre);cajas.setRequiredIndicatorVisible(true);cajas.setClearButtonVisible(true);
         cajas.setPlaceholder("Buscar y seleccionar cajas...");cajas.setErrorMessage("Seleccione al menos una caja.");cajas.setWidthFull();cajas.getStyle().set("grid-column","1 / -1");
         branch.addValueChangeListener(event->{cajas.clear();cajas.setItems(event.getValue()==null?List.of():service.cajas(event.getValue().id()));});
-        Checkbox mostrar=crearCheckboxPdf(actual==null||actual.mostrarPdfAlImprimir(),can("facturas.configurar_impresion"));
+        Checkbox mostrar=crearCheckboxPdf(actual==null||actual.printOnScreen(),can("facturas.configurar_impresion"));
         mostrar.getStyle().set("grid-column","1 / -1");
         if(actual!=null){name.setValue(actual.nombre());branch.setValue(sucursales.stream().filter(s->s.id().equals(actual.sucursalId())).findFirst().orElseThrow());
             // Keep historical inactive selections visible so the administrator can explicitly remove them.
@@ -108,13 +108,13 @@ public class AgentesImpresionView extends VerticalLayout implements BeforeEnterO
         });
         d.getFooter().add(save,new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));return d;
     }
-    static Checkbox crearCheckboxPdf(boolean valor,boolean editable){Checkbox mostrar=new Checkbox("Mostrar PDF al imprimir");mostrar.setValue(valor);mostrar.setReadOnly(!editable);return mostrar;}
+    static Checkbox crearCheckboxPdf(boolean valor,boolean editable){Checkbox mostrar=new Checkbox("Impresión por pantalla (PDF)");mostrar.setValue(valor);mostrar.setReadOnly(!editable);mostrar.setTooltipText("Al imprimir, muestra el PDF en pantalla en lugar de enviarlo a la impresora.");return mostrar;}
 
     private void detail(UUID id){try{
         var a=service.obtener(id);Dialog d=dialog("AGENTE DE IMPRESIÓN","820px");Div heading=new Div(new H2(a.nombre()),badge(a));heading.addClassName("cc-detail-heading");
         d.add(heading,new AppDetailSection("INFORMACIÓN GENERAL").field("Identificador",a.codigo()).field("Empresa",TenantContext.principalActual().empresaCodigo())
             .field("Sucursal",a.sucursal()).field("Cajas",nombresCajas(a)).field("Estado",estado(a.estado())).field("Conectividad",a.conectado()?"Conectado":"Desconectado")
-            .field("Última conexión",fecha(a)).field("Equipo",display(a.nombreMaquina())).field("Versión de contaCloudPrint",display(a.versionAplicacion())).field("Sistema operativo",display(a.sistemaOperativo())),crearCheckboxPdf(a.mostrarPdfAlImprimir(),false));
+            .field("Última conexión",fecha(a)).field("Equipo",display(a.nombreMaquina())).field("Versión de contaCloudPrint",display(a.versionAplicacion())).field("Sistema operativo",display(a.sistemaOperativo())),crearCheckboxPdf(a.printOnScreen(),false));
         if(can("agentes_impresion.editar"))d.getFooter().add(new AppActionButton(ActionType.EDIT,ButtonSize.MAIN,"Editar agente de impresión",e->{d.close();editar(id);}));
         if(can("agentes_impresion.codigo"))d.getFooter().add(new AppActionButton(ActionType.LINK,ButtonSize.MAIN,"Generar nuevo código de vinculación",e->confirmCode(a,d)));
         if(a.estado()!=EstadoAgenteImpresion.REVOKED&&can("agentes_impresion.revocar"))d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Revocar agente",e->confirmRevoke(a,d)));

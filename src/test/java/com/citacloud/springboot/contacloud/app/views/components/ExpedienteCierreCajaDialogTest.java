@@ -16,7 +16,7 @@ class ExpedienteCierreCajaDialogTest {
     @Test void cierreEsInicialYConservaIdentificadoresAlCrearExpediente(){
         UUID cierre=UUID.randomUUID(),sesion=UUID.randomUUID();CierreCajaDto dto=dto(cierre,sesion);
         ExpedienteCierreCajaDialog dialog=new ExpedienteCierreCajaDialog(dto,mock(ExpedienteCierreCajaService.class),
-            false,false,false,false,false,id->{},id->{},id->{},id->{},id->{});
+            false,false,false,false,false,(id,attempt)->true,id->{},id->{},id->{},id->{});
         assertThat(ExpedienteCierreCajaDialog.ordenPestanas()).containsExactly("Cierre","Ventas","Cobros","Movimientos","Recuentos");
         assertThat(dialog.cierreEsPestanaInicial()).isTrue();assertThat(dialog.cierreId()).isEqualTo(cierre);assertThat(dialog.sesionId()).isEqualTo(sesion);
     }

@@ -18,7 +18,7 @@ La entrada inmutable `PosInvoiceDocument` conserva todos los valores recibidos. 
 
 En ContaCloud, `FacturaVentaPdfService.generarParaImpresion` deriva al nuevo `FacturaPosDocumentoService`. Este utiliza líneas y pagos guardados, incluidos los nombres históricos de métodos de pago e impuestos. La agrupación de impuestos suma únicamente importes ya almacenados por concepto; no aplica tasas ni reemplaza el total confirmado de la factura. El PDF manual normal mantiene su ruta Jasper existente. Las preferencias de visualización, el enrutamiento por caja y el protocolo de reserva/confirmación de trabajos se conservan.
 
-Cada aplicación incorpora el mismo núcleo de cinco archivos en su propio paquete para distribuirse sin depender de la instalación de la otra. Comprobar su equivalencia mediante `scripts/check-pos-renderer-parity.ps1`. Al cambiar el núcleo, actualizar ambas copias y repetir las pruebas. No hay dependencias Maven locales entre los dos ejecutables.
+Cada aplicación incorpora el mismo núcleo compartido en su propio paquete para distribuirse sin depender de la instalación de la otra. La incorporación de devoluciones y el motor geométrico común se documentan en DEVOLUCION-POS-80MM.md. Comprobar su equivalencia mediante `scripts/check-pos-renderer-parity.ps1`. Al cambiar el núcleo, actualizar ambas copias y repetir las pruebas. No hay dependencias Maven locales entre los dos ejecutables.
 
 El destino Microsoft Print to PDF continúa guardando y abriendo directamente el archivo según la opción que el usuario solicitó para trabajar sin impresora física. No se añade apertura automática a la interfaz web de Facturación ni a las impresoras físicas.
 

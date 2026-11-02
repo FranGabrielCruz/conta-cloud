@@ -27,13 +27,15 @@ public class LineaDevolucionVenta {
     @Column(nullable=false,precision=19,scale=4) private BigDecimal total;
     @Column(name="track_inventory",nullable=false) private boolean controlaExistencia;
     @Column(name="line_order",nullable=false) private int orden;
+    @Column(name="tax_name",length=120,updatable=false) private String impuestoNombre;
+    public String getImpuestoNombre(){return impuestoNombre;}
     protected LineaDevolucionVenta(){}
     public LineaDevolucionVenta(DevolucionVenta devolucion,LineaFacturaVenta original,BigDecimal cantidad,
             BigDecimal subtotalBruto,BigDecimal descuento,BigDecimal recargo,BigDecimal base,BigDecimal impuesto,BigDecimal total,int orden){
         tenantId=devolucion.getTenantId();empresaId=devolucion.getEmpresaId();devolucionId=devolucion.getId();lineaFacturaId=original.getId();
         productoId=original.getProductoId();productoCodigo=original.getCodigoProducto();description=original.getDescripcion();unidadId=original.getUnidadId();
         unidadNombre=original.getUnidadNombre();this.cantidad=cantidad;precio=original.getPrecioUnitario();this.subtotalBruto=subtotalBruto;
-        this.descuento=descuento;this.recargo=recargo;baseImponible=base;tasaImpuesto=original.getTasaImpuesto();this.impuesto=impuesto;
+        this.descuento=descuento;this.recargo=recargo;baseImponible=base;impuestoNombre=original.getImpuestoNombre();tasaImpuesto=original.getTasaImpuesto();this.impuesto=impuesto;
         this.total=total;controlaExistencia=original.isControlaExistencia();this.orden=orden;
     }
     public UUID getId(){return id;} public UUID getProductoId(){return productoId;} public UUID getUnidadId(){return unidadId;}

@@ -65,7 +65,7 @@ public class PrintAgentAdminService {
     @Transactional @PreAuthorize("hasAuthority('agentes_impresion.crear')")
     public AgenteImpresionDto crear(CrearAgenteImpresionInput input){
         if(input==null)throw new ReglaNegocioException("Completa los datos del agente.");
-        validarNombre(input.nombre());validarSucursal(input.sucursalId());validarPreferencia(input.mostrarPdfAlImprimir(),true);
+        validarNombre(input.nombre());validarSucursal(input.sucursalId());validarPreferencia(input.printOnScreen(),true);
         var p=TenantContext.principalActual();
         var seleccion=asignaciones.validar(p.tenantId(),p.empresaId(),input.sucursalId(),null,input.cajaIds(),List.of(),true);
         var a=mapper.toEntity(input,p.tenantId(),p.empresaId(),numeros.siguiente(p.tenantId(),p.empresaId()),p.usuarioId(),seleccion);
@@ -77,13 +77,13 @@ public class PrintAgentAdminService {
         if(input==null)throw new ReglaNegocioException("Completa los datos del agente.");
         var a=agente(id,true);
         if(a.getVersion()!=input.version())throw new ReglaNegocioException("El agente cambió. Vuelve a abrir el formulario antes de guardar.");
-        validarNombre(input.nombre());validarSucursal(input.sucursalId());validarPreferencia(input.mostrarPdfAlImprimir(),a.isMostrarPdfAlImprimir());
+        validarNombre(input.nombre());validarSucursal(input.sucursalId());validarPreferencia(input.printOnScreen(),a.isPrintOnScreen());
         var anteriores=a.getCajas().stream().map(Caja::getId).toList();
         var p=TenantContext.principalActual();
         var seleccion=asignaciones.validar(p.tenantId(),p.empresaId(),input.sucursalId(),id,input.cajaIds(),anteriores,a.getEstado()!=EstadoAgenteImpresion.REVOKED);
         // Remove old join rows before a branch change; composite foreign keys remain valid at each flush.
         a.reemplazarCajas(Set.of());agentes.flush();
-        a.configurar(input.nombre().trim(),input.sucursalId(),input.mostrarPdfAlImprimir());a.reemplazarCajas(seleccion);agentes.flush();
+        a.configurar(input.nombre().trim(),input.sucursalId(),input.printOnScreen());a.reemplazarCajas(seleccion);agentes.flush();
         var retiradas=new HashSet<>(anteriores);retiradas.removeAll(input.cajaIds());cancelarPendientes(a,retiradas);
         auditoria.registrar("PrintAgentConfigurationChanged","PrintAgent",id,detalle(a));return dto(a);
     }
@@ -138,6 +138,6 @@ public class PrintAgentAdminService {
     }
     private String nuevoCodigo(){for(int i=0;i<100;i++){String code=tokens.nuevoCodigoVinculacion();if(!pairings.existsByHashCodigo(tokens.hashCodigo(code)))return code;}throw new ReglaNegocioException("No fue posible generar el código. Intenta nuevamente.");}
     private static int permitido(int size){return Set.of(10,20,25,50,100).contains(size)?size:10;}
-    private static String detalle(AgenteImpresion a){return "{\"traceId\":\""+TraceContext.currentOrCreate()+"\",\"showPdfOnPrint\":"+a.isMostrarPdfAlImprimir()+",\"cajas\":"+a.getCajas().size()+"}";}
+    private static String detalle(AgenteImpresion a){return "{\"traceId\":\""+TraceContext.currentOrCreate()+"\",\"printOnScreen\":"+a.isPrintOnScreen()+",\"cajas\":"+a.getCajas().size()+"}";}
     public record OpcionSucursal(UUID id,String nombre){}
 }

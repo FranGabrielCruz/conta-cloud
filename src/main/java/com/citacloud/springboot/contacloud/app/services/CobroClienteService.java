@@ -84,7 +84,12 @@ public class CobroClienteService {
         List<CobroClienteInput.AplicacionFactura> allocations=aplicaciones(input.aplicaciones());
         BigDecimal applied=allocations.stream().map(CobroClienteInput.AplicacionFactura::monto).map(CobroClienteService::money).reduce(BigDecimal.ZERO,BigDecimal::add);
         if(applied.compareTo(received)>0)throw new ReglaNegocioException("El total aplicado no puede superar el total recibido.");
+        receipts.bloquearClienteImpresion(p.tenantId(),empresa,customer.getId());
+        // A concurrent retry may have committed while waiting for the customer lock.
+        CobroClienteDto replay=receipts.buscarIdempotencia(p.tenantId(),empresa,input.idempotencia()).orElse(null);
+        if(replay!=null){if(!Objects.equals(receipts.fingerprint(p.tenantId(),empresa,input.idempotencia()),fingerprint))throw new ReglaNegocioException("La operación ya fue utilizada con datos diferentes.");return resultado(replay);}
         List<MedioValidado> paymentMethods=medios(input,received,currency,p.tenantId(),empresa);
+        BigDecimal balanceAnterior=receipts.saldoPendiente(p.tenantId(),empresa,customer.getId(),currency.getId());
         UUID receiptId=UUID.randomUUID();String number="REC-"+String.format(Locale.ROOT,"%06d",receipts.siguienteNumero(p.tenantId(),empresa));
         receipts.insertarRecibo(receiptId,p.tenantId(),empresa,number,customer.getId(),nombre(customer),customer.getIdentificacion(),branch.getId(),branch.getNombre(),
             currency.getId(),currency.getCodigoIso(),input.fecha(),received,applied,texto(input.referencia(),100),texto(input.observacion(),1000),input.idempotencia(),fingerprint,p.usuarioId());
@@ -99,6 +104,8 @@ public class CobroClienteService {
             method.type==TipoCuentaDinero.CASH_REGISTER?method.account.id():null,method.sessionId,method.type==TipoCuentaDinero.BANK_ACCOUNT?method.account.id():null,method.account.nombre(),method.reference,order++);
             MovimientoFinanciero movement=MovimientoFinanciero.cobroCliente(p.tenantId(),empresa,input.fecha(),method.type,method.account.id(),currency.getId(),method.amount,number,paymentId,medio(method.method),method.sessionId,method.reference,p.usuarioId());
             movement.asignarRelacionesCuenta(method.account.caja(),method.account.cuentaBancaria(),method.account.moneda());movement=movements.saveAndFlush(movement);receipts.vincularMovimiento(paymentId,movement.getId());}
+        receipts.conservarImpresion(receiptId,p.tenantId(),empresa,input.cajaId(),balanceAnterior,
+            receipts.saldoPendiente(p.tenantId(),empresa,customer.getId(),currency.getId()));
         audit.registrar("CUSTOMER_RECEIPT_CONFIRMED","CobroCliente",receiptId,"{\"numero\":\""+number+"\",\"recibido\":"+received+",\"aplicado\":"+applied+"}");
         return new CobroClienteResultadoDto(receiptId,number,received,applied,received.subtract(applied));
     }
@@ -108,6 +115,7 @@ public class CobroClienteService {
     public CobroClienteDto aplicarDisponible(UUID id,AplicarSaldoClienteInput input){
         var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();CobroClienteDto receipt=receipts.bloquearRecibo(id,p.tenantId(),empresa);
         if(receipt==null)throw new RecursoNoEncontradoException("Recibo no encontrado.");autorizarSucursal(receipt);if(receipt.estado()==EstadoReciboCliente.VOIDED||receipt.disponible().signum()<=0)throw new ReglaNegocioException("El recibo no tiene saldo disponible.");
+        receipts.bloquearClienteImpresion(p.tenantId(),empresa,receipt.clienteId());
         List<CobroClienteInput.AplicacionFactura> items=aplicaciones(input==null?null:input.aplicaciones());BigDecimal total=items.stream().map(CobroClienteInput.AplicacionFactura::monto).map(CobroClienteService::money).reduce(BigDecimal.ZERO,BigDecimal::add);
         if(total.signum()<=0||total.compareTo(receipt.disponible())>0)throw new ReglaNegocioException("El importe supera el saldo disponible del recibo.");
         for(var item:items){var account=receipts.bloquearCuenta(item.cuentaCobrarId(),p.tenantId(),empresa);BigDecimal amount=money(item.monto());
@@ -125,6 +133,7 @@ public class CobroClienteService {
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.anular')")
     public CobroClienteDto anular(UUID id,String reason){String clean=textoObligatorio(reason,500,"El motivo de anulación es obligatorio.");var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();CobroClienteDto receipt=receipts.bloquearRecibo(id,p.tenantId(),empresa);
         if(receipt==null)throw new RecursoNoEncontradoException("Recibo no encontrado.");autorizarSucursal(receipt);if(receipt.estado()==EstadoReciboCliente.VOIDED)return detalle(id);
+        receipts.bloquearClienteImpresion(p.tenantId(),empresa,receipt.clienteId());
         for(var app:receipts.aplicacionesActivas(id,p.tenantId(),empresa)){
             if(receipts.bloquearCuenta(app.cuentaId(),p.tenantId(),empresa)==null)
                 throw new ReglaNegocioException("No fue posible bloquear una cuenta por cobrar del recibo.");

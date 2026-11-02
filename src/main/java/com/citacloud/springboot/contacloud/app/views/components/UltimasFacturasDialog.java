@@ -28,7 +28,7 @@ public class UltimasFacturasDialog extends Dialog {
     private static final DateTimeFormatter FECHA_HORA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final UltimasFacturasService service;
     private final Consumer<UUID> reimprimir;
-    private Consumer<UUID> imprimir;
+    private java.util.function.BiFunction<UUID,UUID,Boolean> imprimir;
     private final Runnable devolverFoco;
     private final TextField buscar=new TextField();
     private final DatePicker desde=new DatePicker("Desde"),hasta=new DatePicker("Hasta");
@@ -58,7 +58,7 @@ public class UltimasFacturasDialog extends Dialog {
         addClosedListener(e->devolverFoco.run());
     }
 
-    public UltimasFacturasDialog(UltimasFacturasService service,Consumer<UUID> verPdf,Consumer<UUID> imprimir,Runnable foco){this(service,verPdf,foco);this.imprimir=imprimir;}
+    public UltimasFacturasDialog(UltimasFacturasService service,Consumer<UUID> verPdf,java.util.function.BiFunction<UUID,UUID,Boolean> imprimir,Runnable foco){this(service,verPdf,foco);this.imprimir=imprimir;}
     private void configurarFiltros(){
         buscar.setPlaceholder("Buscar por cliente, RNC/Cédula o ID de factura...");buscar.setClearButtonVisible(true);
         buscar.setPrefixComponent(VaadinIcon.SEARCH.create());buscar.setValueChangeMode(ValueChangeMode.LAZY);buscar.setValueChangeTimeout(300);
@@ -92,11 +92,7 @@ public class UltimasFacturasDialog extends Dialog {
         return acciones;}
 
     AppActionButton botonImprimir(UUID facturaId,ButtonSize size){
-        AppActionButton boton=new AppActionButton(ActionType.PRINT,size,"Imprimir",e->{
-            try{imprimir.accept(facturaId);}finally{e.getSource().setEnabled(true);}
-        });
-        boton.setDisableOnClick(true);
-        return boton;
+        return new BillingPrintActionButton(facturaId,size,"Imprimir",imprimir);
     }
 
     private void cargar(){

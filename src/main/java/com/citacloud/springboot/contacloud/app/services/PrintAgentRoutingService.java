@@ -11,9 +11,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class PrintAgentRoutingService {
  private final CashRegisterRepository cajas; private final AgenteImpresionRepository agentes;
  public PrintAgentRoutingService(CashRegisterRepository cajas,AgenteImpresionRepository agentes){this.cajas=cajas;this.agentes=agentes;}
- @Transactional(readOnly=true) @PreAuthorize("hasAuthority('facturas.pdf')")
+ @Transactional(readOnly=true) @PreAuthorize("hasAnyAuthority('facturas.pdf','devoluciones_venta.pdf','recibos.imprimir','recuentos_caja.imprimir','vales_caja.imprimir','cierres_caja.imprimir')")
  public UUID resolver(UUID cajaId){var p=TenantContext.principalActual();var caja=cajas.findByIdAndTenantIdAndEmpresaId(cajaId,p.tenantId(),p.empresaId()).filter(Caja::isActivo).filter(c->EmpresaContext.permiteSucursal(c.getSucursalId())).orElseThrow(()->new RecursoNoEncontradoException("Caja no encontrada."));
  var destinos=agentes.destinos(p.tenantId(),p.empresaId(),caja.getSucursalId(),cajaId,EstadoAgenteImpresion.ACTIVE);
- if(destinos.size()!=1)throw new ReglaNegocioException(destinos.isEmpty()?"El agente de impresión de esta caja no está disponible.":"Configura un único destino de Facturación para esta caja.");return destinos.getFirst().getId();
+ if(destinos.isEmpty()){
+     // An explicitly retained revoked association may still provide PDF-only configuration.
+     // Never pick between historical agents, and never route physical jobs to a revoked agent.
+     var revocados=agentes.destinos(p.tenantId(),p.empresaId(),caja.getSucursalId(),cajaId,EstadoAgenteImpresion.REVOKED);
+     if(revocados.size()==1&&revocados.getFirst().isPrintOnScreen())return revocados.getFirst().getId();
+ }
+ if(destinos.size()!=1)throw new ReglaNegocioException(destinos.isEmpty()?"No hay un agente de impresión válido configurado para esta caja.":"Configura un único destino de impresión para esta caja.");return destinos.getFirst().getId();
  }
 }

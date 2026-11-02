@@ -35,6 +35,20 @@ public class DevolucionVenta {
     @Column(name="operation_key",nullable=false,updatable=false) private UUID claveOperacion;
     @Column(name="confirmed_at",nullable=false) private OffsetDateTime confirmadaEn;
     @Column(name="confirmed_by",nullable=false) private UUID confirmadaPor;
+    @Embedded private EmisorFacturaPos emisorPos;
+    @Column(name="pos_branch_id",updatable=false) private UUID sucursalPosId;
+    @Column(name="pos_cash_register_id",updatable=false) private UUID cajaPosId;
+    @Column(name="pos_branch_name",length=150,updatable=false) private String sucursalPosNombre;
+    @Column(name="pos_operator_name",length=200,updatable=false) private String operadorPosNombre;
+    public EmisorFacturaPos getEmisorPos(){return emisorPos;}
+    public UUID getSucursalPosId(){return sucursalPosId;} public UUID getCajaPosId(){return cajaPosId;}
+    public String getSucursalPosNombre(){return sucursalPosNombre;} public String getOperadorPosNombre(){return operadorPosNombre;}
+    public String getStatus(){return status;}
+    public void conservarIdentidadPos(EmisorFacturaPos emisor,UUID sucursal,UUID caja,String sucursalNombre,String operador){
+        if(emisorPos!=null)throw new IllegalStateException("La identidad histórica ya está conservada.");
+        emisorPos=java.util.Objects.requireNonNull(emisor);sucursalPosId=java.util.Objects.requireNonNull(sucursal);cajaPosId=java.util.Objects.requireNonNull(caja);
+        sucursalPosNombre=sucursalNombre;operadorPosNombre=operador;
+    }
     protected DevolucionVenta(){}
     public DevolucionVenta(UUID tenant,UUID empresa,String numero,FacturaVenta factura,MotivoDevolucionVenta motivo,
             String observacion,boolean retornaInventario,UUID almacenDestino,String almacenDestinoNombre,BigDecimal subtotalBruto,BigDecimal descuento,

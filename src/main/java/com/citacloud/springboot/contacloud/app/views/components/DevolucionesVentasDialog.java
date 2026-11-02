@@ -31,6 +31,8 @@ public class DevolucionesVentasDialog extends Dialog {
     private final ComboBox<EstadoDevolucionFacturaFiltro> estado=new ComboBox<>("Estado");
     private final Grid<FacturaDevolucionResumenDto> facturas=new Grid<>(); private final PosDialogPagination paginacion;
     private DevolucionVentaDetalleDto detalle; private final Map<UUID,BigDecimalField> cantidades=new LinkedHashMap<>();
+    private java.util.function.BiFunction<UUID,UUID,Boolean> imprimir;
+    private String terminalToken;
     private UUID claveOperacion=UUID.randomUUID(); private Button confirmar;
 
     public DevolucionesVentasDialog(DevolucionVentaService service,Consumer<UUID> abrirPdf,Runnable alCerrar){
@@ -38,6 +40,11 @@ public class DevolucionesVentasDialog extends Dialog {
         addClassName("cc-sales-return-dialog");setWidth("min(1180px, 96vw)");setMaxHeight("94vh");setModal(true);setDraggable(false);
         cuerpo.setPadding(false);cuerpo.setSpacing(true);cuerpo.setWidthFull();paginacion=new PosDialogPagination(req->cargarFacturas());
         configurarBusqueda();mostrarBusqueda();add(cuerpo);addDialogCloseActionListener(e->cerrar());
+    }
+
+    public DevolucionesVentasDialog(DevolucionVentaService service,Consumer<UUID> abrirPdf,Runnable alCerrar,
+            java.util.function.BiFunction<UUID,UUID,Boolean> imprimir,String terminalToken){
+        this(service,abrirPdf,alCerrar);this.imprimir=imprimir;this.terminalToken=terminalToken;
     }
 
     private void configurarBusqueda(){
@@ -56,6 +63,8 @@ public class DevolucionesVentasDialog extends Dialog {
                     "Iniciar devolución",e->seleccionar(f.id()));
             accion.addClassName("cc-sales-return-start-action");
             accion.setVisible(TenantContext.principalActual().permisos().contains("devoluciones_venta.crear"));
+            boolean crear=TenantContext.principalActual().permisos().contains("devoluciones_venta.crear");
+            if(puedeImprimir()&&(!crear||"DEVUELTA".equals(f.estado())))return new AppActionButton(ActionType.PRINT,ButtonSize.GRID_ACTION,"Ver devoluciones para imprimir",e->mostrarHistorial(f.id()));
             return accion;
         })).setHeader("Acc.").setWidth("48px").setFlexGrow(0);
     }
@@ -91,7 +100,8 @@ public class DevolucionesVentasDialog extends Dialog {
         confirmar.setVisible(TenantContext.principalActual().permisos().contains("devoluciones_venta.confirmar"));
         Button volver=new AppActionButton(ActionType.BACK,ButtonSize.MAIN,"Volver a facturas",e->mostrarBusqueda());Button cancelar=new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cerrar",e->cerrar());
         HorizontalLayout formulario=new HorizontalLayout(motivo,almacen);formulario.setWidthFull();formulario.setAlignItems(FlexComponent.Alignment.END);formulario.setFlexGrow(1,motivo,almacen);
-        HorizontalLayout acciones=new HorizontalLayout(confirmar,volver,cancelar);acciones.setWidthFull();acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        UUID facturaId=detalle.facturaId();Button historial=new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Ver devoluciones confirmadas",e->mostrarHistorial(facturaId));historial.setVisible(puedeImprimir());
+        HorizontalLayout acciones=new HorizontalLayout(confirmar,historial,volver,cancelar);acciones.getStyle().set("flex-wrap","wrap");acciones.setWidthFull();acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
         cuerpo.add(cabecera,grid,paginacionDetalle,formulario,inventario,observacion,resumen,acciones);actualizarResumen();
     }
 
@@ -105,8 +115,45 @@ public class DevolucionesVentasDialog extends Dialog {
         ConfirmarDevolucionVentaInput input=new ConfirmarDevolucionVentaInput(claveOperacion,detalle.facturaId(),motivo==null?null:motivo.id(),observacion,retorna,almacen==null?null:almacen.id(),lineas);
         Dialog confirmacion=new Dialog();confirmacion.setHeaderTitle("CONFIRMAR DEVOLUCIÓN");confirmacion.add(new Paragraph("La operación generará la devolución, la nota de crédito y los movimientos correspondientes. No podrá duplicarse."));
         AppActionButton[] aceptarRef=new AppActionButton[1];
-        AppActionButton aceptar=new AppActionButton(ActionType.ACCEPT,ButtonSize.MAIN,"Confirmar devolución",e->{aceptarRef[0].setEnabled(false);confirmar.setEnabled(false);try{var resultado=service.confirmar(input);confirmacion.close();close();abrirPdf.accept(resultado.id());}catch(Exception ex){aceptarRef[0].setEnabled(true);confirmar.setEnabled(true);UiErrorHandler.show(ex,"No fue posible confirmar la devolución.");}});aceptarRef[0]=aceptar;
+        AppActionButton aceptar=new AppActionButton(ActionType.ACCEPT,ButtonSize.MAIN,"Confirmar devolución",e->{aceptarRef[0].setEnabled(false);confirmar.setEnabled(false);try{var resultado=service.confirmar(input,terminalToken);confirmacion.close();mostrarConfirmada(resultado);}catch(Exception ex){aceptarRef[0].setEnabled(true);confirmar.setEnabled(true);UiErrorHandler.show(ex,"No fue posible confirmar la devolución.");}});aceptarRef[0]=aceptar;
         AppActionButton cancelar=new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->confirmacion.close());HorizontalLayout pie=new HorizontalLayout(aceptar,cancelar);pie.setWidthFull();pie.setJustifyContentMode(FlexComponent.JustifyContentMode.END);confirmacion.add(pie);confirmacion.open();
+    }
+
+    private boolean puedeImprimir(){return TenantContext.principalActual().permisos().contains("devoluciones_venta.pdf");}
+    private Button botonImprimir(UUID id){
+        var boton=new BillingPrintActionButton(id,ButtonSize.MAIN,"Imprimir devolución",
+                (document,attempt)->imprimir!=null&&puedeImprimir()&&Boolean.TRUE.equals(imprimir.apply(document,attempt)));
+        boton.setVisible(imprimir!=null&&puedeImprimir());return boton;
+    }
+    private Button botonPdf(UUID id){
+        AppActionButton boton=new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF de devolución",event->{if(abrirPdf!=null&&puedeImprimir())abrirPdf.accept(id);});
+        boton.setVisible(abrirPdf!=null&&puedeImprimir());return boton;
+    }
+    private void mostrarConfirmada(DevolucionVentaResultadoDto resultado){
+        UUID facturaId=detalle.facturaId();cuerpo.removeAll();
+        HorizontalLayout acciones=new HorizontalLayout(botonImprimir(resultado.id()),botonPdf(resultado.id()),
+                new AppActionButton(ActionType.BACK,ButtonSize.MAIN,"Ver devoluciones de la factura",e->mostrarHistorial(facturaId)),
+                new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cerrar",e->cerrar()));
+        acciones.setWidthFull();acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        cuerpo.add(new H3("Devolución "+resultado.numero()+" confirmada"),new Paragraph("Puede imprimir el comprobante o consultar su PDF."),acciones);
+    }
+    private void mostrarHistorial(UUID facturaId){
+        if(!puedeImprimir())return;detalle=null;cantidades.clear();cuerpo.removeAll();
+        Grid<DevolucionVentaImpresionResumenDto> historial=new Grid<>();historial.setWidthFull();historial.setAllRowsVisible(true);
+        historial.addColumn(DevolucionVentaImpresionResumenDto::numero).setHeader("Devolución").setAutoWidth(true);
+        historial.addColumn(d->DATE_TIME.format(d.fecha())).setHeader("Fecha/Hora").setAutoWidth(true);
+        historial.addColumn(DevolucionVentaImpresionResumenDto::cliente).setHeader("Cliente").setFlexGrow(1);
+        historial.addColumn(d->d.moneda()+" "+money(d.total())).setHeader("Total").setAutoWidth(true);
+        historial.addColumn(new ComponentRenderer<>(d->new HorizontalLayout(botonImprimir(d.id()),botonPdf(d.id())))).setHeader("Acciones").setAutoWidth(true);
+        PosDialogPagination[] referencia=new PosDialogPagination[1];
+        java.util.function.IntConsumer cargar=pagina->{
+            try{var resultado=service.historialImpresion(facturaId,pagina);historial.setItems(resultado.getContent());if(referencia[0]!=null)referencia[0].setTotal(resultado.getTotalElements());}
+            catch(RuntimeException ex){historial.setItems(List.of());UiErrorHandler.show(ex,"No fue posible cargar las devoluciones confirmadas.");}
+        };
+        referencia[0]=new PosDialogPagination(request->cargar.accept(request.page()));
+        HorizontalLayout acciones=new HorizontalLayout(new AppActionButton(ActionType.BACK,ButtonSize.MAIN,"Volver a facturas",e->mostrarBusqueda()),new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cerrar",e->cerrar()));
+        acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);acciones.setWidthFull();
+        cuerpo.add(new H3("Devoluciones confirmadas"),new Paragraph("Seleccione Imprimir para solicitar una copia del comprobante."),historial,referencia[0],acciones);cargar.accept(0);
     }
 
     private void cerrar(){close();if(alCerrar!=null)alCerrar.run();}

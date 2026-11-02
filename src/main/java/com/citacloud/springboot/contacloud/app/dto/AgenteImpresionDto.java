@@ -7,6 +7,6 @@ import java.util.List;
 
 public record AgenteImpresionDto(UUID id,String codigo,String nombre,UUID sucursalId,String sucursal,
     EstadoAgenteImpresion estado,OffsetDateTime ultimaConexion,boolean conectado,String versionAplicacion,
-    String nombreMaquina,String sistemaOperativo,long version,List<CajaAgenteImpresionDto> cajas,boolean mostrarPdfAlImprimir){
+    String nombreMaquina,String sistemaOperativo,long version,List<CajaAgenteImpresionDto> cajas,@com.fasterxml.jackson.annotation.JsonAlias({"showPdfOnPrint","mostrarPdfAlImprimir"}) boolean printOnScreen){
     public AgenteImpresionDto{cajas=List.copyOf(cajas);}
 }

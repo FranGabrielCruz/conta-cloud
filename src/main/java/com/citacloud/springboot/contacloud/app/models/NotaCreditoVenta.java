@@ -27,6 +27,7 @@ public class NotaCreditoVenta {
         clienteId=devolucion.getClienteId();monedaId=devolucion.getMonedaId();amount=total;creditoCliente=clienteId==null?BigDecimal.ZERO:total;
         confirmadaEn=OffsetDateTime.now();confirmadaPor=usuario;
     }
+    public BigDecimal getAplicadoCxC(){return aplicadoCxC;}
     public UUID getId(){return id;} public String getNumero(){return numero;} public BigDecimal getMonto(){return amount;}
     public BigDecimal getCreditoCliente(){return creditoCliente;} public UUID getDevolucionId(){return devolucionId;}
 }

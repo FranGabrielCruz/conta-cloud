@@ -4,7 +4,7 @@
 
 Nuevo y Editar agente permiten seleccionar una o varias cajas de la misma sucursal mediante un MultiSelectComboBox. Debe seleccionarse al menos una caja activa de una sucursal autorizada. Cambiar la sucursal limpia las cajas incompatibles. Todas las cajas de un agente comparten la impresora física configurada localmente en contaCloudPrint.
 
-Mostrar PDF al imprimir es una propiedad persistente de cada agente. El checkbox aparece en Nuevo/Editar y como dato de solo lectura en el detalle. Cambiar la preferencia requiere facturas.configurar_impresion; editar nombre y cajas requiere agentes_impresion.editar. El formulario conserva el valor anterior si el usuario solo tiene permiso de consulta. No existe una pantalla independiente de impresión de Facturación.
+Impresión por pantalla (PDF) es una propiedad persistente de cada agente. El checkbox aparece en Nuevo/Editar y como dato de solo lectura en el detalle. Cambiar la preferencia requiere facturas.configurar_impresion; editar nombre y cajas requiere agentes_impresion.editar. El formulario conserva el valor anterior si el usuario solo tiene permiso de consulta. No existe una pantalla independiente de impresión de Facturación.
 
 El listado muestra las dos primeras cajas y +N para las restantes, con el listado completo en un tooltip. Nombre, Sucursal y Cajas son flexibles; las acciones se dimensionan por contenido y quedan fijadas al borde derecho.
 
@@ -20,7 +20,7 @@ El permiso agentes_impresion.editar se asigna a ADMINISTRADOR y a los roles que 
 
 ## Autorización y trabajos
 
-La caja se obtiene de la factura confirmada. El backend resuelve su agente activo a partir de las asociaciones y aplica la preferencia de ese mismo agente. La solicitud resuelve el modo bajo bloqueo del agente antes de generar el ticket o insertar un trabajo. En modo PDF devuelve mostrarPdfAlImprimir=true sin ID de trabajo. En modo impresora devuelve el ID del único trabajo y mostrarPdfAlImprimir=false. Un reintento de un trabajo existente conserva el destino físico incluso si cambia la configuración; los trabajos históricos nunca provocan también apertura de PDF. Una nueva impresión explícita consulta la configuración actual.
+La caja se obtiene de la factura confirmada. El backend resuelve su agente activo a partir de las asociaciones y aplica la preferencia de ese mismo agente. La solicitud resuelve el modo bajo bloqueo del agente antes de generar el ticket o insertar un trabajo. En modo PDF devuelve printOnScreen=true sin ID de trabajo. En modo impresora devuelve el ID del único trabajo y printOnScreen=false. Un reintento de un trabajo existente conserva el destino físico incluso si cambia la configuración; los trabajos históricos nunca provocan también apertura de PDF. Una nueva impresión explícita consulta la configuración actual.
 
 POST /api/print-agents/jobs/claim obtiene la identidad del Bearer autenticado. Su consulta exige una asociación actual con la caja y no admite un agentId o cashRegisterId arbitrario para seleccionar trabajos. La reserva usa FOR UPDATE SKIP LOCKED. Descargar un documento no lo marca como impreso.
 
@@ -34,11 +34,11 @@ GET /api/print-agents/me devuelve cashRegisters con objetos {id, name}. Esa cole
 
 contaCloudPrint muestra Cajas como una lista de solo lectura con wrapping. No existe selector local de cajas. Printer-config.txt y SecretStore conservan sus responsabilidades anteriores.
 
-## PDF y transacción de venta
+## Política global de salida de Facturación
 
-El checkbox define dos salidas mutuamente excluyentes en Facturación y Últimas facturas:
+El checkbox define dos salidas mutuamente excluyentes para los documentos soportados de Facturación: factura de venta y devolución de venta, incluidos sus historiales.
 
-- Marcado: abre el PDF normal mediante FacturaVentaPdfService.generar. No genera ticket POS de 80 mm, no crea trabajo y no envía nada a contaCloudPrint. La falta de heartbeat del agente no bloquea esta salida.
+- Marcado: abre el PDF normal mediante FacturaVentaPdfService.generar. La devolución abre DevolucionVentaPdfService.generar. No genera ticket POS de 80 mm, no crea trabajo y no envía nada a contaCloudPrint. La falta de heartbeat del agente no bloquea esta salida.
 - Desmarcado: genera el ticket POS y crea un único trabajo para contaCloudPrint; no abre PDF automáticamente. Se mantienen las reglas de cola cuando el agente está desconectado, sin fallback a PDF.
 
 Ver PDF siempre utiliza el generador normal y nunca crea trabajos, independientemente del checkbox. Imprimir se deshabilita en el cliente durante la solicitud; la cola conserva su idempotencia backend. La configuración permanece en el agente, sin cambios en printer-config.txt. Un fallo de salida no revierte la venta.
@@ -50,3 +50,43 @@ La solicitud de cola se realiza desde la interfaz después de confirmar la trans
 Las pruebas de PostgreSQL son opt-in mediante CONTACLOUD_POSTGRES_TESTS=true y las variables DB_URL/DB_USERNAME/DB_PASSWORD del entorno; usan la base existente conta_cloud y registros temporales con IDs aleatorios, que se eliminan al finalizar. Hibernate valida el esquema; estas pruebas no crean tablas ni bases de datos. Cubren integridad compuesta, activación y asignación concurrentes, JPA, cambios de sucursal, consumo concurrente y autorización de cajas. Las pruebas de cliente cubren la identidad de varias cajas y el reintento de confirmación sin doble impresión.
 
 La verificación de componentes Vaadin cubre las resoluciones 1366×768, 1600×900 y 1920×1080 con escalados de 100 %, 125 % y 150 %. No se ejecutan impresiones físicas como parte de esas pruebas.
+
+## Extensión de documentos y agente revocado
+
+BillingPrintRouter concentra la resolución, comprobación bajo bloqueo, elección PDF/impresora, límites, idempotencia y creación del trabajo tipado. BillingPrintService y DevolucionVentaPrintService son adaptadores autorizados: obtienen el origen persistido y aportan el renderer 80 mm correspondiente. El router no ejecuta comandos de venta, inventario o reembolso. Las solicitudes se ejecutan en una transacción nueva después de confirmar el negocio.
+
+Para incorporar otro documento de Facturación, crear su adaptador con autorización y origen persistido y delegar al mismo router. No insertar trabajos ni interpretar el checkbox por separado. Los tipos semánticos existentes son SALES_INVOICE y SALES_RETURN; PDF es el formato, no un tipo de documento. No se aplica esta política automáticamente a otros módulos o documentos no integrados.
+
+Se prioriza el único agente activo asignado a la caja. Si no existe, una única asociación revocada puede aportar su preferencia exclusivamente si está en modo PDF. Varias asociaciones históricas revocadas se consideran ambiguas: requieren corregir la asignación. Nunca se envía un trabajo a un agente revocado ni se elige una caja o agente alternativo. La conectividad/heartbeat no interviene en la salida PDF.
+
+El cliente recibe los bytes PDF y su tipo semántico, utilizando el perfil y ancho locales existentes. printPdf utiliza una salida silenciosa: ni una impresora física ni el destino virtual Microsoft Print to PDF abren un visor para trabajos recibidos. La prueba local manual puede seguir mostrando su PDF. La cola mantiene la confirmación y el reintento de ACK sin repetir la salida.
+
+## Nombre de configuración y despliegue (V102)
+
+La interfaz usa **Impresión por pantalla (PDF)** y la ayuda «Al imprimir, muestra el PDF en pantalla en lugar de enviarlo a la impresora.» El modelo, DTOs y auditoría usan printOnScreen; la columna activa es print_on_screen. V102 renombra las columnas de print_agents y billing_print_jobs sin UPDATE, sin invertir valores y conservando el default true. La antigua tabla billing_print_settings sigue siendo únicamente historial retirado, sin lecturas ni escrituras de la aplicación; sus nombres históricos y las migraciones ya aplicadas se conservan.
+
+Los DTOs aceptan showPdfOnPrint y mostrarPdfAlImprimir exclusivamente como alias JSON de entrada para el mismo valor; solo emiten printOnScreen. No existen propiedades o columnas activas duplicadas. El backend y la interfaz Vaadin se distribuyen en el mismo ejecutable: aplicar Flyway y reiniciar ContaCloud con la versión actualizada, sin mantener instancias antiguas consultando el esquema renombrado. Recargar las pantallas tras el reinicio. contaCloudPrint no recibe ni interpreta esta propiedad y no requiere actualización por este renombrado.
+
+## Enrutamiento obligatorio de Facturación: factura, devolución y recibo
+
+La matriz de salida es común para SALES_INVOICE, SALES_RETURN y PAYMENT_RECEIPT: printOnScreen=true devuelve SCREEN sin generar ticket ni Print Job; false devuelve PRINT_AGENT con un único trabajo tipado y no abre PDF. SolicitudImpresionResultadoDto.outputMode deriva ese modo de la decisión del backend, manteniendo el contrato printOnScreen existente. FacturacionPosView.procesarSalidaImpresion es el único manejador de salida de las tres acciones Imprimir.
+
+Auditoría de entradas:
+
+| Acción | Adaptador autorizado | Impresión física |
+| --- | --- | --- |
+| Imprimir/Reimprimir factura | BillingPrintService → BillingPrintRouter | Factura 80 mm |
+| Imprimir/Reimprimir devolución | DevolucionVentaPrintService → BillingPrintRouter | Devolución 80 mm |
+| Imprimir/Reimprimir recibo | PaymentReceiptPrintService → BillingPrintRouter | Recibo de cobro 80 mm |
+| Ver PDF explícito | Generador del documento, sin router ni cola | Ninguna |
+
+RecibosCobrosDialog separa los callbacks Imprimir (documento + intento) y Ver PDF; se retira el constructor ambiguo que aceptaba un Consumer de un solo ID como impresión. Su botón deshabilita clics en el cliente y conserva el intento para reintentos. Los fallos de salida después de confirmar se informan como fallos de impresión y no vuelven a ejecutar el cobro.
+
+La política incluye también recuento, vale y cierre de caja. Los seis tipos están registrados obligatoriamente en BillingPrintDocumentRegistry y las acciones Imprimir de POS y Operaciones de caja usan BillingPrintUi. No se extiende a Compras, Inventario o Contabilidad.
+
+### Distribución verificada
+
+Los binarios anteriores encontrados no incluían PAYMENT_RECEIPT en el cliente ni el adaptador/reporte de recibo en ContaCloud, pese a existir en el código fuente. Deben desplegarse ambos ejecutables reconstruidos, con V103 aplicada mediante Flyway. El cliente procesa el PDF recibido mediante printSilently, sin abrir visores ni decidir printOnScreen. El diseño de los tres reportes de 80 mm permanece intacto.
+
+
+La especificación vigente de los seis documentos y el contrato de extensión están en [POLITICA-GLOBAL-IMPRESION.md](POLITICA-GLOBAL-IMPRESION.md); reemplaza las listas parciales anteriores de este documento.

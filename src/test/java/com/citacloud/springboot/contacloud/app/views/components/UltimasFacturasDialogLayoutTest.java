@@ -12,15 +12,16 @@ class UltimasFacturasDialogLayoutTest {
  @AfterEach void limpiar(){SecurityContextHolder.clearContext();}
  @Test void reservaAccionesPorContenidoYConservaClienteFlexibleYAlturaDeRegistros() throws Exception {
   var p=new TenantPrincipal(UUID.randomUUID(),UUID.randomUUID(),"DEMO","Admin","admin","",true,Set.of("facturas.pdf"));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));
-  var dialog=new UltimasFacturasDialog(mock(UltimasFacturasService.class),id->{},id->{},()->{});
+  var dialog=new UltimasFacturasDialog(mock(UltimasFacturasService.class),id->{},(id,attempt)->true,()->{});
   var field=UltimasFacturasDialog.class.getDeclaredField("grid");field.setAccessible(true);Grid<?> grid=(Grid<?>)field.get(dialog);
   var columns=grid.getColumns();assertThat(columns).hasSize(6);var actions=columns.getLast();assertThat(actions.getHeaderText()).isEqualTo("Acciones");assertThat(actions.isAutoWidth()).isTrue();assertThat(actions.isFrozenToEnd()).isTrue();assertThat(actions.getFlexGrow()).isZero();assertThat(columns.get(2).getFlexGrow()).isPositive();assertThat(grid.isAllRowsVisible()).isTrue();
  }
  @Test void imprimirProtegeElBotonYConservaCallbackSeparadoDeVerPdf(){
-  java.util.function.Consumer<UUID> pdf=mock(java.util.function.Consumer.class),impresora=mock(java.util.function.Consumer.class);
+  java.util.function.Consumer<UUID> pdf=mock(java.util.function.Consumer.class);
+  java.util.function.BiFunction<UUID,UUID,Boolean> impresora=mock(java.util.function.BiFunction.class);
   var dialog=new UltimasFacturasDialog(mock(UltimasFacturasService.class),pdf,impresora,()->{});
   UUID factura=UUID.randomUUID();var boton=dialog.botonImprimir(factura,ButtonSize.GRID_ACTION);
   assertThat(boton.isDisableOnClick()).isTrue();boton.click();
-  verify(impresora).accept(factura);verifyNoInteractions(pdf);assertThat(boton.isEnabled()).isTrue();
+  verify(impresora).apply(eq(factura),any(UUID.class));verifyNoInteractions(pdf);assertThat(boton.isEnabled()).isTrue();
  }
 }

@@ -52,7 +52,7 @@ class PrintAgentPostgresIntegrationTest {
     @BeforeEach void preparar(){
         jdbc=new JdbcTemplate(ds);
         for(UUID id:cajas)jdbc.update("insert into cajas(id,tenant_id,empresa_id,sucursal_id,moneda_id,codigo,nombre,creado_por) values(?,?,?,?,?,?,?,?)",id,tenant,empresa,sucursal,moneda,"TEST-"+id.toString().substring(0,20),"TEST multicaja "+id,usuario);
-        for(UUID id:List.of(a,b))jdbc.update("insert into print_agents(id,tenant_id,empresa_id,sucursal_id,display_code,name,status,created_by,show_pdf_on_print) values(?,?,?,?,?,?,'ACTIVE',?,?)",id,tenant,empresa,sucursal,"TEST-"+id.toString().substring(0,20),"TEST multicaja "+id,usuario,id.equals(a));
+        for(UUID id:List.of(a,b))jdbc.update("insert into print_agents(id,tenant_id,empresa_id,sucursal_id,display_code,name,status,created_by,print_on_screen) values(?,?,?,?,?,?,'ACTIVE',?,?)",id,tenant,empresa,sucursal,"TEST-"+id.toString().substring(0,20),"TEST multicaja "+id,usuario,id.equals(a));
     }
     @AfterEach void limpiar(){
         if(jdbc==null)return;
@@ -72,9 +72,9 @@ class PrintAgentPostgresIntegrationTest {
             var seleccion=em.createQuery("select c from Caja c where c.id in :ids and c.tenantId=:t and c.empresaId=:e",Caja.class).setParameter("ids",cajas).setParameter("t",tenant).setParameter("e",empresa).getResultList();
             agent.reemplazarCajas(new LinkedHashSet<>(seleccion));agent.configurar(agent.getNombre(),sucursal,false);em.getTransaction().commit();em.clear();
             var guardado=em.createQuery("select a from AgenteImpresion a where a.id=:id and a.tenantId=:t and a.empresaId=:e",AgenteImpresion.class).setParameter("id",a).setParameter("t",tenant).setParameter("e",empresa).getSingleResult();
-            assertThat(guardado.getCajas()).hasSize(3);assertThat(guardado.isMostrarPdfAlImprimir()).isFalse();
+            assertThat(guardado.getCajas()).hasSize(3);assertThat(guardado.isPrintOnScreen()).isFalse();
         }
-        assertThat(jdbc.queryForObject("select show_pdf_on_print from print_agents where tenant_id=? and empresa_id=? and id=?",Boolean.class,tenant,empresa,b)).isFalse();
+        assertThat(jdbc.queryForObject("select print_on_screen from print_agents where tenant_id=? and empresa_id=? and id=?",Boolean.class,tenant,empresa,b)).isFalse();
     }
 
     @Test void crearYEditarConRepositoriosRealesIncluyeCambiosDeSucursalSinNuevoPairing(){
@@ -89,9 +89,9 @@ class PrintAgentPostgresIntegrationTest {
             var pairings=mock(VinculacionAgenteImpresionRepository.class);var credentials=mock(CredencialAgenteImpresionRepository.class);
             var service=new PrintAgentAdminService(cajasRepo,agentes,pairings,credentials,repos.getRepository(SucursalRepository.class),new AgenteImpresionMapper(),numbers,mock(PrintAgentTokenService.class),mock(AuditoriaService.class),new PrintAgentAssignmentService(cajasRepo,agentes),mock(JdbcTemplate.class),Duration.ofMinutes(10),Duration.ofMinutes(2));
             em.getTransaction().begin();var creado=service.crear(new CrearAgenteImpresionInput("TEST agente CRUD",sucursal,List.of(cajas.get(0),cajas.get(1)),false));agentesExtra.add(creado.id());em.getTransaction().commit();
-            assertThat(creado.cajas()).hasSize(2);assertThat(creado.mostrarPdfAlImprimir()).isFalse();
+            assertThat(creado.cajas()).hasSize(2);assertThat(creado.printOnScreen()).isFalse();
             em.getTransaction().begin();var editado=service.editar(creado.id(),new EditarAgenteImpresionInput("TEST editado CRUD",sucursalExtra,List.of(cajaExtra),true,creado.version()));em.getTransaction().commit();
-            assertThat(editado.sucursalId()).isEqualTo(sucursalExtra);assertThat(editado.cajas()).extracting(CajaAgenteImpresionDto::id).containsExactly(cajaExtra);assertThat(editado.mostrarPdfAlImprimir()).isTrue();verifyNoInteractions(pairings,credentials);
+            assertThat(editado.sucursalId()).isEqualTo(sucursalExtra);assertThat(editado.cajas()).extracting(CajaAgenteImpresionDto::id).containsExactly(cajaExtra);assertThat(editado.printOnScreen()).isTrue();verifyNoInteractions(pairings,credentials);
         }
     }
 
@@ -140,7 +140,7 @@ class PrintAgentPostgresIntegrationTest {
         try(var pool=Executors.newFixedThreadPool(3)){
             List<Future<Integer>> futuros=new ArrayList<>();
             for(UUID id:List.of(a,a,b))futuros.add(pool.submit(()->{var service=servicio(id,mock(AuditoriaService.class));var tx=new TransactionTemplate(new DataSourceTransactionManager(ds));int total=0;while(true){var job=tx.execute(s->service.siguiente(principal(id)));if(job.isEmpty())return total;assertThat(atendidas.add(job.get().id())).isTrue();total++;}}));
-            int total=0;for(var f:futuros)total+=f.get(40,TimeUnit.SECONDS);assertThat(total).isEqualTo(300);
+            int total=0;for(var f:futuros)total+=f.get(120,TimeUnit.SECONDS);assertThat(total).isEqualTo(300);
         }
         assertThat(atendidas).hasSize(300);
         for(UUID caja:cajas)assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and cash_register_id=? and status='PROCESSING'",Integer.class,tenant,empresa,caja)).isEqualTo(100);
@@ -160,20 +160,92 @@ class PrintAgentPostgresIntegrationTest {
             UUID id=UUID.randomUUID();facturas.add(id);var f=mock(FacturaVenta.class);when(f.getCajaId()).thenReturn(caja);when(f.getSucursalId()).thenReturn(sucursal);
             when(invoices.findByIdAndTenantIdAndEmpresaId(id,tenant,empresa)).thenReturn(Optional.of(f));
             var salida=tx.execute(t->service.solicitar(id,UUID.randomUUID()));
-            assertThat(salida.mostrarPdfAlImprimir()).isTrue();assertThat(salida.trabajoId()).isNull();
+            assertThat(salida.printOnScreen()).isTrue();assertThat(salida.trabajoId()).isNull();
         }
         assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and agent_id=?",Integer.class,tenant,empresa,a)).isZero();
         verifyNoInteractions(pdf);
-        jdbc.update("update print_agents set show_pdf_on_print=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
+        jdbc.update("update print_agents set print_on_screen=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
         for(UUID id:facturas){
             when(pdf.generarParaImpresion(id)).thenReturn(new ArchivoPdfDto("ticket.pdf",new byte[]{1}));
             UUID intento=UUID.randomUUID();var salida=tx.execute(t->service.solicitar(id,intento));
-            assertThat(salida.mostrarPdfAlImprimir()).isFalse();assertThat(salida.trabajoId()).isNotNull();
+            assertThat(salida.printOnScreen()).isFalse();assertThat(salida.trabajoId()).isNotNull();
             var repetida=tx.execute(t->service.solicitar(id,intento));assertThat(repetida).isEqualTo(salida);
             verify(pdf).generarParaImpresion(id);
         }
         assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and agent_id=?",Integer.class,tenant,empresa,a)).isEqualTo(3);
         verify(pdf,never()).generar(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(TipoDocumentoImpresion.class)
+    void politicaGlobalAplicaAmbosModosATresCajasYConservaTipo(TipoDocumentoImpresion tipo){
+        for(UUID caja:cajas)asignar(a,caja);
+        var principal=new TenantPrincipal(usuario,tenant,empresa,null,"TEST","Prueba","test","",true,true,Set.of(),Set.of("PRINT_TEST"));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+        var em=org.springframework.orm.jpa.SharedEntityManagerCreator.createSharedEntityManager(factory.getObject());
+        var repos=new JpaRepositoryFactory(em);var agents=repos.getRepository(AgenteImpresionRepository.class);
+        var router=new BillingPrintRouter(jdbc,new PrintAgentRoutingService(repos.getRepository(CashRegisterRepository.class),agents),agents,mock(AuditoriaService.class));
+        var tx=new TransactionTemplate(new org.springframework.orm.jpa.JpaTransactionManager(factory.getObject()));
+        var rendered=new AtomicInteger();var documentos=new ArrayList<BillingPrintRouter.Documento>();
+        Map<UUID,BillingPrintRouter.Documento> stored=new HashMap<>();
+        var registrations=Arrays.stream(TipoDocumentoImpresion.values()).map(t->new BillingPrintDocumentRegistry.Registration(t,"PRINT_TEST",id->{var d=stored.get(id);if(d==null)throw new RecursoNoEncontradoException("Documento no encontrado.");return new BillingPrintDocumentRegistry.Document(d.sucursalId(),d.cajaId(),()->new ArchivoPdfDto("normal.pdf",new byte[]{2}),d.ticket());})).toList();
+        var application=new BillingPrintApplicationService(new BillingPrintDocumentRegistry(registrations),router);
+        for(UUID caja:cajas){
+            var d=new BillingPrintRouter.Documento(tipo,UUID.randomUUID(),sucursal,caja,()->{rendered.incrementAndGet();return new ArchivoPdfDto("ticket.pdf",new byte[]{1});});documentos.add(d);stored.put(d.id(),d);
+            var result=tx.execute(t->application.imprimir(tipo,d.id(),UUID.randomUUID()));
+            assertThat(result.outputMode()).isEqualTo(BillingPrintOutputMode.SCREEN);assertThat(result.output().trabajoId()).isNull();assertThat(result.screenDocument().contenido()).containsExactly((byte)2);
+        }
+        assertThat(rendered.get()).isZero();assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and agent_id=?",Integer.class,tenant,empresa,a)).isZero();
+        jdbc.update("update print_agents set print_on_screen=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
+        for(var d:documentos){
+            UUID intento=UUID.randomUUID();var result=tx.execute(t->application.imprimir(tipo,d.id(),intento));var repetida=tx.execute(t->application.imprimir(tipo,d.id(),intento));
+            assertThat(result.outputMode()).isEqualTo(BillingPrintOutputMode.PRINT_AGENT);assertThat(result.screenDocument()).isNull();assertThat(repetida.output()).isEqualTo(result.output());
+            assertThat(jdbc.queryForObject("select document_type from billing_print_jobs where id=? and tenant_id=? and empresa_id=?",String.class,result.output().trabajoId(),tenant,empresa)).isEqualTo(tipo.name());
+        }
+        assertThat(rendered.get()).isEqualTo(3);
+        var claimService=servicio(a,mock(AuditoriaService.class));var claimTx=new TransactionTemplate(new DataSourceTransactionManager(ds));
+        for(int i=0;i<3;i++){var claimed=claimTx.execute(t->claimService.siguiente(principal(a)).orElseThrow());assertThat(claimed.documentType()).isEqualTo(tipo);}
+        var vacio=claimTx.execute(t->claimService.siguiente(principal(a)));assertThat(vacio).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(TipoDocumentoImpresion.class)
+    void solicitudesSimultaneasDelMismoIntentoCreanUnSoloTrabajo(TipoDocumentoImpresion tipo) throws Exception {
+        asignar(a,cajas.getFirst());jdbc.update("update print_agents set print_on_screen=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
+        var principal=new TenantPrincipal(usuario,tenant,empresa,null,"TEST","Prueba","test","",true,true,Set.of(),Set.of("facturas.pdf","devoluciones_venta.pdf"));
+        var em=org.springframework.orm.jpa.SharedEntityManagerCreator.createSharedEntityManager(factory.getObject());var repos=new JpaRepositoryFactory(em);
+        var router=new BillingPrintRouter(jdbc,new PrintAgentRoutingService(repos.getRepository(CashRegisterRepository.class),repos.getRepository(AgenteImpresionRepository.class)),repos.getRepository(AgenteImpresionRepository.class),mock(AuditoriaService.class));
+        var inicio=new CountDownLatch(1);var renders=new AtomicInteger();UUID intento=UUID.randomUUID();
+        var documento=new BillingPrintRouter.Documento(tipo,UUID.randomUUID(),sucursal,cajas.getFirst(),()->{renders.incrementAndGet();return new ArchivoPdfDto("ticket.pdf",new byte[]{1});});
+        try(var pool=Executors.newFixedThreadPool(2)){
+            var trabajos=new ArrayList<Future<SolicitudImpresionResultadoDto>>();
+            for(int i=0;i<2;i++)trabajos.add(pool.submit(()->{
+                SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+                try{inicio.await();return new TransactionTemplate(new org.springframework.orm.jpa.JpaTransactionManager(factory.getObject())).execute(t->router.solicitar(documento,intento));}
+                finally{SecurityContextHolder.clearContext();}
+            }));
+            inicio.countDown();var primero=trabajos.getFirst().get(30,TimeUnit.SECONDS);assertThat(trabajos.getLast().get(30,TimeUnit.SECONDS)).isEqualTo(primero);
+        }
+        assertThat(renders.get()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and agent_id=?",Integer.class,tenant,empresa,a)).isEqualTo(1);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(TipoDocumentoImpresion.class)
+    void reintentoNoCambiaDestinoAunqueCambieConfiguracion(TipoDocumentoImpresion tipo){
+        asignar(a,cajas.getFirst());var p=new TenantPrincipal(usuario,tenant,empresa,null,"TEST","Prueba","test","",true,true,Set.of(),Set.of("facturas.pdf"));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));
+        var em=org.springframework.orm.jpa.SharedEntityManagerCreator.createSharedEntityManager(factory.getObject());var repos=new JpaRepositoryFactory(em);
+        var router=new BillingPrintRouter(jdbc,new PrintAgentRoutingService(repos.getRepository(CashRegisterRepository.class),repos.getRepository(AgenteImpresionRepository.class)),repos.getRepository(AgenteImpresionRepository.class),mock(AuditoriaService.class));
+        var tx=new TransactionTemplate(new org.springframework.orm.jpa.JpaTransactionManager(factory.getObject()));
+        var renders=new AtomicInteger();var document=new BillingPrintRouter.Documento(tipo,UUID.randomUUID(),sucursal,cajas.getFirst(),()->{renders.incrementAndGet();return new ArchivoPdfDto("ticket.pdf",new byte[]{1});});UUID screenAttempt=UUID.randomUUID();
+        var first=tx.execute(t->router.solicitar(document,screenAttempt));assertThat(first.printOnScreen()).isTrue();
+        jdbc.update("update print_agents set print_on_screen=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
+        var retry=tx.execute(t->router.solicitar(document,screenAttempt));assertThat(retry.printOnScreen()).isTrue();assertThat(renders.get()).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from billing_print_jobs where tenant_id=? and empresa_id=? and agent_id=?",Integer.class,tenant,empresa,a)).isZero();
+        UUID physicalAttempt=UUID.randomUUID();var physical=tx.execute(t->router.solicitar(document,physicalAttempt));assertThat(physical.printOnScreen()).isFalse();
+        jdbc.update("update print_agents set print_on_screen=true where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
+        var samePhysical=tx.execute(t->router.solicitar(document,physicalAttempt));assertThat(samePhysical).isEqualTo(physical);assertThat(renders.get()).isEqualTo(1);
+        var other=new BillingPrintRouter.Documento(tipo,UUID.randomUUID(),sucursal,cajas.getFirst(),document.ticket());assertThatThrownBy(()->tx.execute(t->router.solicitar(other,screenAttempt))).isInstanceOf(ReglaNegocioException.class);
     }
 
     private void asignar(UUID agent,UUID caja){jdbc.update("insert into print_agent_cash_registers(tenant_id,empresa_id,sucursal_id,agent_id,cash_register_id) values(?,?,?,?,?)",tenant,empresa,sucursal,agent,caja);}

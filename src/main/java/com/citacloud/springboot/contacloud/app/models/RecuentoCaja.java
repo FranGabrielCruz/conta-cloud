@@ -19,6 +19,9 @@ public class RecuentoCaja {
  @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="currency_id",insertable=false,updatable=false) private Moneda moneda;
  @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="counted_by",insertable=false,updatable=false) private Usuario usuario;
  @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="cash_session_id",insertable=false,updatable=false) private SesionCaja sesion;
+ @Column(name="pos_print_snapshot",columnDefinition="text") private String documentoPos;
+ public String getDocumentoPos(){return documentoPos;}
+ public void conservarDocumentoPos(String json){if(documentoPos!=null)throw new IllegalStateException("El snapshot de recuento ya existe");documentoPos=java.util.Objects.requireNonNull(json);}
  protected RecuentoCaja(){}
  public RecuentoCaja(UUID t,UUID e,String n,SesionCaja s,OffsetDateTime instante,UUID usuario,BigDecimal esperado,BigDecimal contado,String obs,UUID key){tenantId=t;empresaId=e;numero=n;cajaId=s.getCajaId();sesionId=s.getId();sucursalId=s.getSucursalId();monedaId=s.getMonedaId();contadoEn=instante;corteEn=instante;contadoPor=usuario;this.esperado=esperado;this.contado=contado;diferencia=contado.subtract(esperado);result=resultado(diferencia);observation=obs;idempotencia=key;this.caja=s.getCaja();this.sucursal=s.getSucursal();this.moneda=s.getMoneda();this.usuario=s.getUsuarioApertura();this.sesion=s;}
  public static ResultadoRecuentoCaja resultado(BigDecimal d){int s=d.signum();return s==0?ResultadoRecuentoCaja.BALANCED:s>0?ResultadoRecuentoCaja.OVERAGE:ResultadoRecuentoCaja.SHORTAGE;}

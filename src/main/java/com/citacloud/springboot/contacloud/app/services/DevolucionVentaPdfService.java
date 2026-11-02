@@ -33,6 +33,10 @@ public class DevolucionVentaPdfService {
         var p=TenantContext.principalActual();
         DevolucionVenta d=devoluciones.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())
                 .orElseThrow(()->new RecursoNoEncontradoException("Devolución no encontrada."));
+        UUID sucursal=d.getSucursalPosId();
+        if(sucursal==null)sucursal=devoluciones.sucursalFactura(id,p.tenantId(),p.empresaId()).orElseThrow(()->new RecursoNoEncontradoException("Devolución no encontrada."));
+        if(!com.citacloud.springboot.contacloud.app.security.EmpresaContext.permiteSucursal(sucursal))
+            throw new RecursoNoEncontradoException("Devolución no encontrada.");
         NotaCreditoVenta nota=notas.findByDevolucionIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId()).orElseThrow();
         Empresa empresa=empresas.findByIdAndTenantId(p.empresaId(),p.tenantId()).orElseThrow();
         DatosEmpresa dato=datos.findByEmpresaId(p.empresaId()).orElse(null);

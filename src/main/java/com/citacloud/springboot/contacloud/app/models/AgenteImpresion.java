@@ -21,11 +21,11 @@ public class AgenteImpresion {
         @JoinColumn(name="agent_id",referencedColumnName="id")
     },inverseJoinColumns=@JoinColumn(name="cash_register_id",referencedColumnName="id"))
     private Set<Caja> cajas=new LinkedHashSet<>();
-    @Column(name="show_pdf_on_print",nullable=false) private boolean mostrarPdfAlImprimir=true;
+    @Column(name="print_on_screen",nullable=false) private boolean printOnScreen=true;
     public Set<Caja> getCajas(){return Collections.unmodifiableSet(cajas);}
-    public boolean isMostrarPdfAlImprimir(){return mostrarPdfAlImprimir;}
+    public boolean isPrintOnScreen(){return printOnScreen;}
     public void reemplazarCajas(Set<Caja> seleccion){cajas.clear();cajas.addAll(seleccion);actualizadoEn=OffsetDateTime.now();}
-    public void configurar(String nombre,UUID sucursal,boolean mostrarPdf){this.nombre=nombre;this.sucursalId=sucursal;this.mostrarPdfAlImprimir=mostrarPdf;actualizadoEn=OffsetDateTime.now();}
+    public void configurar(String nombre,UUID sucursal,boolean printOnScreen){this.nombre=nombre;this.sucursalId=sucursal;this.printOnScreen=printOnScreen;actualizadoEn=OffsetDateTime.now();}
     public void prepararRevinculacion(){if(estado==EstadoAgenteImpresion.REVOKED){estado=EstadoAgenteImpresion.PENDING;actualizadoEn=OffsetDateTime.now();}}
     @Column(name="display_code",nullable=false,updatable=false,length=30) private String codigoVisible;
     @Column(name="name",nullable=false,length=150) private String nombre;

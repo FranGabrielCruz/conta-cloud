@@ -19,39 +19,31 @@ public class BillingPrintService {
     private final FacturaVentaPdfService pdf;
     private final AgenteImpresionRepository agentes;
     private final AuditoriaService audit;
+    private final BillingPrintRouter router;
     public BillingPrintService(JdbcTemplate jdbc,FacturaVentaRepository facturas,PrintAgentRoutingService routing,
             FacturaVentaPdfService pdf,AgenteImpresionRepository agentes,AuditoriaService audit){
-        this.jdbc=jdbc;this.facturas=facturas;this.routing=routing;this.pdf=pdf;this.agentes=agentes;this.audit=audit;
+        this(jdbc,facturas,routing,pdf,agentes,audit,new BillingPrintRouter(jdbc,routing,agentes,audit));
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public BillingPrintService(JdbcTemplate jdbc,FacturaVentaRepository facturas,PrintAgentRoutingService routing,
+            FacturaVentaPdfService pdf,AgenteImpresionRepository agentes,AuditoriaService audit,BillingPrintRouter router){
+        this.jdbc=jdbc;this.facturas=facturas;this.routing=routing;this.pdf=pdf;this.agentes=agentes;this.audit=audit;this.router=router;
     }
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.pdf')")
-    public boolean mostrarPdf(UUID facturaId){
+    public boolean printOnScreen(UUID facturaId){
         var f=factura(facturaId);var p=TenantContext.principalActual();UUID id=routing.resolver(f.getCajaId());
         return agentes.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())
-            .filter(a->a.getEstado()==EstadoAgenteImpresion.ACTIVE).orElseThrow(()->new ReglaNegocioException("El agente de impresión de esta caja no está disponible.")).isMostrarPdfAlImprimir();
+            .filter(a->a.getEstado()==EstadoAgenteImpresion.ACTIVE||a.isPrintOnScreen()).orElseThrow(()->new ReglaNegocioException("El agente de impresión de esta caja no está disponible.")).isPrintOnScreen();
     }
 
-    @Transactional
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.pdf')")
     public SolicitudImpresionResultadoDto solicitar(UUID facturaId,UUID intento){
-        if(intento==null)throw new ReglaNegocioException("La solicitud de impresión no es válida.");
-        var p=TenantContext.principalActual();var f=factura(facturaId);
-        var existente=existente(p.tenantId(),p.empresaId(),facturaId,intento);if(existente.isPresent())return existente.get();
-        UUID agentId=routing.resolver(f.getCajaId());
-        var a=agentes.bloquear(agentId,p.tenantId(),p.empresaId()).filter(x->x.getEstado()==EstadoAgenteImpresion.ACTIVE&&x.getSucursalId().equals(f.getSucursalId()))
-            .orElseThrow(()->new ReglaNegocioException("El agente de impresión de esta caja no está disponible."));
-        if(a.getCajas().stream().noneMatch(c->c.getId().equals(f.getCajaId())))throw new ReglaNegocioException("La asignación de impresión cambió. Intenta nuevamente.");
-        // Resolve output under the agent lock before generating or enqueueing a POS ticket.
-        // A missing heartbeat must not prevent normal PDF viewing.
-        if(a.isMostrarPdfAlImprimir())return new SolicitudImpresionResultadoDto(null,true);
-        byte[] documento=pdf.generarParaImpresion(facturaId).contenido();
-        if(documento.length>8_000_000)throw new ReglaNegocioException("El documento excede el tamaño permitido para impresión.");
-        UUID id=UUID.randomUUID();
-        int creados=jdbc.update("insert into billing_print_jobs(id,tenant_id,empresa_id,branch_id,cash_register_id,agent_id,document_id,idempotency_key,document_pdf,show_pdf_on_print) values(?,?,?,?,?,?,?,?,?,?) on conflict(tenant_id,empresa_id,idempotency_key) do nothing",
-            id,p.tenantId(),p.empresaId(),f.getSucursalId(),f.getCajaId(),agentId,facturaId,intento,documento,false);
-        if(creados==1)audit.registrar("PrintJobCreated","PrintJob",id,detalle(p.tenantId(),f.getSucursalId(),f.getCajaId(),agentId));
-        return existente(p.tenantId(),p.empresaId(),facturaId,intento).orElseThrow(()->new ReglaNegocioException("El intento de impresión pertenece a otro documento."));
+        var f=factura(facturaId);
+        return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.SALES_INVOICE,facturaId,
+            f.getSucursalId(),f.getCajaId(),()->pdf.generarParaImpresion(facturaId)),intento);
     }
 
     @Transactional @PreAuthorize("hasAuthority('PRINT_AGENT')")
@@ -71,7 +63,8 @@ public class BillingPrintService {
         int count=jdbc.update("update billing_print_jobs set status='PROCESSING',claim_id=?,claimed_at=current_timestamp where id=? and tenant_id=? and empresa_id=? and agent_id=? and status='PENDING'",claim,id,p.tenantId(),p.companyId(),a.getId());
         if(count!=1)throw new RecursoNoEncontradoException("Trabajo no encontrado.");
         byte[] bytes=jdbc.queryForObject("select document_pdf from billing_print_jobs where id=? and tenant_id=? and empresa_id=? and agent_id=? and claim_id=?",byte[].class,id,p.tenantId(),p.companyId(),a.getId(),claim);
-        return Optional.of(new TrabajoImpresionDto(id,claim,bytes));
+        String type=jdbc.queryForObject("select document_type from billing_print_jobs where id=? and tenant_id=? and empresa_id=? and agent_id=? and claim_id=?",String.class,id,p.tenantId(),p.companyId(),a.getId(),claim);
+        return Optional.of(new TrabajoImpresionDto(id,claim,bytes,type==null?TipoDocumentoImpresion.SALES_INVOICE:TipoDocumentoImpresion.valueOf(type)));
     }
 
     @Transactional @PreAuthorize("hasAuthority('PRINT_AGENT')")
@@ -90,8 +83,6 @@ public class BillingPrintService {
 
     private FacturaVenta factura(UUID id){var p=TenantContext.principalActual();return facturas.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())
         .filter(x->EmpresaContext.permiteSucursal(x.getSucursalId())).orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada."));}
-    private Optional<SolicitudImpresionResultadoDto> existente(UUID tenant,UUID empresa,UUID factura,UUID intento){return jdbc.query("select id,show_pdf_on_print from billing_print_jobs where tenant_id=? and empresa_id=? and idempotency_key=? and document_id=?",
-        (r,n)->new SolicitudImpresionResultadoDto(r.getObject(1,UUID.class),false),tenant,empresa,intento,factura).stream().findFirst();}
     private AgenteImpresion activo(PrintAgentPrincipal p){return agentes.bloquear(p.agentId(),p.tenantId(),p.companyId()).filter(a->a.getEstado()==EstadoAgenteImpresion.ACTIVE).orElseThrow(VinculacionAgenteException::new);}
     private static String detalle(UUID tenant,UUID branch,UUID caja,UUID agent){return "{\"traceId\":\""+TraceContext.currentOrCreate()+"\",\"tenantId\":\""+tenant+"\",\"branchId\":\""+branch+"\",\"cashRegisterId\":\""+caja+"\",\"agentId\":\""+agent+"\"}";}
     private record TrabajoReservado(UUID sucursalId,UUID cajaId,String estado){}
