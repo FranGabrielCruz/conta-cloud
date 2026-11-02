@@ -23,64 +23,18 @@ public class MovimientosCajaDialog extends Dialog {
     private static final DateTimeFormatter FECHA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final UUID sesionId;
     private final MovimientoCajaService service;
-    private final boolean puedeCrear;
     private final boolean puedeRevertir;
-    private final MovimientoCajaContextoDto contexto;
-    private final TextField buscar=new TextField("Buscar");
-    private final Select<TipoMovimientoFinanciero> tipo=new Select<>();
-    private final Select<TipoOrigenMovimiento> origen=new Select<>();
-    private final AppGrid<MovimientoCajaDto> grid=new AppGrid<>(MovimientoCajaDto.class);
-    private final AppPagination paginacion;
-
+    private final AppActionButton crear=new AppActionButton(ActionType.NEW,ButtonSize.MAIN,"Nuevo movimiento",e->nuevo());
+    private final MovimientosCajaPanel panel;
     public MovimientosCajaDialog(UUID sesionId,MovimientoCajaService service,boolean puedeCrear,boolean puedeRevertir){
-        this.sesionId=Objects.requireNonNull(sesionId);this.service=Objects.requireNonNull(service);
-        this.puedeCrear=puedeCrear;this.puedeRevertir=puedeRevertir;this.contexto=service.contexto(sesionId);
-        setHeaderTitle("MOVIMIENTOS DE CAJA");setWidth("min(1280px, 96vw)");setMaxHeight("92vh");
-        addClassName("cc-cash-movements-dialog");
-        configurarFiltros();configurarGrid();
-        paginacion=new AppPagination(req->cargar(),5,5,10,20,50);
-        Div encabezado=new Div(new H3(contexto.caja()+" · "+contexto.sucursal()),estado());
-        encabezado.addClassName("cc-cash-movement-heading");
-        Div filtros=new Div(buscar,tipo,origen);filtros.addClassNames("cc-filter-bar","cc-cash-movement-filters");
-        VerticalLayout contenido=new VerticalLayout(encabezado,filtros,grid,paginacion);contenido.setPadding(false);contenido.setSpacing(false);
-        add(contenido);
-        if(puedeCrear)getFooter().add(new AppActionButton(ActionType.NEW,ButtonSize.MAIN,"Nuevo movimiento",e->nuevo()));
+        this.sesionId=sesionId;this.service=Objects.requireNonNull(service);this.puedeRevertir=puedeRevertir;
+        setHeaderTitle("MOVIMIENTOS DE CAJA");setWidth("min(1280px, 96vw)");setMaxHeight("92vh");addClassName("cc-cash-movements-dialog");
+        panel=new MovimientosCajaPanel((b,t,o,p,z)->service.consultar(sesionId,b,t,o,p,z),m->ver(m.id()),
+            r->crear.setEnabled(puedeCrear&&r!=null&&r.estado()==EstadoSesionCaja.OPEN),false);
+        add(panel);if(puedeCrear)getFooter().add(crear);
         getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->close()));
-        cargar();
     }
-
-    private Span estado(){Span estado=new Span(contexto.abierta()?"● Abierta":"● Cerrada");
-        estado.addClassName(contexto.abierta()?"cc-cash-movement-open":"cc-cash-movement-closed");return estado;}
-    private void configurarFiltros(){
-        buscar.setPlaceholder("Concepto o referencia...");buscar.setClearButtonVisible(true);
-        buscar.setValueChangeMode(ValueChangeMode.LAZY);buscar.setValueChangeTimeout(350);
-        tipo.setLabel("Tipo");tipo.setItems(TipoMovimientoFinanciero.values());tipo.setEmptySelectionAllowed(true);
-        tipo.setEmptySelectionCaption("Todos");tipo.setItemLabelGenerator(MovimientosCajaDialog::tipo);
-        origen.setLabel("Origen");origen.setItems(TipoOrigenMovimiento.values());origen.setEmptySelectionAllowed(true);
-        origen.setEmptySelectionCaption("Todos");origen.setItemLabelGenerator(MovimientosCajaDialog::origen);
-        buscar.addValueChangeListener(e->{if(e.isFromClient())reiniciar();});
-        tipo.addValueChangeListener(e->{if(e.isFromClient())reiniciar();});
-        origen.addValueChangeListener(e->{if(e.isFromClient())reiniciar();});
-    }
-    private void configurarGrid(){
-        grid.addColumn(x->fechaHora(x.fechaHora())).setHeader("Fecha/Hora").setAutoWidth(true);
-        grid.addColumn(MovimientoCajaDto::concepto).setHeader("Concepto").setFlexGrow(1);
-        grid.addColumn(x->origen(x.origen())).setHeader("Origen").setAutoWidth(true);
-        grid.addColumn(MovimientoCajaDto::referencia).setHeader("Referencia").setAutoWidth(true);
-        grid.addColumn(x->x.tipo()==TipoMovimientoFinanciero.INCOME?dinero(x):"").setHeader("Entrada").setAutoWidth(true)
-            .setTextAlign(com.vaadin.flow.component.grid.ColumnTextAlign.END);
-        grid.addColumn(x->x.tipo()==TipoMovimientoFinanciero.EXPENSE?dinero(x):"").setHeader("Salida").setAutoWidth(true)
-            .setTextAlign(com.vaadin.flow.component.grid.ColumnTextAlign.END);
-        grid.addColumn(x->x.monedaCodigo()+" "+PosNumberFormatter.money(x.saldo())).setHeader("Saldo").setAutoWidth(true)
-            .setTextAlign(com.vaadin.flow.component.grid.ColumnTextAlign.END);
-        grid.addComponentColumn(x->new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver movimiento",e->ver(x.id())))
-            .setHeader("Acc.").setAutoWidth(true).setFlexGrow(0);
-        grid.setEmptyStateText("No se encontraron movimientos de caja.");
-    }
-    private void cargar(){try{var p=paginacion.currentRequest();var pagina=service.buscar(sesionId,buscar.getValue(),tipo.getValue(),origen.getValue(),p.page(),p.size());
-        grid.setItems(pagina.getContent());paginacion.setTotal(pagina.getTotalElements());}
-        catch(RuntimeException ex){grid.setItems(List.of());paginacion.setTotal(0);UiErrorHandler.show(ex,"No fue posible consultar los movimientos de caja.");}}
-    private void reiniciar(){paginacion.reset();cargar();}
+    private void reiniciar(){panel.recargarPrimeraPagina();}
 
     private void nuevo(){
         MovimientoCajaContextoDto actual=service.contexto(sesionId);if(!actual.abierta()){UiErrorHandler.show(

@@ -8,6 +8,50 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
 public interface FinancialMovementRepository extends JpaRepository<MovimientoFinanciero,UUID> {
+    @Query(value="""
+      select tipo_origen as origen,
+        coalesce(sum(case when tipo_movimiento='INCOME' then monto else 0 end),0) as entradas,
+        coalesce(sum(case when tipo_movimiento='EXPENSE' then monto else 0 end),0) as salidas
+      from movimientos_financieros where tenant_id=:tenant and empresa_id=:empresa
+        and cash_register_session_id=:sesion and estado='REGISTERED' and payment_method='CASH'
+      group by tipo_origen
+      """,nativeQuery=true)
+    List<ResumenMovimientoCajaProjection> resumenEfectivoSesion(@Param("tenant")UUID tenant,
+        @Param("empresa")UUID empresa,@Param("sesion")UUID sesion);
+
+    /** Document payment lines include noncash destinations; never infer a session from dates. */
+    @Query(value="""
+      with pagos as (
+        select a.payment_method_id::text as codigo,a.method_name as nombre,a.amount as importe
+        from sales_payment_application a
+        join sales_payment p on p.id=a.sales_payment_id and p.tenant_id=a.tenant_id and p.empresa_id=a.empresa_id
+        join sales_invoice f on f.id=p.sales_invoice_id and f.tenant_id=p.tenant_id and f.empresa_id=p.empresa_id
+        where f.tenant_id=:tenant and f.empresa_id=:empresa and f.cash_register_session_id=:sesion and f.status='CONFIRMED'
+        union all
+        select a.payment_method_id::text,a.method_name,a.amount
+        from customer_receipt_payment a
+        join customer_receipt r on r.id=a.customer_receipt_id and r.tenant_id=a.tenant_id and r.empresa_id=a.empresa_id
+        where r.tenant_id=:tenant and r.empresa_id=:empresa and r.status<>'VOIDED'
+          and exists(select 1 from customer_receipt_payment cp where cp.tenant_id=r.tenant_id and cp.empresa_id=r.empresa_id
+            and cp.customer_receipt_id=r.id and cp.cash_register_session_id=:sesion)
+        union all
+        select 'LEGACY_' || m.payment_method,m.payment_method,m.monto
+        from movimientos_financieros m where m.tenant_id=:tenant and m.empresa_id=:empresa
+          and m.cash_register_session_id=:sesion and m.estado='REGISTERED' and m.tipo_movimiento='INCOME'
+          and m.tipo_origen in ('SALES_INVOICE','SALES_PAYMENT','CUSTOMER_RECEIPT')
+          and not exists(select 1 from sales_payment_application a join sales_payment p
+            on p.id=a.sales_payment_id and p.tenant_id=a.tenant_id and p.empresa_id=a.empresa_id
+            where p.tenant_id=m.tenant_id and p.empresa_id=m.empresa_id
+              and ((m.tipo_origen='SALES_INVOICE' and p.sales_invoice_id=m.origen_id)
+                or (m.tipo_origen='SALES_PAYMENT' and a.id=m.origen_id)))
+          and not exists(select 1 from customer_receipt_payment a where a.tenant_id=m.tenant_id and a.empresa_id=m.empresa_id
+            and a.financial_movement_id=m.id)
+      ) select codigo,min(nombre) as nombre,sum(importe) as importe from pagos
+        group by codigo having sum(importe)<>0 order by min(nombre),codigo
+      """,nativeQuery=true)
+    List<FormaPagoSesionProjection> formasPagoSesion(@Param("tenant")UUID tenant,
+        @Param("empresa")UUID empresa,@Param("sesion")UUID sesion);
+
     String CASH_MOVEMENT_SELECT="""
       with ordered as (
         select m.id,coalesce(m.cash_movement_number,nullif(m.referencia,''),'MOVIMIENTO') as numero,

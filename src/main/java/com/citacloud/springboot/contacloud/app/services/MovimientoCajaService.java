@@ -9,6 +9,8 @@ import org.springframework.data.domain.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.*;
 import java.time.*;
@@ -25,12 +27,65 @@ public class MovimientoCajaService {
     private final IdempotentOperationService idempotencia;
     private final AuditoriaService auditoria;
     private final MovimientoCajaNumeroService numeros;
+    private final CashRegisterRepository cajas;
 
     public MovimientoCajaService(CashRegisterSessionRepository sesiones,FinancialMovementRepository movimientos,
             ConceptoMovimientoCajaRepository conceptos,
-            IdempotentOperationService idempotencia,AuditoriaService auditoria,MovimientoCajaNumeroService numeros){
+            IdempotentOperationService idempotencia,AuditoriaService auditoria,MovimientoCajaNumeroService numeros,CashRegisterRepository cajas){
         this.sesiones=sesiones;this.movimientos=movimientos;this.conceptos=conceptos;
-        this.idempotencia=idempotencia;this.auditoria=auditoria;this.numeros=numeros;
+        this.idempotencia=idempotencia;this.auditoria=auditoria;this.numeros=numeros;this.cajas=cajas;
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,propagation=Propagation.REQUIRES_NEW)
+    @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('movimientos_caja.ver')")
+    public ConsultaMovimientosCajaDto consultar(UUID sesionId,String buscar,TipoMovimientoFinanciero tipo,
+            TipoOrigenMovimiento origen,int pagina,int tamano){
+        validarPagina(pagina,tamano);
+        if(sesionId==null)return new ConsultaMovimientosCajaDto(null,Page.empty());
+        return consultarSesion(sesionPos(sesionId,false),buscar,tipo,origen,pagina,tamano);
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,propagation=Propagation.REQUIRES_NEW)
+    @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('operaciones_caja.ver') and hasAuthority('movimientos_caja.ver')")
+    public ConsultaMovimientosCajaDto consultarCaja(UUID cajaId,String buscar,TipoMovimientoFinanciero tipo,
+            TipoOrigenMovimiento origen,int pagina,int tamano){
+        validarPagina(pagina,tamano);if(cajaId==null)return new ConsultaMovimientosCajaDto(null,Page.empty());
+        var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();
+        Caja caja=cajas.findByIdAndTenantIdAndEmpresaId(cajaId,p.tenantId(),empresa)
+            .filter(c->EmpresaContext.permiteSucursal(c.getSucursalId()))
+            .orElseThrow(()->new RecursoNoEncontradoException("Caja no encontrada."));
+        var actual=sesiones.findByTenantIdAndEmpresaIdAndCajaIdAndStatus(p.tenantId(),empresa,caja.getId(),EstadoSesionCaja.OPEN);
+        if(actual.isEmpty())return new ConsultaMovimientosCajaDto(null,Page.empty());
+        return consultarSesion(actual.get(),buscar,tipo,origen,pagina,tamano);
+    }
+    private ConsultaMovimientosCajaDto consultarSesion(SesionCaja s,String buscar,TipoMovimientoFinanciero tipo,
+            TipoOrigenMovimiento origen,int pagina,int tamano){
+        var p=TenantContext.principalActual();
+        BigDecimal entradas=BigDecimal.ZERO,salidas=BigDecimal.ZERO,otrasEntradas=BigDecimal.ZERO;
+        for(var fila:movimientos.resumenEfectivoSesion(p.tenantId(),p.empresaId(),s.getId())){
+            entradas=entradas.add(fila.getEntradas());salidas=salidas.add(fila.getSalidas());
+            if(!Set.of("SALES_INVOICE","SALES_PAYMENT","CUSTOMER_RECEIPT").contains(fila.getOrigen()))
+                otrasEntradas=otrasEntradas.add(fila.getEntradas());
+        }
+        var formas=movimientos.formasPagoSesion(p.tenantId(),p.empresaId(),s.getId()).stream()
+            .map(f->new ConsultaMovimientosCajaDto.FormaPago(f.getCodigo(),nombreMedio(f),f.getImporte())).toList();
+        BigDecimal total=formas.stream().map(ConsultaMovimientosCajaDto.FormaPago::importe).reduce(BigDecimal.ZERO,BigDecimal::add);
+        var resumen=new ConsultaMovimientosCajaDto.Resumen(s.getId(),s.getSucursalId(),s.getCajaId(),s.getCaja().getNombre(),
+            s.getSucursal().getNombre(),s.getUsuarioApertura().getNombre(),s.getAbiertoEn(),s.getMoneda().getCodigoIso(),
+            s.getStatus(),s.getFondoInicial(),otrasEntradas,salidas,s.getFondoInicial().add(entradas).subtract(salidas),formas,total);
+        var detalle=movimientos.buscarMovimientosCaja(p.tenantId(),p.empresaId(),s.getId(),limpiar(buscar),
+            tipo==null?"ALL":tipo.name(),origen==null?"ALL":origen.name(),PageRequest.of(pagina,tamano)).map(this::mapear);
+        if(pagina>0&&detalle.isEmpty()&&detalle.getTotalElements()>0)
+            detalle=movimientos.buscarMovimientosCaja(p.tenantId(),p.empresaId(),s.getId(),limpiar(buscar),
+                tipo==null?"ALL":tipo.name(),origen==null?"ALL":origen.name(),
+                PageRequest.of((int)((detalle.getTotalElements()-1)/tamano),tamano)).map(this::mapear);
+        org.slf4j.LoggerFactory.getLogger(getClass()).debug("event=CashMovementsConsulted tenantId={} cashRegisterId={} sessionId={} traceId={}",
+            p.tenantId(),s.getCajaId(),s.getId(),com.citacloud.springboot.contacloud.app.errors.TraceContext.currentOrCreate());
+        return new ConsultaMovimientosCajaDto(resumen,detalle);
+    }
+    private static String nombreMedio(FormaPagoSesionProjection f){
+        if(f.getCodigo().startsWith("LEGACY_"))return MedioPagoMovimiento.valueOf(f.getNombre()).getEtiqueta();
+        return f.getNombre();
     }
 
     @Transactional(readOnly=true)

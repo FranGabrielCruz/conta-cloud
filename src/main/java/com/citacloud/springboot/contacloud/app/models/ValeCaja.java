@@ -42,6 +42,7 @@ public class ValeCaja {
  @Column(name="void_reason",length=500) private String motivoAnulacion;
  @Column(name="reversal_movement_id") private UUID movimientoReversionId;
  @Column(name="idempotency_key",nullable=false,updatable=false) private UUID idempotencia;
+ @Column(name="pos_print_snapshot",columnDefinition="text") private String documentoPos;
  @Version private long version;
  protected ValeCaja(){}
  public ValeCaja(UUID tenant,UUID empresa,SesionCaja sesion,ConceptoValeCaja concepto,String numero,
@@ -56,6 +57,8 @@ public class ValeCaja {
   this.empresaNombre=empresaNombre;this.empresaIdentificacion=empresaIdentificacion;this.empresaDireccion=empresaDireccion;
   this.empresaTelefono=empresaTelefono;this.empresaCorreo=empresaCorreo;this.empresaLogoObjectKey=empresaLogoObjectKey;
  }
+ public String getDocumentoPos(){return documentoPos;}
+ public void conservarDocumentoPos(String json){if(documentoPos!=null)throw new IllegalStateException("El snapshot del vale ya está conservado.");documentoPos=java.util.Objects.requireNonNull(json);}
  public void vincularMovimiento(UUID id){if(movimientoId!=null)throw new IllegalStateException("El vale ya posee movimiento.");movimientoId=id;}
  public void anular(String motivo,UUID usuarioId,String usuario,UUID reversionId){if(status==EstadoValeCaja.VOIDED)return;
   status=EstadoValeCaja.VOIDED;motivoAnulacion=motivo;anuladoPor=usuarioId;usuarioAnulacion=usuario;anuladoEn=OffsetDateTime.now();movimientoReversionId=reversionId;}

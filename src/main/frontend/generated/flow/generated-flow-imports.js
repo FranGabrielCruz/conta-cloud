@@ -1,4 +1,5 @@
 import '@vaadin/vertical-layout/src/vaadin-vertical-layout.js';
+import 'Frontend/billing-keyboard-shortcuts.js';
 import '@vaadin/app-layout/src/vaadin-app-layout.js';
 import '@vaadin/button/src/vaadin-button.js';
 import '@vaadin/grid/src/vaadin-grid.js';

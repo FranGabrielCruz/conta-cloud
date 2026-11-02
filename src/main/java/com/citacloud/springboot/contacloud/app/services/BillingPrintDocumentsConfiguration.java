@@ -18,6 +18,6 @@ public class BillingPrintDocumentsConfiguration {
  @Bean Registration cashCountPrintDocument(CashCountDocumentService documents,CashCountPrintService pdf){
   return new Registration(TipoDocumentoImpresion.CASH_COUNT,"recuentos_caja.imprimir",id->{var d=documents.obtener(id);return new Document(d.getSucursalId(),d.getCajaId(),()->pdf.pantalla(id),()->documents.generar(d));});
  }
- @Bean Registration cashVoucherPrintDocument(CashOperationPrintDocumentService documents){return new Registration(TipoDocumentoImpresion.CASH_VOUCHER,"vales_caja.imprimir",documents::vale);}
- @Bean Registration cashClosingPrintDocument(CashOperationPrintDocumentService documents){return new Registration(TipoDocumentoImpresion.CASH_CLOSING,"cierres_caja.imprimir",documents::cierre);}
+ @Bean Registration cashVoucherPrintDocument(CashVoucherDocumentService documents){return new Registration(TipoDocumentoImpresion.CASH_VOUCHER,"vales_caja.imprimir",documents::cargar);}
+ @Bean Registration cashClosingPrintDocument(CashClosingDocumentService documents){return new Registration(TipoDocumentoImpresion.CASH_CLOSING,"cierres_caja.imprimir",documents::cargar);}
 }

@@ -1286,3 +1286,17 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 @media (max-width:760px) { .cc-cash-movement-filters { grid-template-columns:1fr; } }
 
 .cc-agent-register-summary { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Current-session consultation: values are supplied by a single backend snapshot. */
+.cc-cash-session-summary { width:100%; }
+.cc-cash-summary-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px; width:100%; }
+.cc-cash-summary-card { display:flex; flex-direction:column; gap:8px; padding:16px; min-width:0; border:1px solid var(--lumo-contrast-10pct); border-radius:10px; background:var(--lumo-base-color); }
+.cc-cash-summary-card > span:first-child { font-size:var(--lumo-font-size-xs); color:var(--lumo-secondary-text-color); font-weight:600; overflow-wrap:anywhere; }
+.cc-cash-summary-card > span:last-child { font-size:var(--lumo-font-size-xl); font-weight:700; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.cc-cash-summary-card.cc-cash-expected { border-color:var(--lumo-primary-color); background:var(--lumo-primary-color-10pct); }
+.cc-cash-movement-concept { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
+@media (max-width:480px) { .cc-cash-summary-cards { grid-template-columns:1fr; } }
+
+.cc-cash-tabs { width:100%; max-width:100%; min-width:0; }
+.cc-cash-movements-panel { min-width:0; max-width:100%; }

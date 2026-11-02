@@ -37,7 +37,7 @@ class CobroClienteContratoTest {
         assertTrue(dialog.contains("setAllRowsVisible(true)"));
         assertTrue(service.contains("PAGE_SIZE=5"));
         assertTrue(dialog.contains("ActionType.COLLECT"));
-        assertTrue(dialog.contains("ActionType.PRINT"));
+        assertTrue(dialog.contains("new BillingPrintActionButton"));
         assertTrue(dialog.contains("ActionType.VOID"));
         assertTrue(dialog.contains("ActionType.CLOSE"));
         assertTrue(dialog.contains("initializeReceivedWhenEmpty"));

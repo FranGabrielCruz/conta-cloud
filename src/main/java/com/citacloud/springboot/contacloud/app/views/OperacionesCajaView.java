@@ -35,6 +35,13 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private static final DateTimeFormatter DATE=DateTimeFormatter.ofPattern("dd/MM/yyyy");
     @org.springframework.beans.factory.annotation.Autowired private BillingPrintUi billingPrintUi;
     private final CashRegisterSessionService service;
+    private final MovimientoCajaService movimientosCaja;
+    private final VerticalLayout panelMovimientos=new VerticalLayout();
+    private final ComboBox<OperacionCajaDto> cajaMovimientos=new ComboBox<>("Caja");
+    private final Div contenidoMovimientos=new Div();
+    private final Tabs tabs=new Tabs();
+    private final LinkedHashMap<String,Tab> pestanas=new LinkedHashMap<>();
+    private boolean navegando;
     private final RecuentoCajaConsultaService consultaRecuentos;
     private final RecuentoCajaPdfService pdfRecuentos;
     @org.springframework.beans.factory.annotation.Autowired private CashCountPrintService recuentosImpresion;
@@ -80,8 +87,8 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     public OperacionesCajaView(CashRegisterSessionService service,EmpresaModuloService modulos,
             RecuentoCajaConsultaService consultaRecuentos,RecuentoCajaPdfService pdfRecuentos,
             ValeCajaService valesCaja,ValeCajaPdfService pdfVales,CierreCajaService cierresCaja,CierreCajaPdfService pdfCierres,
-            ExpedienteCierreCajaService expedienteCierres,UltimasFacturasService facturasVenta,CobroClienteService cobrosClientes){
-        this.service=service;this.modulos=modulos;this.consultaRecuentos=consultaRecuentos;this.pdfRecuentos=pdfRecuentos;this.valesCaja=valesCaja;this.pdfVales=pdfVales;this.cierresCaja=cierresCaja;this.pdfCierres=pdfCierres;this.expedienteCierres=expedienteCierres;this.facturasVenta=facturasVenta;this.cobrosClientes=cobrosClientes;addClassName("cc-page");setPadding(false);setSpacing(false);setWidthFull();
+            ExpedienteCierreCajaService expedienteCierres,UltimasFacturasService facturasVenta,CobroClienteService cobrosClientes,MovimientoCajaService movimientosCaja){
+        this.movimientosCaja=movimientosCaja;this.service=service;this.modulos=modulos;this.consultaRecuentos=consultaRecuentos;this.pdfRecuentos=pdfRecuentos;this.valesCaja=valesCaja;this.pdfVales=pdfVales;this.cierresCaja=cierresCaja;this.pdfCierres=pdfCierres;this.expedienteCierres=expedienteCierres;this.facturasVenta=facturasVenta;this.cobrosClientes=cobrosClientes;addClassName("cc-page");setPadding(false);setSpacing(false);setWidthFull();
         add(new AppPageHeader("OPERACIONES DE CAJA","Abre turnos, consulta el efectivo esperado y realiza cierres de caja."));
         configurarOperaciones();configurarHistorial();configurarRecuentos();configurarVales();
         paginacionCajas=new AppPagination(r->cargarCajas());paginacionHistorial=new AppPagination(r->cargarHistorial());paginacionRecuentos=new AppPagination(r->cargarRecuentos(),10,10,20,50);paginacionVales=new AppPagination(r->cargarVales(),10,10,20,50);
@@ -89,15 +96,48 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
         panelHistorial.setPadding(false);panelHistorial.setSpacing(false);panelHistorial.add(filtrosHistorial(),historial,paginacionHistorial);panelHistorial.setVisible(false);
         panelRecuentos.setPadding(false);panelRecuentos.setSpacing(false);panelRecuentos.add(filtrosRecuentos(),recuentos,paginacionRecuentos);panelRecuentos.setVisible(false);
         panelVales.setPadding(false);panelVales.setSpacing(false);panelVales.add(filtrosVales(),vales,paginacionVales);panelVales.setVisible(false);
-        Tab actual=new Tab("Estado actual"),historico=new Tab("Historial de cierres"),tabRecuentos=new Tab("Recuentos"),tabVales=new Tab("Vales de caja");tabVales.setVisible(puede("vales_caja.ver"));Tabs tabs=new Tabs(actual,historico,tabRecuentos,tabVales);
-        tabs.addSelectedChangeListener(e->{boolean esActual=e.getSelectedTab()==actual,esHistorial=e.getSelectedTab()==historico,esRecuento=e.getSelectedTab()==tabRecuentos;panelOperaciones.setVisible(esActual);panelHistorial.setVisible(esHistorial);panelRecuentos.setVisible(esRecuento);panelVales.setVisible(e.getSelectedTab()==tabVales);if(esActual)cargarCajas();else if(esHistorial)cargarHistorial();else if(esRecuento)cargarRecuentos();else cargarVales();});
-        add(tabs,panelOperaciones,panelHistorial,panelRecuentos,panelVales);
+        panelMovimientos.setPadding(false);panelMovimientos.setSpacing(false);panelMovimientos.setVisible(false);
+        contenidoMovimientos.setWidthFull();panelMovimientos.add(cajaMovimientos,contenidoMovimientos);
+        cajaMovimientos.setPageSize(25);cajaMovimientos.setWidth("min(100%,480px)");
+        cajaMovimientos.setItemLabelGenerator(c->c.cajaNombre()+" · "+c.sucursalNombre());
+        cajaMovimientos.setItems(query->service.buscarOperaciones(query.getFilter().orElse(""),null,null,query.getOffset()/25,25,"nombre",true).stream());
+        cajaMovimientos.addValueChangeListener(e->cargarMovimientos());
+        for(var entry:Map.of("current","Estado actual","movements","Movimientos","history","Historial de cierres","counts","Recuentos","vouchers","Vales de caja").entrySet())pestanas.put(entry.getKey(),new Tab(entry.getValue()));
+        for(String key:List.of("current","movements","history","counts","vouchers")){Tab tab=pestanas.get(key);tab.setId("cash-tab-"+key);tabs.add(tab);}
+        pestanas.get("movements").setVisible(puede("movimientos_caja.ver"));pestanas.get("vouchers").setVisible(puede("vales_caja.ver"));
+        tabs.addClassName("cc-cash-tabs");
+        tabs.addSelectedChangeListener(e->{if(!navegando){String key=clave(e.getSelectedTab());UI.getCurrent().navigate("operaciones-caja",QueryParameters.simple(Map.of("tab",key)));}});
+        add(tabs,panelOperaciones,panelMovimientos,panelHistorial,panelRecuentos,panelVales);
     }
 
     @Override public void beforeEnter(BeforeEnterEvent event){
         if(!modulos.habilitado("CAJA_BANCOS")||!puede("operaciones_caja.ver")){
             Notification.show("No tienes permiso para acceder a esta opción.");event.rerouteTo(DashboardView.class);return;}
-        cargarCajas();
+        String key=event.getLocation().getQueryParameters().getSingleParameter("tab").orElse("current");
+        if(!pestanas.containsKey(key))key="current";
+        if(!pestanas.get(key).isVisible()){Notification.show("No tienes permiso para acceder a esta opción.");event.rerouteTo(DashboardView.class);return;}
+        mostrarPestana(key);
+    }
+    private String clave(Tab tab){return pestanas.entrySet().stream().filter(e->e.getValue()==tab).map(Map.Entry::getKey).findFirst().orElse("current");}
+    void mostrarPestana(String key){
+        if(!pestanas.containsKey(key)||!pestanas.get(key).isVisible())throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para consultar esta pestaña.");
+        navegando=true;try{tabs.setSelectedTab(pestanas.get(key));}finally{navegando=false;}
+        panelOperaciones.setVisible(key.equals("current"));panelMovimientos.setVisible(key.equals("movements"));
+        panelHistorial.setVisible(key.equals("history"));panelRecuentos.setVisible(key.equals("counts"));panelVales.setVisible(key.equals("vouchers"));
+        switch(key){case "current"->cargarCajas();case "history"->cargarHistorial();case "counts"->cargarRecuentos();case "vouchers"->cargarVales();case "movements"->iniciarMovimientos();default->throw new IllegalArgumentException();}
+    }
+    private void iniciarMovimientos(){
+        if(cajaMovimientos.getValue()!=null){cargarMovimientos();return;}
+        try{
+            var disponibles=service.buscarOperaciones("",null,true,0,25,"nombre",true).getContent();
+            if(disponibles.isEmpty())disponibles=service.buscarOperaciones("",null,null,0,25,"nombre",true).getContent();
+            if(disponibles.isEmpty())cargarMovimientos();else cajaMovimientos.setValue(disponibles.getFirst());
+        }catch(RuntimeException ex){contenidoMovimientos.removeAll();UiErrorHandler.show(ex,"No fue posible consultar las cajas disponibles.");}
+    }
+    private void cargarMovimientos(){
+        contenidoMovimientos.removeAll();if(!puede("movimientos_caja.ver"))return;
+        UUID cajaId=cajaMovimientos.getValue()==null?null:cajaMovimientos.getValue().cajaId();
+        contenidoMovimientos.add(new MovimientosCajaPanel((b,t,o,p,z)->movimientosCaja.consultarCaja(cajaId,b,t,o,p,z)));
     }
 
     private void configurarOperaciones(){
@@ -210,11 +250,11 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private Boolean estadoFiltro(){return switch(estado.getValue()==null?"Todas":estado.getValue()){case "Abiertas"->true;case "Cerradas"->false;default->null;};}
 
     private void abrir(OperacionCajaDto item){try{Dialog d=dialog("ABRIR CAJA");BigDecimalField fondo=new BigDecimalField("Fondo inicial");fondo.setRequiredIndicatorVisible(true);fondo.setValue(BigDecimal.ZERO);TextArea nota=new TextArea("Observación");nota.setMaxLength(500);d.add(new AppDetailSection("Información").field("Caja",item.cajaNombre()).field("Sucursal",item.sucursalNombre()).field("Moneda",item.monedaCodigo()).field("Fecha operativa",DATE.format(service.fechaOperativaActual())),form(fondo,nota));AppActionButton confirmar=new AppActionButton(ActionType.OPEN_CASH,ButtonSize.MAIN,"Abrir caja",e->{try{service.abrir(item.cajaId(),new AperturaCajaInput(fondo.getValue(),nota.getValue()));d.close();cargarCajas();Notification.show("Caja abierta correctamente.");}catch(RuntimeException ex){error(ex,"No fue posible abrir la caja.");}});d.getFooter().add(confirmar,new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->d.close()));d.open();}catch(RuntimeException ex){error(ex,"No fue posible preparar la apertura.");}}
-    private void cerrar(UUID sesionId){try{new CierreCajaDialog(sesionId,cierresCaja,c->{cargarCajas();cargarHistorial();Notification.show("Caja cerrada correctamente.");},this::imprimirCierre).open();}catch(RuntimeException ex){error(ex,"No fue posible preparar el cierre.");}}
+    private void cerrar(UUID sesionId){try{new CierreCajaDialog(sesionId,cierresCaja,c->{cargarCajas();cargarHistorial();Notification.show("Caja cerrada correctamente.");},puede("cierres_caja.imprimir")?this::imprimirCierre:null,puede("cierres_caja.imprimir")?this::verPdfCierre:null).open();}catch(RuntimeException ex){error(ex,"No fue posible preparar el cierre.");}}
     private void detalle(UUID id){try{SesionCajaDto s=service.obtener(id);ResumenTurnoCajaDto r=service.resumen(id);Dialog d=dialog("TURNO DE CAJA");VerticalLayout resumen=new VerticalLayout(new AppDetailSection("Información").field("Turno",s.codigoVisible()).field("Caja",s.cajaNombre()).field("Sucursal",s.sucursalNombre()).field("Fecha operativa",DATE.format(s.fechaOperativa())).field("Cajero",s.cajeroNombre()).field("Moneda",s.monedaCodigo()).field("Estado",s.estado()==EstadoSesionCaja.OPEN?"Abierto":"Cerrado").field("Fondo inicial",dinero(s.fondoInicial())).field("Entradas en efectivo",dinero(r.entradasEfectivo())).field("Salidas en efectivo",dinero(r.salidasEfectivo())).field("Tarjeta",dinero(r.entradasTarjeta())).field("Transferencia bancaria",dinero(r.entradasTransferencia())).field("Otras entradas",dinero(r.otrasEntradas())).field("Total entradas",dinero(r.totalEntradas())).field("Efectivo esperado",dinero(s.estado()==EstadoSesionCaja.CLOSED?s.efectivoEsperado():r.efectivoEsperado())).field("Efectivo contado",dinero(s.efectivoContado())).field("Diferencia",dinero(s.diferencia())).field("Revisión",revision(s.estadoRevision())));resumen.setPadding(false);AppGrid<MovimientoTurnoCajaDto> grid=new AppGrid<>(MovimientoTurnoCajaDto.class);grid.addColumn(m->m.fechaHora()==null?"—":m.fechaHora().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))).setHeader("Hora");grid.addColumn(m->m.tipo()==TipoMovimientoFinanciero.INCOME?"Entrada":"Salida").setHeader("Tipo");grid.addColumn(m->m.medioPago().getEtiqueta()).setHeader("Medio");grid.addColumn(MovimientoTurnoCajaDto::concepto).setHeader("Concepto").setFlexGrow(1);grid.addColumn(m->(m.tipo()==TipoMovimientoFinanciero.INCOME?"+":"-")+dinero(m.monto())).setHeader("Monto");AppPagination[] holder=new AppPagination[1];holder[0]=new AppPagination(req->{var page=service.movimientos(id,req.page(),req.size());grid.setItems(page.getContent());holder[0].setTotal(page.getTotalElements());});VerticalLayout movimientosPanel=new VerticalLayout(grid,holder[0]);movimientosPanel.setPadding(false);movimientosPanel.setVisible(false);Tab tabResumen=new Tab("Resumen"),tabMovimientos=new Tab("Movimientos");Tabs tabs=new Tabs(tabResumen,tabMovimientos);tabs.addSelectedChangeListener(e->{boolean show=e.getSelectedTab()==tabResumen;resumen.setVisible(show);movimientosPanel.setVisible(!show);if(!show){var page=service.movimientos(id,0,10);grid.setItems(page.getContent());holder[0].setTotal(page.getTotalElements());}});d.add(tabs,resumen,movimientosPanel);d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}catch(RuntimeException ex){error(ex,"No fue posible consultar el turno.");}}
     private void verCierre(SesionCajaDto sesion){try{CierreCajaDto c=cierresCaja.obtenerPorSesion(sesion.id());new ExpedienteCierreCajaDialog(c,expedienteCierres,
         puede("facturas.ver"),puede("recibos.ver"),puede("movimientos_caja.ver"),puede("recuentos_caja.ver"),puede("cierres_caja.imprimir"),
-        this::imprimirCierre,this::verFacturaTurno,this::verReciboTurno,id->verMovimientoTurno(c.id(),id),this::verRecuento).open();
+        this::imprimirCierre,this::verFacturaTurno,this::verReciboTurno,id->verMovimientoTurno(c.id(),id),this::verRecuento,this::verPdfCierre).open();
         }catch(RecursoNoEncontradoException legacy){detalle(sesion.id());}catch(RuntimeException ex){error(ex,"No fue posible consultar el cierre.");}}
     private void verFacturaTurno(UUID id){try{FacturaVentaDetalleDto f=facturasVenta.detalle(id);Dialog d=dialog("FACTURA "+f.numero());
         AppDetailSection info=new AppDetailSection("INFORMACIÓN GENERAL").field("Fecha/Hora",f.fechaHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -258,7 +298,8 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private void abrirArchivoRecuento(ArchivoPdfDto archivo){StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank");}
     private void verPdfRecuento(UUID id){try{ArchivoPdfDto archivo=pdfRecuentos.generar(id);StreamResource recurso=new StreamResource(archivo.nombreArchivo(),()->new ByteArrayInputStream(archivo.contenido()));recurso.setContentType("application/pdf");recurso.setCacheTime(0);var registro=VaadinSession.getCurrent().getResourceRegistry().registerResource(recurso);UI.getCurrent().getPage().open(registro.getResourceUri().toString(),"_blank");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el comprobante de recuento.");}}
 
-    private void verVale(UUID id){try{ValeCajaDto v=valesCaja.obtener(id);Dialog d=dialog("VALE DE CAJA "+v.numero());d.add(new AppDetailSection("Información").field("Estado",v.estado()==EstadoValeCaja.VOIDED?"Anulado":"Confirmado").field("Fecha/Hora",v.fechaHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).field("Caja",v.caja()).field("Sucursal",v.sucursal()).field("Usuario",v.usuario()).field("Beneficiario",v.beneficiario()).field("Concepto",v.concepto()).field("Referencia",v.referencia()==null?"—":v.referencia()).field("Importe",v.monedaCodigo()+" "+PosNumberFormatter.money(v.importe())).field("Observación",v.observacion()==null?"—":v.observacion()).field("Motivo de anulación",v.motivoAnulacion()==null?"—":v.motivoAnulacion()));if(puede("vales_caja.imprimir"))d.getFooter().add(billingPrintUi.boton(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_VOUCHER,v.id(),ButtonSize.MAIN,"Reimprimir vale"));if(puede("vales_caja.anular")&&v.anulable())d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular",e->anularVale(d,v.id())));d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible cargar el vale de caja.");}}
+    private void verPdfVale(UUID id){try{abrirArchivoRecuento(pdfVales.generar(id));}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el comprobante del vale.");}}
+    private void verVale(UUID id){try{ValeCajaDto v=valesCaja.obtener(id);Dialog d=dialog("VALE DE CAJA "+v.numero());d.add(new AppDetailSection("Información").field("Estado",v.estado()==EstadoValeCaja.VOIDED?"Anulado":"Confirmado").field("Fecha/Hora",v.fechaHora().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).field("Caja",v.caja()).field("Sucursal",v.sucursal()).field("Usuario",v.usuario()).field("Beneficiario",v.beneficiario()).field("Concepto",v.concepto()).field("Referencia",v.referencia()==null?"—":v.referencia()).field("Importe",v.monedaCodigo()+" "+PosNumberFormatter.money(v.importe())).field("Observación",v.observacion()==null?"—":v.observacion()).field("Motivo de anulación",v.motivoAnulacion()==null?"—":v.motivoAnulacion()));if(puede("vales_caja.imprimir")){d.getFooter().add(billingPrintUi.boton(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_VOUCHER,v.id(),ButtonSize.MAIN,"Reimprimir vale"));d.getFooter().add(new AppActionButton(ActionType.VIEW,ButtonSize.MAIN,"Ver PDF",e->verPdfVale(v.id())));}if(puede("vales_caja.anular")&&v.anulable())d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular",e->anularVale(d,v.id())));d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible cargar el vale de caja.");}}
 
     private void anularVale(Dialog detalle,UUID id){Dialog d=dialog("ANULAR VALE");TextArea motivo=new TextArea("Motivo de anulación");motivo.setRequiredIndicatorVisible(true);motivo.setMaxLength(500);motivo.setWidthFull();d.add(motivo);UUID clave=UUID.randomUUID();d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular vale",e->{try{valesCaja.anular(new AnulacionValeCajaInput(id,motivo.getValue(),clave));d.close();detalle.close();cargarVales();Notification.show("Vale de caja anulado correctamente.");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible anular el vale de caja.");}}),new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->d.close()));d.open();}
 
@@ -281,5 +322,6 @@ public class OperacionesCajaView extends VerticalLayout implements BeforeEnterOb
     private static String revision(EstadoRevisionCaja e){return switch(e){case APPROVED->"Aprobado";case REQUIRES_REVIEW->"Requiere revisión";default->"Pendiente";};}
     private static boolean puede(String permiso){return TenantContext.principalActual().permisos().contains(permiso);}
     private static void error(RuntimeException ex,String fallback){String m=ex instanceof ReglaNegocioException||ex instanceof RecursoNoEncontradoException?ex.getMessage():fallback;Notification.show(m==null||m.isBlank()?fallback:m);}
+    private void verPdfCierre(UUID id){try{abrirArchivoRecuento(pdfCierres.generar(id));}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el comprobante del cierre.");}}
     private boolean imprimirCierre(UUID id,UUID intento){return billingPrintUi.imprimir(com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion.CASH_CLOSING,id,intento);}
 }

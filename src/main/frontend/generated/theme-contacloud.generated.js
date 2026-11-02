@@ -2,7 +2,6 @@ import { injectGlobalCss } from 'Frontend/generated/jar-resources/theme-util.js'
 import { webcomponentGlobalCssInjector } from 'Frontend/generated/jar-resources/theme-util.js';
 import './theme-contacloud.components.generated.js';
 let needsReloadOnChanges = false;
-import stylesCss from 'themes/contacloud/styles.css?inline';
 
   let themeRemovers = new WeakMap();
   let targets = [];
@@ -11,8 +10,7 @@ import stylesCss from 'themes/contacloud/styles.css?inline';
   export const applyTheme = (target) => {
     const removers = [];
     if (target !== document) {
-      removers.push(injectGlobalCss(stylesCss.toString(), '', target));
-    
+      
       
         webcomponentGlobalCssInjector((css) => {
           removers.push(injectGlobalCss(css, '', target));

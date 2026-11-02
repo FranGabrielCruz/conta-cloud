@@ -53,6 +53,7 @@ import java.util.stream.Stream;
 @Route(value = "facturas", layout = MainLayout.class)
 @PageTitle("Facturación | ContaCloud")
 @PermitAll
+@com.vaadin.flow.component.dependency.JsModule("./billing-keyboard-shortcuts.js")
 public class FacturacionPosView extends VerticalLayout implements BeforeEnterObserver {
     private static final String TOKEN_KEY = "contacloud.pos.terminal.token";
     @org.springframework.beans.factory.annotation.Autowired private BillingPrintUi billingPrintUi;
@@ -92,7 +93,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     private final Span total = new Span("0.00");
     private final Div resumen = new Div();
     private final TextArea observacion = new TextArea("Observación interna");
-    private final DoubleEnterDetector doubleEnter = new DoubleEnterDetector();
+    private boolean preparandoCobro;
     private final PosNumericKeypad tecladoNumerico = new PosNumericKeypad();
     private String token;
     private TerminalPosDto terminal;
@@ -192,54 +193,16 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
     }
 
     private void registrarDobleEnter() {
-        getElement().addEventListener("cc-pos-enter", event -> {
-            long timestamp = Math.round(event.getEventData().get("event.detail.timestamp").asDouble());
-            if (doubleEnter.register(timestamp, true)) dialogoCobro();
-        }).addEventData("event.detail.timestamp");
-        getElement().addEventListener("cc-pos-enter-reset", event -> doubleEnter.reset());
-        addAttachListener(event -> event.getUI().getPage().executeJs("""
-                const host = $0;
-                if (host.__ccPosEnterHandler) document.removeEventListener('keydown', host.__ccPosEnterHandler, true);
-                const reset = () => {
-                  host.__ccPosLastEnter = 0;
-                  host.dispatchEvent(new CustomEvent('cc-pos-enter-reset'));
-                };
-                host.__ccPosEnterHandler = event => {
-                  if (event.key !== 'Enter' || event.repeat) return;
-                  const path = event.composedPath ? event.composedPath() : [event.target];
-                  const modalOpen = document.querySelector('vaadin-dialog-overlay[opened], vaadin-confirm-dialog-overlay[opened]');
-                  if (modalOpen) { reset(); return; }
-                  const combo = path.find(node => node?.tagName === 'VAADIN-COMBO-BOX');
-                  const textArea = path.some(node => node?.tagName === 'TEXTAREA' || node?.tagName === 'VAADIN-TEXT-AREA');
-                  const editable = path.some(node => node?.isContentEditable || ['INPUT','VAADIN-BIG-DECIMAL-FIELD','VAADIN-NUMBER-FIELD','VAADIN-TEXT-FIELD','BUTTON'].includes(node?.tagName));
-                  if (combo) {
-                    const productCombo = combo.classList.contains('cc-pos-product-search');
-                    const filter = productCombo ? String(combo.filter || '').trim() : '';
-                    const activeProduct = productCombo && combo.opened && Number(combo._focusedIndex) >= 0;
-                    if (!productCombo || filter || activeProduct) { reset(); return; }
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                  } else if (textArea || editable) { reset(); return; }
-                  const now = performance.now();
-                  if (host.__ccPosLastEnter && now - host.__ccPosLastEnter <= 450) {
-                    event.preventDefault();
-                    event.stopImmediatePropagation();
-                  }
-                  host.dispatchEvent(new CustomEvent('cc-pos-enter', {detail: {timestamp: now}}));
-                  host.__ccPosLastEnter = host.__ccPosLastEnter && now - host.__ccPosLastEnter <= 450 ? 0 : now;
-                };
-                document.addEventListener('keydown', host.__ccPosEnterHandler, true);
-                """, getElement()));
-        addDetachListener(event -> event.getUI().getPage().executeJs("""
-                const host = $0;
-                if (host.__ccPosEnterHandler) document.removeEventListener('keydown', host.__ccPosEnterHandler, true);
-                host.__ccPosEnterHandler = null;
-                """, getElement()));
+        getElement().addEventListener("cc-pos-open-payment", event -> dialogoCobro());
+        addAttachListener(event -> getElement().executeJs(
+                "window.ContaCloudBillingKeyboard.install(this,{windowMillis:$0})",
+                DoubleEnterDetector.DEFAULT_WINDOW_MILLIS));
+        addDetachListener(event -> event.getUI().getPage().executeJs(
+                "$0.__ccBillingKeyboard?.dispose()",getElement()));
     }
 
     private void reiniciarDobleEnter() {
-        doubleEnter.reset();
-        getElement().executeJs("this.__ccPosLastEnter = 0");
+        getElement().executeJs("this.__ccBillingKeyboard?.reset()");
     }
 
     private void inicializar() {
@@ -1066,11 +1029,15 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
 
     private void dialogoCobro() {
         reiniciarDobleEnter();
+        if (preparandoCobro) return;
         if (dialogoCobroActivo != null && dialogoCobroActivo.isOpened()) return;
         if (terminal == null) return;
+        if (!puede("facturas.cobrar")) { Notification.show("No tienes permiso para cobrar esta factura."); return; }
+        if (!terminal.cajaAbierta()) { Notification.show("La caja debe estar abierta para cobrar."); return; }
         if (filas.isEmpty()) { Notification.show("Agregue al menos un producto para cobrar."); return; }
         suspenderTecladoNumerico();
         BigDecimal totalVenta = filas.stream().map(Fila::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+        preparandoCobro = true;
         try {
             CreditoVentaPosDto credito = service.creditoDisponible(token,terminal.almacenId(),
                     clienteSeleccionado==null?null:clienteSeleccionado.id(),totalVenta);
@@ -1088,6 +1055,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             });
             dialog.open();
         } catch (RuntimeException ex) { error(ex, "No fue posible preparar el cobro."); }
+        finally { preparandoCobro = false; }
     }
 
     private void dialogoGuardarVenta() {
@@ -1380,7 +1348,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             if (dialogoValesCajaActivo != null && dialogoValesCajaActivo.isOpened()) return;
             if (terminal == null || !terminal.cajaAbierta() || terminal.sesionCajaId() == null) { Notification.show("La caja debe estar abierta para consultar los vales."); return; }
             if (!puede("vales_caja.ver")) { Notification.show("No tiene permisos para consultar los vales de caja."); return; }
-            try { dialogoValesCajaActivo=new ValesCajaDialog(terminal.sesionCajaId(),valesCaja,this::imprimirVale,puede("vales_caja.crear"),puede("vales_caja.imprimir"),puede("vales_caja.anular"));dialogoValesCajaActivo.addClosedListener(e->dialogoValesCajaActivo=null);dialogoValesCajaActivo.open(); }
+            try { dialogoValesCajaActivo=new ValesCajaDialog(terminal.sesionCajaId(),valesCaja,this::imprimirVale,this::abrirPdfVale,puede("vales_caja.crear"),puede("vales_caja.imprimir"),puede("vales_caja.anular"));dialogoValesCajaActivo.addClosedListener(e->dialogoValesCajaActivo=null);dialogoValesCajaActivo.open(); }
             catch(RuntimeException ex){dialogoValesCajaActivo=null;error(ex,"No fue posible abrir los vales de caja.");}return;
         }
         if ("Movimientos de caja".equals(funcion)) {
@@ -1417,7 +1385,7 @@ public class FacturacionPosView extends VerticalLayout implements BeforeEnterObs
             if (!puede("cierres_caja.ejecutar") && !puede("operaciones_caja.cerrar")) {
                 Notification.show("No tiene permisos para cerrar la caja."); return;
             }
-            dialogoCierreCajaActivo=new CierreCajaDialog(terminal.sesionCajaId(),cierresCaja,c->{ inicializar(); },this::imprimirCierre);
+            dialogoCierreCajaActivo=new CierreCajaDialog(terminal.sesionCajaId(),cierresCaja,c->{ inicializar(); },puede("cierres_caja.imprimir")?this::imprimirCierre:null,puede("cierres_caja.imprimir")?this::abrirPdfCierre:null);
             dialogoCierreCajaActivo.addClosedListener(e->dialogoCierreCajaActivo=null);
             dialogoCierreCajaActivo.open(); return;
         }

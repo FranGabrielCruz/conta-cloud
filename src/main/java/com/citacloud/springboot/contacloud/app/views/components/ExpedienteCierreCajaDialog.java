@@ -44,7 +44,11 @@ public class ExpedienteCierreCajaDialog extends Dialog {
     public ExpedienteCierreCajaDialog(CierreCajaDto cierre,ExpedienteCierreCajaService service,
             boolean puedeVentas,boolean puedeCobros,boolean puedeMovimientos,boolean puedeRecuentos,
             boolean puedeImprimir,java.util.function.BiFunction<UUID,UUID,Boolean> imprimir,Consumer<UUID> verFactura,Consumer<UUID> verRecibo,
-            Consumer<UUID> verMovimiento,Consumer<UUID> verRecuento){
+            Consumer<UUID> verMovimiento,Consumer<UUID> verRecuento){this(cierre,service,puedeVentas,puedeCobros,puedeMovimientos,puedeRecuentos,puedeImprimir,imprimir,verFactura,verRecibo,verMovimiento,verRecuento,null);}
+    public ExpedienteCierreCajaDialog(CierreCajaDto cierre,ExpedienteCierreCajaService service,
+            boolean puedeVentas,boolean puedeCobros,boolean puedeMovimientos,boolean puedeRecuentos,
+            boolean puedeImprimir,java.util.function.BiFunction<UUID,UUID,Boolean> imprimir,Consumer<UUID> verFactura,Consumer<UUID> verRecibo,
+            Consumer<UUID> verMovimiento,Consumer<UUID> verRecuento,Consumer<UUID> verPdf){
         this.cierre=Objects.requireNonNull(cierre);this.service=Objects.requireNonNull(service);
         this.verFactura=Objects.requireNonNull(verFactura);this.verRecibo=Objects.requireNonNull(verRecibo);
         this.verMovimiento=Objects.requireNonNull(verMovimiento);this.verRecuento=Objects.requireNonNull(verRecuento);
@@ -59,18 +63,20 @@ public class ExpedienteCierreCajaDialog extends Dialog {
         AppActionButton print=new BillingPrintActionButton(cierre.id(),ButtonSize.MAIN,"Imprimir cierre",imprimir);
         print.setDisableOnClick(true);
         print.setVisible(puedeImprimir);
+        AppActionButton pdf=new AppActionButton(ActionType.VIEW,ButtonSize.MAIN,"Ver PDF",e->{if(puedeImprimir&&verPdf!=null)verPdf.accept(cierre.id());});
+        pdf.setVisible(puedeImprimir&&verPdf!=null);
         restringir(panelVentas,puedeVentas,"No tienes permiso para consultar las facturas del turno.");
         restringir(panelCobros,puedeCobros,"No tienes permiso para consultar los cobros del turno.");
         restringir(panelMovimientos,puedeMovimientos,"No tienes permiso para consultar los movimientos del turno.");
         restringir(panelRecuentos,puedeRecuentos,"No tienes permiso para consultar los recuentos del turno.");
-        tabs.addSelectedChangeListener(e->{ocultarPaneles();Tab selected=e.getSelectedTab();print.setVisible(puedeImprimir&&selected==tabCierre);
+        tabs.addSelectedChangeListener(e->{ocultarPaneles();Tab selected=e.getSelectedTab();print.setVisible(puedeImprimir&&selected==tabCierre);pdf.setVisible(puedeImprimir&&verPdf!=null&&selected==tabCierre);
             if(selected==tabCierre)panelCierre.setVisible(true);
             else if(selected==tabVentas){panelVentas.setVisible(true);if(puedeVentas&&!ventasCargadas)cargarVentas();}
             else if(selected==tabCobros){panelCobros.setVisible(true);if(puedeCobros&&!cobrosCargados)cargarCobros();}
             else if(selected==tabMovimientos){panelMovimientos.setVisible(true);if(puedeMovimientos&&!movimientosCargados)cargarMovimientos();}
             else{panelRecuentos.setVisible(true);if(puedeRecuentos&&!recuentosCargados)cargarRecuentos();}});
         add(tabs,panelCierre,panelVentas,panelCobros,panelMovimientos,panelRecuentos);
-        getFooter().add(print,new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->close()));
+        getFooter().add(print,pdf,new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->close()));
     }
 
     private void prepararPaneles(){for(VerticalLayout panel:List.of(panelCierre,panelVentas,panelCobros,panelMovimientos,panelRecuentos)){

@@ -23,10 +23,10 @@ public class CierreCajaService {
  private final DenominacionCajaRepository denominaciones; private final CierreCajaRepository cierres;
  private final DetalleCierreCajaRepository detalles; private final ResumenMedioPagoCierreCajaRepository medios;
  private final EmpresaRepository empresas; private final AuditoriaService auditoria;
- private final IdempotentOperationService idempotencia; private final JdbcTemplate jdbc;
+ private final IdempotentOperationService idempotencia; private final JdbcTemplate jdbc;private final CashClosingDocumentService documentos;
  public CierreCajaService(CashRegisterSessionRepository s,FinancialMovementRepository m,DenominacionCajaRepository d,
         CierreCajaRepository c,DetalleCierreCajaRepository de,ResumenMedioPagoCierreCajaRepository mp,
-        EmpresaRepository e,AuditoriaService a,IdempotentOperationService i,JdbcTemplate j){sesiones=s;movimientos=m;denominaciones=d;cierres=c;detalles=de;medios=mp;empresas=e;auditoria=a;idempotencia=i;jdbc=j;}
+        EmpresaRepository e,AuditoriaService a,IdempotentOperationService i,JdbcTemplate j,CashClosingDocumentService documentos){this.documentos=documentos;sesiones=s;movimientos=m;denominaciones=d;cierres=c;detalles=de;medios=mp;empresas=e;auditoria=a;idempotencia=i;jdbc=j;}
 
  @Transactional(readOnly=true) @PreAuthorize("hasAnyAuthority('cierres_caja.ejecutar','operaciones_caja.cerrar')")
  public PreparacionCierreCajaDto preparar(UUID sesionId){SesionCaja s=sesionAbierta(sesionId,false);var p=TenantContext.principalActual();return new PreparacionCierreCajaDto(s.getId(),s.getCodigoVisible(),s.getCaja().getNombre(),s.getSucursal().getNombre(),s.getMoneda().getCodigoIso(),s.getMoneda().getSimbolo(),s.getAbiertoEn(),p.nombre(),catalogo(s).stream().map(d->new PreparacionCierreCajaDto.Denominacion(d.getId(),d.getValor(),d.getTipo(),d.getOrden())).toList());}
@@ -44,6 +44,7 @@ public class CierreCajaService {
   Empresa empresa=empresas.findByIdAndTenantId(empresaId,p.tenantId()).orElseThrow(()->new RecursoNoEncontradoException("Empresa no encontrada."));
   CierreCaja c=new CierreCaja(p.tenantId(),empresaId,siguienteNumero(p.tenantId(),empresaId),s,corte,p.usuarioId(),p.nombre(),resumen,contado,observacion,input.idempotencia(),empresa);
   try{c=cierres.saveAndFlush(c);int orden=1;for(DenominacionCaja d:catalogo)detalles.save(new DetalleCierreCaja(p.tenantId(),empresaId,c.getId(),d,cantidades.getOrDefault(d.getId(),0),orden++));guardarMedios(p.tenantId(),empresaId,c.getId(),ms);detalles.flush();medios.flush();s.cerrar(c.getEsperado(),c.getContado(),observacion,p.usuarioId(),corte);sesiones.saveAndFlush(s);}catch(DataIntegrityViolationException ex){throw new ReglaNegocioException("El turno de caja ya fue cerrado.",ex);}
+  documentos.conservar(c,s,empresa);
   auditoria.registrar("CASH_REGISTER_CLOSED","CierreCaja",c.getId(),"{\"sesionId\":\""+s.getId()+"\",\"numero\":\""+c.getNumero()+"\",\"resultado\":\""+c.getResult()+"\"}");idempotencia.complete(p.tenantId(),empresaId,OP,input.idempotencia(),"CierreCaja",c.getId());return dto(c,detalles.findAllByCierreIdOrderByOrdenAsc(c.getId()),medios.findAllByCierreIdOrderByOrdenAsc(c.getId()));
  }
  @Transactional(readOnly=true) @PreAuthorize("hasAnyAuthority('cierres_caja.ver','operaciones_caja.ver_historial')") public CierreCajaDto obtener(UUID id){return obtenerInterno(id);}

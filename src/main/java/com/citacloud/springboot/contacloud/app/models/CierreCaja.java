@@ -45,6 +45,9 @@ public class CierreCaja {
     @Column(name="company_name",nullable=false,updatable=false,length=150) private String empresaNombre;
     @Column(name="company_tax_id",updatable=false,length=30) private String empresaIdentificacion;
     @Column(name="company_logo_object_key",updatable=false,length=512) private String empresaLogo;
+    @Column(name="pos_print_snapshot",columnDefinition="text") private String documentoPos;
+    public String getDocumentoPos(){return documentoPos;}
+    public void conservarDocumentoPos(String json){if(documentoPos!=null)throw new IllegalStateException("El snapshot del cierre ya está conservado.");documentoPos=java.util.Objects.requireNonNull(json);}
     protected CierreCaja() {}
     public CierreCaja(UUID t,UUID e,String numero,SesionCaja s,OffsetDateTime instante,UUID usuarioId,
             String usuarioNombre,Resumen r,BigDecimal contado,String observacion,UUID key,Empresa empresa){

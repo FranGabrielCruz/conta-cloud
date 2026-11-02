@@ -22,7 +22,7 @@ class MovimientoCajaServiceTest {
     private final IdempotentOperationService idempotencia=mock(IdempotentOperationService.class);
     private final AuditoriaService auditoria=mock(AuditoriaService.class);
     private final MovimientoCajaNumeroService numeros=mock(MovimientoCajaNumeroService.class);
-    private final MovimientoCajaService service=new MovimientoCajaService(sesiones,movimientos,conceptos,idempotencia,auditoria,numeros);
+    private final MovimientoCajaService service=new MovimientoCajaService(sesiones,movimientos,conceptos,idempotencia,auditoria,numeros,mock(CashRegisterRepository.class));
     private final UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),usuario=UUID.randomUUID();
     private final UUID sesionId=UUID.randomUUID(),cajaId=UUID.randomUUID(),monedaId=UUID.randomUUID(),sucursalId=UUID.randomUUID();
 
