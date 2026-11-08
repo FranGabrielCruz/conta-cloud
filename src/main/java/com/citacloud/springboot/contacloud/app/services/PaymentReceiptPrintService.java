@@ -24,7 +24,7 @@ public class PaymentReceiptPrintService {
     public SolicitudImpresionResultadoDto solicitar(UUID id,UUID intento){
         var s=obtener(id);
         if(s.cashRegisterId()==null)throw new ReglaNegocioException("El recibo no conserva una caja de origen para resolver su agente.");
-        return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.PAYMENT_RECEIPT,id,s.branchId(),s.cashRegisterId(),()->pdf(id,s)),intento);
+        return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.PAYMENT_RECEIPT,id,s.branchId(),s.cashRegisterId(),()->pdf(id,s),()->snapshots.documento(s)),intento);
     }
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.imprimir')")

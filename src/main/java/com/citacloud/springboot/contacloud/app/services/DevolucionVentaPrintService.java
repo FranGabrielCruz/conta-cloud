@@ -25,6 +25,6 @@ public class DevolucionVentaPrintService {
     public SolicitudImpresionResultadoDto solicitar(UUID devolucionId,UUID intento){
         var d=documentos.obtener(devolucionId);var origen=documentos.origen(d);
         return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.SALES_RETURN,devolucionId,
-            origen.sucursalId(),origen.cajaId(),()->documentos.generar(devolucionId)),intento);
+            origen.sucursalId(),origen.cajaId(),()->documentos.generar(devolucionId),()->documentos.documento(d)),intento);
     }
 }

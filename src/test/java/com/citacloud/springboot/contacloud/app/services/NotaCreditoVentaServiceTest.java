@@ -1,0 +1,61 @@
+package com.citacloud.springboot.contacloud.app.services;
+import com.citacloud.springboot.contacloud.app.dto.*;
+import com.citacloud.springboot.contacloud.app.models.*;
+import com.citacloud.springboot.contacloud.app.repositories.*;
+import com.citacloud.springboot.contacloud.app.security.*;
+import org.junit.jupiter.api.*;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class NotaCreditoVentaServiceTest {
+    final UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),user=UUID.randomUUID(),invoice=UUID.randomUUID(),line=UUID.randomUUID(),reason=UUID.randomUUID();
+    final FacturaVentaRepository facturas=mock(FacturaVentaRepository.class);final LineaFacturaVentaRepository lineas=mock(LineaFacturaVentaRepository.class);
+    final MotivoDevolucionVentaRepository motivos=mock(MotivoDevolucionVentaRepository.class);final NotaCreditoVentaConsultaRepository repo=mock(NotaCreditoVentaConsultaRepository.class);
+    final EmpresaRepository empresas=mock(EmpresaRepository.class);final DatosEmpresaRepository datos=mock(DatosEmpresaRepository.class);final PeriodoFiscalRepository periodos=mock(PeriodoFiscalRepository.class);
+    final IdempotentOperationService intents=mock(IdempotentOperationService.class);final AuditoriaService audit=mock(AuditoriaService.class);
+    final NotaCreditoVentaService service=new NotaCreditoVentaService(facturas,lineas,motivos,repo,empresas,datos,periodos,intents,audit);
+    final LineaFacturaVenta l=mock(LineaFacturaVenta.class);final FacturaVenta f=mock(FacturaVenta.class);final LocalDate today=LocalDate.now(ZoneId.of("America/Santo_Domingo"));
+    static final BigDecimal ZERO=new BigDecimal("0.0000");
+    NotaCreditoVentaConsultaRepository.Consumido vacio(){return new NotaCreditoVentaConsultaRepository.Consumido(ZERO,ZERO,ZERO,ZERO,ZERO,ZERO);}
+    @BeforeEach void setup(){auth(tenant,empresa,true);when(f.getId()).thenReturn(invoice);when(f.getClienteId()).thenReturn(UUID.randomUUID());when(f.getMonedaId()).thenReturn(UUID.randomUUID());when(f.getSucursalId()).thenReturn(UUID.randomUUID());when(f.getStatus()).thenReturn(EstadoFacturaVenta.CONFIRMED);when(f.getFecha()).thenReturn(today.minusDays(5));when(f.getTotal()).thenReturn(new BigDecimal("470.4"));when(f.getMonedaCodigo()).thenReturn("USD");when(f.getNumero()).thenReturn("FAC-TEST");when(f.getClienteNombre()).thenReturn("Cliente histórico");
+        when(facturas.findByIdAndTenantIdAndEmpresaId(invoice,tenant,empresa)).thenReturn(Optional.of(f));when(facturas.bloquear(invoice,tenant,empresa)).thenReturn(Optional.of(f));
+        when(l.getId()).thenReturn(line);when(l.getCantidad()).thenReturn(new BigDecimal("4"));when(l.getPrecioUnitario()).thenReturn(new BigDecimal("100"));when(l.getSubtotalBruto()).thenReturn(new BigDecimal("400"));when(l.getDescuento()).thenReturn(new BigDecimal("20"));when(l.getRecargo()).thenReturn(new BigDecimal("40"));when(l.getImpuesto()).thenReturn(new BigDecimal("50.4"));when(l.getTotal()).thenReturn(new BigDecimal("470.4"));when(l.getTasaImpuesto()).thenReturn(new BigDecimal("12"));when(l.getImpuestoNombre()).thenReturn("Impuesto diverso");when(l.getDescripcion()).thenReturn("Producto histórico");
+        when(lineas.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(invoice,tenant,empresa)).thenReturn(List.of(l));when(lineas.bloquearPorFactura(invoice,tenant,empresa)).thenReturn(List.of(l));when(repo.consumido(line)).thenReturn(vacio());when(repo.consumidos(invoice)).thenAnswer(x->Map.of(line,repo.consumido(line)));when(repo.totalAcreditado(invoice)).thenReturn(ZERO);
+        Empresa e=mock(Empresa.class);when(e.getZonaHoraria()).thenReturn("America/Santo_Domingo");when(e.getNombre()).thenReturn("Empresa de prueba");when(empresas.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(e));
+        var m=mock(MotivoDevolucionVenta.class);when(m.getNombre()).thenReturn("Error de facturación");when(motivos.findByIdAndTenantIdAndEmpresaIdAndActivoTrue(reason,tenant,empresa)).thenReturn(Optional.of(m));
+        when(intents.begin(any(),any(),anyString(),any(),anyString())).thenReturn(new IdempotentOperationService.Start(true,null,null));when(repo.siguiente()).thenReturn("NCV-TEST");when(repo.aplicar(any(),any(),any(),any())).thenReturn(new NotaCreditoVentaConsultaRepository.Aplicacion(new BigDecimal("100"),new BigDecimal("100"),ZERO,new BigDecimal("135.2")));
+    }
+    void auth(UUID t,UUID e,boolean todas){var p=new TenantPrincipal(user,t,e,null,"TEST","Operador","test","",true,todas,Set.of(),Set.of("notas_credito.crear","notas_credito.emitir","notas_credito.ver","notas_credito.pdf"));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));}
+    @AfterEach void clear(){SecurityContextHolder.clearContext();org.slf4j.MDC.clear();}
+    EmitirNotaCreditoVentaInput input(String qty){return new EmitirNotaCreditoVentaInput(invoice,today,reason,"Corrección autorizada",null,List.of(new EmitirNotaCreditoVentaInput.Linea(line,new BigDecimal(qty))),UUID.randomUUID());}
+    @Test void calculaParcialConDescuentoRecargoImpuestoYMonedaHistoricos(){var d=service.calcular(input("2"));assertThat(d.subtotal()).isEqualByComparingTo("200");assertThat(d.descuento()).isEqualByComparingTo("10");assertThat(d.recargo()).isEqualByComparingTo("20");assertThat(d.impuesto()).isEqualByComparingTo("25.2");assertThat(d.total()).isEqualByComparingTo("235.2");assertThat(d.moneda()).isEqualTo("USD");verify(repo,never()).aplicar(any(),any(),any(),any());verify(repo,never()).insertar(any(),any(),any());}
+    @Test void calculaTotalYRecuperaElResiduoDeRedondeo(){var d=service.calcular(input("4"));assertThat(d.total()).isEqualByComparingTo("470.4");when(l.getCantidad()).thenReturn(new BigDecimal("3"));when(l.getSubtotalBruto()).thenReturn(new BigDecimal("1"));when(l.getDescuento()).thenReturn(ZERO);when(l.getRecargo()).thenReturn(ZERO);when(l.getImpuesto()).thenReturn(ZERO);when(l.getTotal()).thenReturn(new BigDecimal("1"));var used=new NotaCreditoVentaConsultaRepository.Consumido(new BigDecimal("2"),new BigDecimal(".6666"),ZERO,ZERO,ZERO,new BigDecimal(".6666"));var last=NotaCreditoVentaService.calcularLinea(l,BigDecimal.ONE,used);assertThat(last.total()).isEqualByComparingTo(".3334");}
+    @Test void descuentaNotasYDevolucionesPreviasYRechazaSobreacreditacion(){var used=new NotaCreditoVentaConsultaRepository.Consumido(new BigDecimal("3"),new BigDecimal("300"),new BigDecimal("15"),new BigDecimal("30"),new BigDecimal("37.8"),new BigDecimal("352.8"));when(repo.consumido(line)).thenReturn(used);when(repo.totalAcreditado(invoice)).thenReturn(new BigDecimal("352.8"));assertThat(service.calcular(input("1")).total()).isEqualByComparingTo("117.6");assertThatThrownBy(()->service.calcular(input("2"))).isInstanceOf(ReglaNegocioException.class).hasMessageContaining("disponible");}
+    @Test void emiteUnaVezYReintentoNoRepiteEfectos(){var i=input("2");var d=service.emitir(i);UUID currency=f.getMonedaId();assertThat(d.aplicadoCxC()).isEqualByComparingTo("100");assertThat(d.creditoCliente()).isEqualByComparingTo("135.2");when(intents.begin(any(),any(),anyString(),any(),anyString())).thenReturn(new IdempotentOperationService.Start(false,"SALES_CREDIT_NOTE",d.id()));when(repo.documento(d.id())).thenReturn(d);assertThat(service.emitir(i)).isEqualTo(d);verify(repo,times(1)).aplicar(invoice,f.getClienteId(),f.getMonedaId(),new BigDecimal("235.2000"));verify(repo,times(1)).insertar(any(),eq(invoice),eq(currency));verify(repo,times(1)).siguiente();}
+    @Test void rechazaFacturaAjenaSucursalAjenaYFacturaAnulada(){auth(UUID.randomUUID(),UUID.randomUUID(),true);assertThatThrownBy(()->service.calcular(input("1"))).isInstanceOf(RecursoNoEncontradoException.class);auth(tenant,empresa,false);assertThatThrownBy(()->service.calcular(input("1"))).isInstanceOf(RecursoNoEncontradoException.class);auth(tenant,empresa,true);when(f.getStatus()).thenReturn(EstadoFacturaVenta.VOIDED);assertThatThrownBy(()->service.calcular(input("1"))).isInstanceOf(ReglaNegocioException.class);}
+    @Test void rechazaCantidadNegativaDuplicadaYLineaManipulada(){assertThatThrownBy(()->service.calcular(input("-1"))).isInstanceOf(ReglaNegocioException.class);var i=input("1");assertThatThrownBy(()->service.calcular(new EmitirNotaCreditoVentaInput(invoice,today,reason,"Corrección",null,List.of(i.lineas().getFirst(),i.lineas().getFirst()),UUID.randomUUID()))).isInstanceOf(ReglaNegocioException.class);assertThatThrownBy(()->service.calcular(new EmitirNotaCreditoVentaInput(invoice,today,reason,"Corrección",null,List.of(new EmitirNotaCreditoVentaInput.Linea(UUID.randomUUID(),BigDecimal.ONE)),UUID.randomUUID()))).isInstanceOf(RecursoNoEncontradoException.class);}
+    @Test void validaFechaMotivoDescripcionYClienteParaSaldoAFavor(){var i=input("1");assertThatThrownBy(()->service.calcular(new EmitirNotaCreditoVentaInput(invoice,today.plusDays(1),reason,"Corrección",null,i.lineas(),i.idempotencia()))).isInstanceOf(ReglaNegocioException.class);assertThatThrownBy(()->service.calcular(new EmitirNotaCreditoVentaInput(invoice,today,reason,"",null,i.lineas(),i.idempotencia()))).isInstanceOf(ReglaNegocioException.class);when(f.getClienteId()).thenReturn(null);when(f.getClienteNombre()).thenReturn("");assertThat(service.calcular(i).cliente()).isEqualTo("Consumidor Final");}
+    @Test void rechazaPeriodoCerradoYElementoNuloSinEscribir(){
+        var periodo=mock(PeriodoFiscal.class);when(periodo.getEstado()).thenReturn(PeriodoFiscal.Estado.CERRADO);when(periodos.findFirstByTenantIdAndEmpresaIdAndFechaInicialLessThanEqualAndFechaFinalGreaterThanEqual(tenant,empresa,today,today)).thenReturn(Optional.of(periodo));assertThatThrownBy(()->service.calcular(input("1"))).isInstanceOf(ReglaNegocioException.class).hasMessageContaining("período");
+        when(periodos.findFirstByTenantIdAndEmpresaIdAndFechaInicialLessThanEqualAndFechaFinalGreaterThanEqual(tenant,empresa,today,today)).thenReturn(Optional.empty());assertThatThrownBy(()->service.calcular(new EmitirNotaCreditoVentaInput(invoice,today,reason,"Ajuste",null,Arrays.asList((EmitirNotaCreditoVentaInput.Linea)null),UUID.randomUUID()))).isInstanceOf(ReglaNegocioException.class);verify(repo,never()).insertar(any(),any(),any());
+    }
+    @Test void facturaSinClienteNoExigeEntidadNiCreaSaldoFicticio(){
+        when(f.getClienteId()).thenReturn(null);when(f.getClienteNombre()).thenReturn(null);
+        when(repo.aplicar(eq(invoice),isNull(),any(),any())).thenReturn(new NotaCreditoVentaConsultaRepository.Aplicacion(null,ZERO,null,ZERO));
+        var d=service.emitir(input("1"));assertThat(d.clienteId()).isNull();assertThat(d.cliente()).isEqualTo("Consumidor Final");assertThat(d.aplicadoCxC()).isZero();assertThat(d.creditoCliente()).isZero();verify(repo).insertar(eq(d),eq(invoice),any());
+    }
+
+    @Test void anulacionExigeMotivoEstadoYVersionYReintentoNoRevierteDosVeces(){
+        UUID invalidId=UUID.randomUUID(),key=UUID.randomUUID();var active=new NotaCreditoVentaCicloDto(invoice,null,null,0,"CONFIRMED",true,null,null,null);
+        assertThatThrownBy(()->service.anular(new AnularNotaCreditoVentaInput(invalidId,0," ",key))).isInstanceOf(ReglaNegocioException.class);verify(repo,never()).revertir(any(),any());
+        var d=service.emitir(input("2"));UUID id=d.id();var request=new AnularNotaCreditoVentaInput(id,0,"Corrección autorizada",key);
+        when(repo.ciclo(id,false)).thenReturn(active);when(repo.ciclo(id,true)).thenReturn(active);when(repo.documento(id)).thenReturn(d,d.conEstado("VOIDED"));clearInvocations(repo);
+        assertThat(service.anular(request).estado()).isEqualTo("VOIDED");verify(repo).revertir(d,invoice);verify(repo).marcarAnulada(id,0,"Corrección autorizada",key,"America/Santo_Domingo");
+        when(intents.begin(any(),any(),eq("SALES_CREDIT_NOTE_VOID"),any(),any())).thenReturn(new IdempotentOperationService.Start(false,"SALES_CREDIT_NOTE",id));assertThat(service.anular(request).estado()).isEqualTo("VOIDED");verify(repo,times(1)).revertir(any(),any());
+    }
+}

@@ -10,7 +10,8 @@ import org.springframework.security.access.AccessDeniedException;
 /** Closed registration boundary: adding an enum without an adapter prevents application startup. */
 @Component
 public class BillingPrintDocumentRegistry {
- public record Document(UUID branchId,UUID cashRegisterId,Supplier<ArchivoPdfDto> screen,Supplier<ArchivoPdfDto> printer){
+ public record Document(UUID branchId,UUID cashRegisterId,Supplier<ArchivoPdfDto> screen,Supplier<ArchivoPdfDto> printer,Supplier<Object> snapshot){
+  public Document(UUID branchId,UUID cashRegisterId,Supplier<ArchivoPdfDto> screen,Supplier<ArchivoPdfDto> printer){this(branchId,cashRegisterId,screen,printer,null);}
   public Document{Objects.requireNonNull(screen);Objects.requireNonNull(printer);}
  }
  public record Registration(TipoDocumentoImpresion type,String permission,Function<UUID,Document> load){

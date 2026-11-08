@@ -72,6 +72,15 @@ class DevolucionVentaServiceTest {
         assertEquals(new BigDecimal("342.1800"),resultado.total());
     }
 
+    @Test void notasFinancierasReducenDisponibleSinPresentarlasComoRetornoFisico(){
+        UUID tenant=UUID.randomUUID(),empresa=UUID.randomUUID(),invoice=UUID.randomUUID(),line=UUID.randomUUID();
+        var principal=new TenantPrincipal(UUID.randomUUID(),tenant,empresa,null,"TEST","Prueba","test","",true,true,Set.of(),Set.of("devoluciones_venta.crear"));SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
+        var facturas=mock(FacturaVentaRepository.class);var lines=mock(LineaFacturaVentaRepository.class);var returns=mock(LineaDevolucionVentaRepository.class);var inventory=mock(InventoryMovementService.class);
+        var f=mock(com.citacloud.springboot.contacloud.app.models.FacturaVenta.class);when(f.getId()).thenReturn(invoice);when(f.getTenantId()).thenReturn(tenant);when(f.getEmpresaId()).thenReturn(empresa);when(f.getStatus()).thenReturn(com.citacloud.springboot.contacloud.app.models.EstadoFacturaVenta.CONFIRMED);when(facturas.findByIdAndTenantIdAndEmpresaId(invoice,tenant,empresa)).thenReturn(Optional.of(f));
+        var l=mock(LineaFacturaVenta.class);when(l.getId()).thenReturn(line);when(l.getCantidad()).thenReturn(new BigDecimal("4"));when(lines.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(invoice,tenant,empresa)).thenReturn(List.of(l));when(returns.cantidadDevuelta(tenant,empresa,line)).thenReturn(BigDecimal.ONE);when(returns.cantidadAcreditada(tenant,empresa,line)).thenReturn(new BigDecimal("2"));
+        var service=new DevolucionVentaService(facturas,lines,mock(DevolucionVentaRepository.class),returns,mock(MotivoDevolucionVentaRepository.class),mock(AlmacenRepository.class),mock(NotaCreditoVentaRepository.class),mock(CreditoClienteRepository.class),inventory,mock(IdempotentOperationService.class),mock(AuditoriaService.class),mock(JdbcTemplate.class),new SimpleMeterRegistry());
+        try{var d=service.preparar(invoice).lineas().getFirst();assertEquals(BigDecimal.ONE,d.devuelto());assertEquals(BigDecimal.ONE,d.disponible());verifyNoInteractions(inventory);}finally{SecurityContextHolder.clearContext();}
+    }
     private static LineaFacturaVenta linea(String cantidad,String bruto,String descuento,String recargo,String impuesto,String total){
         LineaFacturaVenta linea=nuevaLinea();
         ReflectionTestUtils.setField(linea,"cantidad",new BigDecimal(cantidad));ReflectionTestUtils.setField(linea,"subtotalBruto",new BigDecimal(bruto));

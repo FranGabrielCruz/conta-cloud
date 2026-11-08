@@ -11,7 +11,7 @@ public class NotaCreditoVenta {
     @Column(name="tenant_id",nullable=false,updatable=false) private UUID tenantId;
     @Column(name="empresa_id",nullable=false,updatable=false) private UUID empresaId;
     @Column(name="credit_note_number",nullable=false,updatable=false,length=30) private String numero;
-    @Column(name="sales_return_id",nullable=false,updatable=false) private UUID devolucionId;
+    @Column(name="sales_return_id",updatable=false) private UUID devolucionId;
     @Column(name="sales_invoice_id",nullable=false,updatable=false) private UUID facturaId;
     @Column(name="customer_id") private UUID clienteId;
     @Column(name="currency_id",nullable=false) private UUID monedaId;

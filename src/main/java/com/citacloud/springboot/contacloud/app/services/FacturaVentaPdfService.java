@@ -31,6 +31,12 @@ public class FacturaVentaPdfService {
     public ArchivoPdfDto generar(UUID id){return generarDocumento(id,false);}
     @Transactional(readOnly=true) @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.pdf')")
     public ArchivoPdfDto generarParaImpresion(UUID id){return generarDocumento(id,true);}
+    @Transactional(readOnly=true) @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('facturas.pdf')")
+    public com.citacloud.springboot.contacloud.app.reports.pos.PosInvoiceDocument documentoParaImpresion(UUID id){
+        var p=TenantContext.principalActual();var f=facturas.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId()).orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada."));
+        if(!EmpresaContext.permiteSucursal(f.getSucursalId()))throw new RecursoNoEncontradoException("Factura no encontrada.");
+        return documentosPos.documento(f);
+    }
     private ArchivoPdfDto generarDocumento(UUID id,boolean ticket){
         var p=TenantContext.principalActual();FacturaVenta f=facturas.findByIdAndTenantIdAndEmpresaId(id,p.tenantId(),p.empresaId())
             .orElseThrow(()->new RecursoNoEncontradoException("Factura no encontrada."));

@@ -73,7 +73,7 @@ public class PurchaseOrderPdfService {
 
     private JasperReport report() throws JRException{
         JasperReport result=compiledReport;if(result!=null)return result;
-        synchronized(this){if(compiledReport==null){InputStream in=getClass().getResourceAsStream("/reports/purchase-order/purchase-order.jrxml");if(in==null)throw new ReglaNegocioException("No se encontró la plantilla de la orden de compra.");compiledReport=JasperCompileManager.compileReport(in);}return compiledReport;}
+        synchronized(this){if(compiledReport==null){InputStream in=LargeDocumentPdfTemplate.purchaseOrder();if(in==null)throw new ReglaNegocioException("No se encontró la plantilla de la orden de compra.");compiledReport=JasperCompileManager.compileReport(in);}return compiledReport;}
     }
     private static String format(java.time.LocalDate date){return date==null?"—":DATE.format(date);}
     private static String value(String value){return value==null||value.isBlank()?"—":value;}

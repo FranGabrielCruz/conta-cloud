@@ -34,7 +34,7 @@ class PaymentReceiptPrintServiceTest {
         when(jdbc.query(contains("select id,print_on_screen"),org.mockito.ArgumentMatchers.<RowMapper<SolicitudImpresionResultadoDto>>any(),eq(tenant),eq(company),eq(attempt),eq(receipt))).thenReturn(List.of(),List.of(),List.of(result),List.of(result));
         when(snapshots.documento(s)).thenReturn(doc());
         assertThat(service.solicitar(receipt,attempt)).isEqualTo(result);assertThat(service.solicitar(receipt,attempt)).isEqualTo(result);
-        verify(snapshots).documento(s);verify(jdbc).update(contains("insert into billing_print_jobs"),any(UUID.class),eq(tenant),eq(company),eq(branch),eq(cash),eq(agentId),eq(receipt),eq(attempt),any(byte[].class),eq(false),eq("PAYMENT_RECEIPT"));
+        verify(snapshots,times(2)).documento(s);verify(jdbc).update(contains("insert into billing_print_jobs"),any(UUID.class),eq(tenant),eq(company),eq(branch),eq(cash),eq(agentId),eq(receipt),eq(attempt),any(byte[].class),eq(false),eq("PAYMENT_RECEIPT"));
     }
     @Test void otroTenantNoResuelveAgente(){assertThatThrownBy(()->service.solicitar(receipt,UUID.randomUUID())).isInstanceOf(RecursoNoEncontradoException.class);verifyNoInteractions(jdbc,routing,agents,audit);}
     @Test void sinCajaNoSeSeleccionaAgenteArbitrario(){when(snapshots.obtener(receipt,tenant,company)).thenReturn(new PaymentReceiptSnapshotRepository.Stored(branch,null,"AVAILABLE","{}"));assertThatThrownBy(()->service.solicitar(receipt,UUID.randomUUID())).isInstanceOf(ReglaNegocioException.class);verifyNoInteractions(jdbc,routing,agents,audit);}

@@ -14,7 +14,7 @@ public class BillingPrintApplicationService {
  @PreAuthorize("isAuthenticated()")
  public BillingPrintResult imprimir(TipoDocumentoImpresion type,UUID id,UUID attempt){
   var document=documents.load(type,id);
-  var output=router.solicitar(new BillingPrintRouter.Documento(type,id,document.branchId(),document.cashRegisterId(),document.printer()),attempt);
+  var output=router.solicitar(new BillingPrintRouter.Documento(type,id,document.branchId(),document.cashRegisterId(),document.printer(),document.snapshot()),attempt);
   return new BillingPrintResult(output,output.outputMode()==BillingPrintOutputMode.SCREEN?document.screen().get():null);
  }
 }

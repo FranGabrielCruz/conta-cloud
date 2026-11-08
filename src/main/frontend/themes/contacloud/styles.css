@@ -1300,3 +1300,12 @@ vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
 
 .cc-cash-tabs { width:100%; max-width:100%; min-width:0; }
 .cc-cash-movements-panel { min-width:0; max-width:100%; }
+
+.cc-credit-note-filters { display:grid; grid-template-columns:minmax(180px,2fr) repeat(4,minmax(130px,1fr)); gap:12px; width:100%; }
+@media (max-width:1000px) { .cc-credit-note-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:520px) { .cc-credit-note-filters { grid-template-columns:1fr; } }
+
+.cc-detail-four .cc-detail-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px 18px; }
+.cc-detail-four .cc-detail-value { overflow-wrap:anywhere; min-width:0; white-space:normal; }
+@media(max-width:900px){ .cc-detail-four .cc-detail-grid {grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media(max-width:600px){ .cc-detail-four .cc-detail-grid {grid-template-columns:minmax(0,1fr);} }

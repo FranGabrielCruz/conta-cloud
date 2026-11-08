@@ -42,7 +42,7 @@ public class CashVoucherDocumentService {
         return v.getEstado()==EstadoValeCaja.VOIDED?doc.withCancellation(clean(v.getMotivoAnulacion())==null?"Vale anulado":clean(v.getMotivoAnulacion())):doc;
     }
     @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('vales_caja.ver') and hasAuthority('vales_caja.imprimir')")
-    public BillingPrintDocumentRegistry.Document cargar(UUID id){var v=obtener(id);return new BillingPrintDocumentRegistry.Document(v.getSucursalId(),v.getCajaId(),()->generar(v),()->generar(v));}
+    public BillingPrintDocumentRegistry.Document cargar(UUID id){var v=obtener(id);return new BillingPrintDocumentRegistry.Document(v.getSucursalId(),v.getCajaId(),()->generar(v),()->generar(v),()->documento(v));}
     @Transactional(readOnly=true) @PreAuthorize("@empresaModuloService.habilitado('CAJA_BANCOS') and hasAuthority('vales_caja.ver') and hasAuthority('vales_caja.imprimir')")
     public ArchivoPdfDto generar(UUID id){return generar(obtener(id));}
     ArchivoPdfDto generar(ValeCaja v){

@@ -61,7 +61,8 @@ public class DevolucionVentaService {
                 .orElseThrow(()->error(ErrorCode.RETURN_INVOICE_NOT_FOUND,"Factura no encontrada."));
         validarFactura(f);
         List<DevolucionVentaDetalleDto.Linea> detalle=lineasFactura.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(f.getId(),p.tenantId(),p.empresaId()).stream().map(l->{
-            BigDecimal devuelta=cantidadDevuelta(p,l.getId());BigDecimal disponible=l.getCantidad().subtract(devuelta).max(BigDecimal.ZERO);
+            BigDecimal devuelta=lineasDevolucion.cantidadDevuelta(p.tenantId(),p.empresaId(),l.getId());
+            BigDecimal disponible=l.getCantidad().subtract(cantidadDevuelta(p,l.getId())).max(BigDecimal.ZERO);
             return new DevolucionVentaDetalleDto.Linea(l.getId(),l.getProductoId(),l.getCodigoProducto(),l.getDescripcion(),l.getUnidadNombre(),
                     l.getCantidad(),devuelta,disponible,l.getPrecioUnitario(),l.getSubtotalBruto(),l.getDescuento(),l.getRecargo(),l.getImpuesto(),l.getTotal(),l.isControlaExistencia());
         }).toList();
@@ -148,7 +149,7 @@ public class DevolucionVentaService {
             .orElseThrow(()->error(ErrorCode.RETURN_ALREADY_COMPLETED,"La devolución ya fue procesada."));NotaCreditoVenta n=notas.findByDevolucionId(d.getId()).orElseThrow();return new DevolucionVentaResultadoDto(d.getId(),d.getNumero(),n.getNumero(),d.getTotal(),d.getMonedaCodigo());}
     private void validarFactura(FacturaVenta f){if(!EmpresaContext.permiteSucursal(f.getSucursalId()))throw error(ErrorCode.RETURN_INVOICE_NOT_FOUND,"Factura no encontrada.");if(f.getStatus()!=EstadoFacturaVenta.CONFIRMED)throw error(ErrorCode.RETURN_INVOICE_NOT_ELIGIBLE,"La factura no está disponible para devolución.");}
     private String estadoDerivado(FacturaVenta f){List<LineaFacturaVenta>ls=lineasFactura.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(f.getId(),f.getTenantId(),f.getEmpresaId());boolean alguna=false,todas=!ls.isEmpty();for(var l:ls){BigDecimal d=lineasDevolucion.cantidadDevuelta(f.getTenantId(),f.getEmpresaId(),l.getId());alguna|=d.signum()>0;todas&=d.compareTo(l.getCantidad())>=0;}return todas?"DEVUELTA":alguna?"PARCIALMENTE DEVUELTA":"PAGADA";}
-    private BigDecimal cantidadDevuelta(TenantPrincipal p,UUID linea){BigDecimal v=lineasDevolucion.cantidadDevuelta(p.tenantId(),p.empresaId(),linea);return v==null?BigDecimal.ZERO:v;}
+    private BigDecimal cantidadDevuelta(TenantPrincipal p,UUID linea){BigDecimal v=lineasDevolucion.cantidadDevuelta(p.tenantId(),p.empresaId(),linea);BigDecimal c=lineasDevolucion.cantidadAcreditada(p.tenantId(),p.empresaId(),linea);return (v==null?BigDecimal.ZERO:v).add(c==null?BigDecimal.ZERO:c);}
     static Calculada calcular(LineaFacturaVenta l,BigDecimal cantidad){BigDecimal ratio=cantidad.divide(l.getCantidad(),12,RoundingMode.HALF_UP);BigDecimal bruto=proporcion(l.getSubtotalBruto(),ratio),descuento=proporcion(l.getDescuento(),ratio),recargo=proporcion(l.getRecargo(),ratio),impuesto=proporcion(l.getImpuesto(),ratio),total=proporcion(l.getTotal(),ratio);return new Calculada(l,cantidad,bruto,descuento,recargo,bruto.subtract(descuento).add(recargo),impuesto,total);}
     private static BigDecimal proporcion(BigDecimal valor,BigDecimal ratio){return (valor==null?BigDecimal.ZERO:valor).multiply(ratio).setScale(4,RoundingMode.HALF_UP);}
     private static BigDecimal suma(List<Calculada>ls,java.util.function.Function<Calculada,BigDecimal>fn){return ls.stream().map(fn).reduce(BigDecimal.ZERO,BigDecimal::add).setScale(4,RoundingMode.HALF_UP);}

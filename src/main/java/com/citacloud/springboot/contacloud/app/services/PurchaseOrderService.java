@@ -153,7 +153,7 @@ public class PurchaseOrderService {
         Empresa company=companies.findByIdAndTenantId(order.getEmpresaId(),order.getTenantId()).orElseThrow(()->new ReglaNegocioException("No fue posible identificar la empresa de la orden."));
         DatosEmpresa data=companyData.findByEmpresaId(order.getEmpresaId()).orElse(null);
         Usuario user=users.findByIdAndTenantId(userId,order.getTenantId()).orElseThrow(()->new ReglaNegocioException("No fue posible identificar al usuario emisor."));
-        byte[] logo=company.getLogoObjectKey()==null?null:storage.load(company.getLogoObjectKey(),5L*1024*1024).orElse(null);
+        byte[] logo=CompanyReportAssets.logo(company,storage);
         String commercial=data==null?company.getNombre():first(data.getNombreComercial(),company.getNombre());
         String legal=data==null?company.getNombre():first(data.getRazonSocial(),company.getNombre());
         List<PurchaseOrderReportLine> lines=order.getLineas().stream().map(l->new PurchaseOrderReportLine(l.getNumeroLinea(),l.getProductoCodigo(),l.getDescripcion(),unit(l.getUnidadMedidaNombre(),l.getUnidadMedidaAbreviatura()),l.getCantidad(),l.getPrecioUnitario(),l.getDescuento(),l.getImpuesto(),l.getTotal())).toList();

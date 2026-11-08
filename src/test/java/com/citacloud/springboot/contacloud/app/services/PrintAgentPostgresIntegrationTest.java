@@ -167,6 +167,7 @@ class PrintAgentPostgresIntegrationTest {
         jdbc.update("update print_agents set print_on_screen=false where tenant_id=? and empresa_id=? and id=?",tenant,empresa,a);
         for(UUID id:facturas){
             when(pdf.generarParaImpresion(id)).thenReturn(new ArchivoPdfDto("ticket.pdf",new byte[]{1}));
+            when(pdf.documentoParaImpresion(id)).thenReturn(PrintSnapshotFixtures.invoice());
             UUID intento=UUID.randomUUID();var salida=tx.execute(t->service.solicitar(id,intento));
             assertThat(salida.printOnScreen()).isFalse();assertThat(salida.trabajoId()).isNotNull();
             var repetida=tx.execute(t->service.solicitar(id,intento));assertThat(repetida).isEqualTo(salida);
@@ -248,10 +249,10 @@ class PrintAgentPostgresIntegrationTest {
         var other=new BillingPrintRouter.Documento(tipo,UUID.randomUUID(),sucursal,cajas.getFirst(),document.ticket());assertThatThrownBy(()->tx.execute(t->router.solicitar(other,screenAttempt))).isInstanceOf(ReglaNegocioException.class);
     }
 
-    private void asignar(UUID agent,UUID caja){jdbc.update("insert into print_agent_cash_registers(tenant_id,empresa_id,sucursal_id,agent_id,cash_register_id) values(?,?,?,?,?)",tenant,empresa,sucursal,agent,caja);}
-    private UUID trabajo(UUID agent,UUID caja){UUID id=UUID.randomUUID();jdbc.update("insert into billing_print_jobs(id,tenant_id,empresa_id,branch_id,cash_register_id,agent_id,document_id,idempotency_key,document_pdf) values(?,?,?,?,?,?,?,?,?)",id,tenant,empresa,sucursal,caja,agent,UUID.randomUUID(),UUID.randomUUID(),new byte[]{1});return id;}
-    private PrintAgentPrincipal principal(UUID id){return new PrintAgentPrincipal(id,tenant,empresa,sucursal,"TEST","Prueba");}
-    private BillingPrintService servicio(UUID id,AuditoriaService audit){var repo=mock(AgenteImpresionRepository.class);var agent=mock(AgenteImpresion.class);when(agent.getId()).thenReturn(id);when(agent.getSucursalId()).thenReturn(sucursal);when(agent.getEstado()).thenReturn(EstadoAgenteImpresion.ACTIVE);when(agent.getCajas()).thenReturn(Set.of(mock(Caja.class)));when(repo.bloquear(id,tenant,empresa)).thenReturn(Optional.of(agent));return new BillingPrintService(jdbc,mock(FacturaVentaRepository.class),mock(PrintAgentRoutingService.class),mock(FacturaVentaPdfService.class),repo,audit);}
+    void asignar(UUID agent,UUID caja){jdbc.update("insert into print_agent_cash_registers(tenant_id,empresa_id,sucursal_id,agent_id,cash_register_id) values(?,?,?,?,?)",tenant,empresa,sucursal,agent,caja);}
+    UUID trabajo(UUID agent,UUID caja){UUID id=UUID.randomUUID();jdbc.update("insert into billing_print_jobs(id,tenant_id,empresa_id,branch_id,cash_register_id,agent_id,document_id,idempotency_key,document_pdf) values(?,?,?,?,?,?,?,?,?)",id,tenant,empresa,sucursal,caja,agent,UUID.randomUUID(),UUID.randomUUID(),new byte[]{1});return id;}
+    PrintAgentPrincipal principal(UUID id){return new PrintAgentPrincipal(id,tenant,empresa,sucursal,"TEST","Prueba");}
+    BillingPrintService servicio(UUID id,AuditoriaService audit){var repo=mock(AgenteImpresionRepository.class);var agent=mock(AgenteImpresion.class);when(agent.getId()).thenReturn(id);when(agent.getSucursalId()).thenReturn(sucursal);when(agent.getEstado()).thenReturn(EstadoAgenteImpresion.ACTIVE);when(agent.getCajas()).thenReturn(Set.of(mock(Caja.class)));when(repo.bloquear(id,tenant,empresa)).thenReturn(Optional.of(agent));return new BillingPrintService(jdbc,mock(FacturaVentaRepository.class),mock(PrintAgentRoutingService.class),mock(FacturaVentaPdfService.class),repo,audit);}
     private void competir(Operacion operacion) throws Exception {
         var inicio=new CountDownLatch(1);var exitos=new AtomicInteger();var rechazados=new AtomicInteger();
         try(var pool=Executors.newFixedThreadPool(2)){

@@ -46,7 +46,7 @@ public class CashClosingDocumentService {
         checkCount(c,d);return d;
     }
     @PreAuthorize("hasAuthority('cierres_caja.imprimir') and hasAnyAuthority('cierres_caja.ver','operaciones_caja.ver_historial')")
-    public BillingPrintDocumentRegistry.Document cargar(UUID id){var c=obtener(id);return new BillingPrintDocumentRegistry.Document(c.getSucursalId(),c.getCajaId(),()->generar(c),()->generar(c));}
+    public BillingPrintDocumentRegistry.Document cargar(UUID id){var c=obtener(id);return new BillingPrintDocumentRegistry.Document(c.getSucursalId(),c.getCajaId(),()->generar(c),()->generar(c),()->documento(c));}
     @Transactional(readOnly=true) @PreAuthorize("hasAuthority('cierres_caja.imprimir') and hasAnyAuthority('cierres_caja.ver','operaciones_caja.ver_historial')")
     public ArchivoPdfDto generar(UUID id){return generar(obtener(id));}
     ArchivoPdfDto generar(CierreCaja c){

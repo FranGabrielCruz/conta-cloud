@@ -17,6 +17,6 @@ public class CashCountPrintService {
     @PreAuthorize("hasAuthority('recuentos_caja.imprimir')")
     public SolicitudImpresionResultadoDto solicitar(UUID id,UUID intento){
         var r=documentos.obtener(id);
-        return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.CASH_COUNT,id,r.getSucursalId(),r.getCajaId(),()->documentos.generar(r)),intento);
+        return router.solicitar(new BillingPrintRouter.Documento(TipoDocumentoImpresion.CASH_COUNT,id,r.getSucursalId(),r.getCajaId(),()->documentos.generar(r),()->documentos.documento(r)),intento);
     }
 }

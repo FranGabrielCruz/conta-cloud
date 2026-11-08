@@ -22,7 +22,8 @@ public class BillingPrintRouter {
     public BillingPrintRouter(JdbcTemplate jdbc,PrintAgentRoutingService routing,AgenteImpresionRepository agentes,AuditoriaService auditoria){
         this.jdbc=jdbc;this.routing=routing;this.agentes=agentes;this.auditoria=auditoria;
     }
-    record Documento(TipoDocumentoImpresion tipo,UUID id,UUID sucursalId,UUID cajaId,Supplier<ArchivoPdfDto> ticket){
+    record Documento(TipoDocumentoImpresion tipo,UUID id,UUID sucursalId,UUID cajaId,Supplier<ArchivoPdfDto> ticket,Supplier<Object> snapshot){
+        Documento(TipoDocumentoImpresion tipo,UUID id,UUID sucursalId,UUID cajaId,Supplier<ArchivoPdfDto> ticket){this(tipo,id,sucursalId,cajaId,ticket,null);}
         Documento {Objects.requireNonNull(tipo);Objects.requireNonNull(id);Objects.requireNonNull(sucursalId);Objects.requireNonNull(cajaId);Objects.requireNonNull(ticket);}
     }
     // Internal entry point: only authorized document adapters in this package can construct Documento.
@@ -49,9 +50,17 @@ public class BillingPrintRouter {
         byte[] pdf=d.ticket().get().contenido();
         if(pdf==null||pdf.length==0||pdf.length>8_000_000)
             throw new ReglaNegocioException("El documento excede los límites permitidos para impresión.");
+        String snapshot=null;
+        if(d.snapshot()!=null){
+            Object document=d.snapshot().get();
+            if(document==null)throw new ReglaNegocioException("El documento no conserva un snapshot imprimible.");
+            snapshot=tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(document);
+            if(snapshot.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>2_000_000)throw new ReglaNegocioException("El snapshot excede los límites permitidos para impresión.");
+        }
         UUID id=UUID.randomUUID();
         int count=jdbc.update("insert into billing_print_jobs(id,tenant_id,empresa_id,branch_id,cash_register_id,agent_id,document_id,idempotency_key,document_pdf,print_on_screen,document_type) values(?,?,?,?,?,?,?,?,?,?,?) on conflict(tenant_id,empresa_id,idempotency_key) do nothing",
             id,p.tenantId(),p.empresaId(),d.sucursalId(),d.cajaId(),agentId,d.id(),intento,pdf,false,d.tipo().name());
+        if(count==1&&snapshot!=null)jdbc.update("update billing_print_jobs set snapshot_json=?,snapshot_version=1,trace_id=? where id=? and tenant_id=? and empresa_id=? and agent_id=?",snapshot,TraceContext.currentOrCreate(),id,p.tenantId(),p.empresaId(),agentId);
         if(count==1)auditoria.registrar("PrintJobCreated","PrintJob",id,
             "{\"documentType\":\"%s\",\"documentId\":\"%s\",\"tenantId\":\"%s\",\"companyId\":\"%s\",\"branchId\":\"%s\",\"cashRegisterId\":\"%s\",\"agentId\":\"%s\",\"traceId\":\"%s\"}"
                 .formatted(d.tipo(),d.id(),p.tenantId(),p.empresaId(),d.sucursalId(),d.cajaId(),agentId,TraceContext.currentOrCreate()));

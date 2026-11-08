@@ -31,7 +31,7 @@ class SalesReturnPrintServiceTest {
         when(agent.getEstado()).thenReturn(EstadoAgenteImpresion.ACTIVE);when(agent.getSucursalId()).thenReturn(branch);
         var first=mock(Caja.class);when(first.getId()).thenReturn(UUID.randomUUID());var second=mock(Caja.class);when(second.getId()).thenReturn(cash);
         when(agent.getCajas()).thenReturn(Set.of(first,second));when(agent.isPrintOnScreen()).thenReturn(false);
-        when(documents.generar(returnId)).thenReturn(new ArchivoPdfDto("Devolucion.pdf",pdf));
+        when(documents.documento(returned)).thenReturn(PrintSnapshotFixtures.salesReturn());when(documents.generar(returnId)).thenReturn(new ArchivoPdfDto("Devolucion.pdf",pdf));
     }
     @AfterEach void cleanup(){SecurityContextHolder.clearContext();}
     private void existing(List<UUID> first,List<UUID> second){
