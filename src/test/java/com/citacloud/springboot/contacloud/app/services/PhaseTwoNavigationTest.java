@@ -1,6 +1,8 @@
 package com.citacloud.springboot.contacloud.app.services;
 
 import com.citacloud.springboot.contacloud.app.views.PhaseTwoPlaceholderView;
+import com.citacloud.springboot.contacloud.app.views.NotasCreditoVentaView;
+import com.citacloud.springboot.contacloud.app.views.NotasDebitoVentaView;
 import com.citacloud.springboot.contacloud.app.views.CajasView;
 import com.citacloud.springboot.contacloud.app.views.CuentasBancariasView;
 import com.citacloud.springboot.contacloud.app.views.IngresosView;
@@ -98,7 +100,9 @@ class PhaseTwoNavigationTest {
             .map(RouteAlias::value);
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
-            Stream.of(ClientesView.class.getAnnotation(Route.class).value(),
+            Stream.of(NotasDebitoVentaView.class.getAnnotation(Route.class).value(),
+                NotasCreditoVentaView.class.getAnnotation(Route.class).value(),
+                ClientesView.class.getAnnotation(Route.class).value(),
                 CotizacionesView.class.getAnnotation(Route.class).value(),
                 FacturacionPosView.class.getAnnotation(Route.class).value(),
                 CajasView.class.getAnnotation(Route.class).value(),

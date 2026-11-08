@@ -64,7 +64,7 @@ public class MovimientoCajaService {
         BigDecimal entradas=BigDecimal.ZERO,salidas=BigDecimal.ZERO,otrasEntradas=BigDecimal.ZERO;
         for(var fila:movimientos.resumenEfectivoSesion(p.tenantId(),p.empresaId(),s.getId())){
             entradas=entradas.add(fila.getEntradas());salidas=salidas.add(fila.getSalidas());
-            if(!Set.of("SALES_INVOICE","SALES_PAYMENT","CUSTOMER_RECEIPT").contains(fila.getOrigen()))
+            if(!Set.of("SALES_INVOICE","SALES_PAYMENT","CUSTOMER_RECEIPT","DEBIT_NOTE_PAYMENT").contains(fila.getOrigen()))
                 otrasEntradas=otrasEntradas.add(fila.getEntradas());
         }
         var formas=movimientos.formasPagoSesion(p.tenantId(),p.empresaId(),s.getId()).stream()

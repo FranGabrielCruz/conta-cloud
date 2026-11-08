@@ -85,7 +85,7 @@ public class MovimientosCajaDialog extends Dialog {
     private static String fechaHora(java.time.OffsetDateTime valor){return valor==null?"—":FECHA.format(valor.atZoneSameInstant(ZoneId.systemDefault()));}
     static String tipo(TipoMovimientoFinanciero tipo){if(tipo==null)return "Todos";return tipo==TipoMovimientoFinanciero.INCOME?"Entrada":"Salida";}
     static String origen(TipoOrigenMovimiento origen){if(origen==null)return "Todos";return switch(origen){
-        case OPENING_BALANCE->"Apertura";case SALES_INVOICE->"Venta";case SALES_PAYMENT,CUSTOMER_RECEIPT->"Recibo/Cobro";
+        case OPENING_BALANCE->"Apertura";case SALES_INVOICE->"Venta";case DEBIT_NOTE_PAYMENT->"Cobro nota de débito";case SALES_PAYMENT,CUSTOMER_RECEIPT->"Recibo/Cobro";
         case SUPPLIER_PAYMENT->"Pago a proveedor";case TRANSFER->"Transferencia";case MANUAL->"Movimiento manual";
         case REVERSAL->"Reversión";case CASH_VOUCHER->"Vale de caja";case ADJUSTMENT->"Ajuste";case OTHER->"Otro";};}
 }

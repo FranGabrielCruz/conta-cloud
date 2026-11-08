@@ -121,6 +121,9 @@ public class MovimientoFinanciero {
             TipoOrigenMovimiento.CUSTOMER_RECEIPT,medioReciboId,medioPago,
             tipoCuenta==TipoCuentaDinero.CASH_REGISTER?sesionCajaId:null,usuarioId);
     }
+    public static MovimientoFinanciero cobroNotaDebito(UUID tenant,UUID empresa,LocalDate fecha,TipoCuentaDinero tipo,UUID cuenta,UUID moneda,BigDecimal monto,String numero,UUID pago,MedioPagoMovimiento medio,UUID sesion,String referencia,UUID usuario){
+        return new MovimientoFinanciero(tenant,empresa,TipoMovimientoFinanciero.INCOME,fecha,tipo,cuenta,moneda,monto,"Cobro nota de débito "+numero,tipo==TipoCuentaDinero.CASH_REGISTER?numero:referencia==null?numero:referencia,"Cobro inmediato de nota de débito",TipoOrigenMovimiento.DEBIT_NOTE_PAYMENT,pago,medio,sesion,usuario);
+    }
     public static MovimientoFinanciero manualCaja(UUID tenantId,UUID empresaId,TipoMovimientoFinanciero tipo,
             LocalDate fecha,UUID cajaId,UUID monedaId,BigDecimal monto,String numero,UUID conceptoId,
             String concepto,String referencia,String observacion,UUID sesionId,UUID usuarioId){

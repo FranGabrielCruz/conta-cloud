@@ -1323,3 +1323,41 @@ vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
   .cc-sales-return-dialog .cc-sales-return-invoice-data,
   .cc-sales-return-dialog .cc-sales-return-invoice-controls { grid-template-columns:minmax(0,1fr); }
 }
+
+.cc-debit-note-filters { display:grid; grid-template-columns:minmax(220px,2fr) repeat(3,minmax(140px,1fr)); gap:16px; align-items:end; }
+@media(max-width:800px){ .cc-debit-note-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:500px){ .cc-debit-note-filters { grid-template-columns:minmax(0,1fr); } }
+
+
+/* Compact debit-note preparation; financial detail and payment context stay separate. */
+.cc-debit-note-form { gap:12px; }
+.cc-debit-note-form h4,.cc-debit-section-heading h4 { margin:0; }
+.cc-debit-note-data { display:grid; grid-template-columns:minmax(170px,.8fr) minmax(240px,2fr) minmax(190px,1.2fr); gap:12px; width:100%; align-items:end; }
+.cc-debit-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; flex-wrap:wrap; }
+.cc-debit-note-description::part(input-field) { min-height:36px; }
+.cc-debit-note-totals { width:min(100%,340px); margin-left:auto; padding:4px 0; }
+.cc-debit-total-row { display:flex; justify-content:space-between; align-items:baseline; gap:24px; padding:3px 0; }
+.cc-debit-total-row > span:last-child { text-align:right; white-space:nowrap; }
+.cc-debit-total-main { border-top:1px solid var(--lumo-contrast-20pct); margin-top:4px; padding-top:8px; font-size:var(--lumo-font-size-l); font-weight:700; }
+.cc-debit-payment-panel { gap:8px; }
+.cc-debit-payment-rows { gap:8px; }
+.cc-debit-payment-context { display:flex; align-items:end; gap:8px; max-width:100%; }
+.cc-debit-cash-selector { width:280px; max-width:100%; }
+.cc-debit-cash-context { color:var(--lumo-secondary-text-color); font-size:var(--lumo-font-size-s); overflow-wrap:anywhere; }
+.cc-debit-cash-unavailable { color:var(--lumo-error-text-color); font-size:var(--lumo-font-size-s); }
+.cc-debit-payment-row { display:grid; grid-template-columns:minmax(180px,1.5fr) minmax(120px,1fr) minmax(140px,1.4fr) minmax(130px,1.2fr) 32px; gap:12px; align-items:end; width:100%; }
+.cc-debit-payment-row > * { min-width:0; }
+.cc-debit-payment-change { display:flex; flex-direction:column; justify-content:space-between; min-height:61px; gap:8px; padding-bottom:8px; box-sizing:border-box; }
+.cc-debit-payment-change > span:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+.cc-debit-payment-actions { display:flex; justify-content:flex-end; width:100%; }
+.cc-debit-payment-summary { font-size:var(--lumo-font-size-s); line-height:1.5; overflow-wrap:anywhere; }
+@media(max-width:800px) {
+ .cc-debit-note-data { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .cc-debit-note-data > :last-child { grid-column:1 / -1; }
+ .cc-debit-payment-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:500px) {
+ .cc-debit-note-data,.cc-debit-payment-row { grid-template-columns:minmax(0,1fr); }
+ .cc-debit-note-data > :last-child { grid-column:auto; }
+ .cc-debit-cash-selector { width:100%; }
+}

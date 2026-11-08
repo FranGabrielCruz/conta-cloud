@@ -149,5 +149,5 @@ public class ExpedienteCierreCajaDialog extends Dialog {
     private static String dinero(BigDecimal valor){return valor==null?"—":String.format(Locale.US,"%,.2f",valor);}
     private static String resultado(ResultadoRecuentoCaja r){return switch(r){case BALANCED->"Cuadre";case SHORTAGE->"Faltante";case OVERAGE->"Sobrante";};}
     private static String estado(EstadoReciboCliente e){return switch(e){case AVAILABLE->"Disponible";case PARTIALLY_APPLIED->"Parcial";case APPLIED->"Aplicado";case VOIDED->"Anulado";};}
-    private static String origen(TipoOrigenMovimiento o){return switch(o){case SALES_INVOICE->"Venta";case CUSTOMER_RECEIPT,SALES_PAYMENT->"Recibo";case CASH_VOUCHER->"Vale de caja";case OPENING_BALANCE->"Apertura";case REVERSAL->"Reversión";case MANUAL->"Manual";default->o.name().replace('_',' ');};}
+    private static String origen(TipoOrigenMovimiento o){return switch(o){case SALES_INVOICE->"Venta";case DEBIT_NOTE_PAYMENT->"Cobro nota de débito";case CUSTOMER_RECEIPT,SALES_PAYMENT->"Recibo";case CASH_VOUCHER->"Vale de caja";case OPENING_BALANCE->"Apertura";case REVERSAL->"Reversión";case MANUAL->"Manual";default->o.name().replace('_',' ');};}
 }

@@ -75,7 +75,7 @@ public class NotaCreditoVentaConsultaRepository {
         if(cliente==null)return new Aplicacion(null,BigDecimal.ZERO,null,BigDecimal.ZERO);
         var p=TenantContext.principalActual();
         jdbc.queryForObject("SELECT id FROM customer WHERE tenant_id=? AND empresa_id=? AND id=? FOR UPDATE",UUID.class,p.tenantId(),p.empresaId(),cliente);
-        var row=jdbc.query("SELECT id,original_amount-applied_amount,status FROM customer_accounts_receivable WHERE tenant_id=? AND empresa_id=? AND sales_invoice_id=? AND customer_id=? AND currency_id=? FOR UPDATE",r->r.next()?new Object[]{uuid(r,1),r.getBigDecimal(2),r.getString(3)}:null,p.tenantId(),p.empresaId(),factura,cliente,moneda);
+        var row=jdbc.query("SELECT id,original_amount-applied_amount,status FROM customer_accounts_receivable WHERE tenant_id=? AND empresa_id=? AND sales_invoice_id=? AND sales_debit_note_id IS NULL AND customer_id=? AND currency_id=? FOR UPDATE",r->r.next()?new Object[]{uuid(r,1),r.getBigDecimal(2),r.getString(3)}:null,p.tenantId(),p.empresaId(),factura,cliente,moneda);
         BigDecimal anterior=row==null||"VOIDED".equals(row[2])?BigDecimal.ZERO:(BigDecimal)row[1];
         BigDecimal applied=anterior.min(amount);
         if(applied.signum()>0)jdbc.update("UPDATE customer_accounts_receivable SET applied_amount=applied_amount+?,status=CASE WHEN applied_amount+?=original_amount THEN 'PAID' ELSE 'PARTIALLY_PAID' END,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND empresa_id=? AND id=?",applied,applied,p.tenantId(),p.empresaId(),row[0]);
@@ -98,7 +98,7 @@ public class NotaCreditoVentaConsultaRepository {
     public NotaCreditoVentaCicloDto ciclo(UUID id,boolean lock){
         var p=TenantContext.principalActual();return jdbc.query("""
             SELECT n.sales_invoice_id,n.sales_return_id,r.status,n.version,n.status,n.annulment_reason,n.annulled_by_name,n.annulled_at,n.annulled_zone,f.branch_id,
-              (n.status='CONFIRMED' AND f.status='CONFIRMED' AND (n.applied_receivable_amount=0 OR EXISTS(SELECT 1 FROM customer_accounts_receivable a WHERE a.tenant_id=n.tenant_id AND a.empresa_id=n.empresa_id AND a.sales_invoice_id=n.sales_invoice_id AND a.status<>'VOIDED' AND a.applied_amount>=n.applied_receivable_amount)) AND (n.customer_credit_amount=0 OR EXISTS(SELECT 1 FROM customer_credit_ledger c WHERE c.tenant_id=n.tenant_id AND c.empresa_id=n.empresa_id AND c.sales_credit_note_id=n.id AND c.available_amount=c.amount AND c.amount=n.customer_credit_amount))) eligible
+              (n.status='CONFIRMED' AND f.status='CONFIRMED' AND (n.applied_receivable_amount=0 OR EXISTS(SELECT 1 FROM customer_accounts_receivable a WHERE a.tenant_id=n.tenant_id AND a.empresa_id=n.empresa_id AND a.sales_invoice_id=n.sales_invoice_id AND a.sales_debit_note_id IS NULL AND a.status<>'VOIDED' AND a.applied_amount>=n.applied_receivable_amount)) AND (n.customer_credit_amount=0 OR EXISTS(SELECT 1 FROM customer_credit_ledger c WHERE c.tenant_id=n.tenant_id AND c.empresa_id=n.empresa_id AND c.sales_credit_note_id=n.id AND c.available_amount=c.amount AND c.amount=n.customer_credit_amount))) eligible
             FROM sales_credit_note n JOIN sales_invoice f ON f.id=n.sales_invoice_id AND f.tenant_id=n.tenant_id AND f.empresa_id=n.empresa_id
             LEFT JOIN sales_return r ON r.id=n.sales_return_id AND r.tenant_id=n.tenant_id AND r.empresa_id=n.empresa_id
             WHERE n.id=? AND n.tenant_id=? AND n.empresa_id=?
@@ -111,7 +111,7 @@ public class NotaCreditoVentaConsultaRepository {
         var p=TenantContext.principalActual();
         if(d.clienteId()!=null)jdbc.queryForObject("SELECT id FROM customer WHERE tenant_id=? AND empresa_id=? AND id=? FOR UPDATE",UUID.class,p.tenantId(),p.empresaId(),d.clienteId());
         if(d.aplicadoCxC().signum()>0){
-            var ar=jdbc.query("SELECT id,applied_amount,status FROM customer_accounts_receivable WHERE tenant_id=? AND empresa_id=? AND sales_invoice_id=? FOR UPDATE",r->r.next()?new Object[]{uuid(r,1),r.getBigDecimal(2),r.getString(3)}:null,p.tenantId(),p.empresaId(),factura);
+            var ar=jdbc.query("SELECT id,applied_amount,status FROM customer_accounts_receivable WHERE tenant_id=? AND empresa_id=? AND sales_invoice_id=? AND sales_debit_note_id IS NULL FOR UPDATE",r->r.next()?new Object[]{uuid(r,1),r.getBigDecimal(2),r.getString(3)}:null,p.tenantId(),p.empresaId(),factura);
             if(ar==null||"VOIDED".equals(ar[2])||((BigDecimal)ar[1]).compareTo(d.aplicadoCxC())<0)throw new ReglaNegocioException("La cuenta por cobrar cambió y requiere revisión antes de anular la nota.");
             jdbc.update("UPDATE customer_accounts_receivable SET applied_amount=applied_amount-?,status=CASE WHEN applied_amount-?=0 THEN 'PENDING' WHEN applied_amount-?=original_amount THEN 'PAID' ELSE 'PARTIALLY_PAID' END,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND empresa_id=? AND id=?",d.aplicadoCxC(),d.aplicadoCxC(),d.aplicadoCxC(),p.tenantId(),p.empresaId(),ar[0]);
         }

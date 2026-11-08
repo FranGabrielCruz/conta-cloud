@@ -49,6 +49,9 @@ final class LargeDocumentPdfTemplate {
         String footer=section(base,"pageFooter");footer=footer.replace("<band height=\"18\">","<band height=\"18\">"+field("$P{emissionFooter}",0,2,580,14,"Base","Left",false));base=replaceSection(base,"pageFooter",footer);
         return base;
     }
+    static String debitNote(boolean logo,int corporateHeight,int boxHeight,int noteHeight,boolean voided)throws IOException{
+        return creditNote(logo,corporateHeight,boxHeight,noteHeight,voided).replace("NOTA DE CRÉDITO","NOTA DE DÉBITO").replace("sales_credit_note","sales_debit_note");
+    }
     private static String when(String kind){return "<printWhenExpression><![CDATA[\""+kind+"\".equals($F{rowKind})]]></printWhenExpression>";}
     private static String staticText(String text,int x,int y,int w,int h,String style,String align){return "<staticText><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\" verticalAlignment=\"Middle\"/><text><![CDATA["+text+"]]></text></staticText>";}
     private static String field(String expression,int x,int y,int w,int h,String style,String align,boolean stretch){return "<textField pattern=\"#,##0.00\""+(stretch?" textAdjust=\"StretchHeight\"":"")+"><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\"/><textFieldExpression><![CDATA["+expression+"]]></textFieldExpression></textField>";}

@@ -32,8 +32,8 @@ public class CobroClienteRepository {
               FROM sales_invoice f JOIN customer c ON c.id=f.customer_id AND c.tenant_id=f.tenant_id AND c.empresa_id=f.empresa_id
              WHERE f.tenant_id=? AND f.empresa_id=? AND f.customer_id=? AND f.status='CONFIRMED'
                AND lower(f.payment_condition)<>'contado'
-               AND NOT EXISTS(SELECT 1 FROM customer_accounts_receivable a WHERE a.tenant_id=f.tenant_id AND a.empresa_id=f.empresa_id AND a.sales_invoice_id=f.id)
-            ON CONFLICT(tenant_id,empresa_id,sales_invoice_id) DO NOTHING
+               AND NOT EXISTS(SELECT 1 FROM customer_accounts_receivable a WHERE a.tenant_id=f.tenant_id AND a.empresa_id=f.empresa_id AND a.sales_invoice_id=f.id AND a.sales_debit_note_id IS NULL)
+            ON CONFLICT(tenant_id,empresa_id,sales_invoice_id) WHERE sales_debit_note_id IS NULL DO NOTHING
             """,tenant,empresa,cliente);
     }
 
@@ -60,10 +60,10 @@ public class CobroClienteRepository {
         String where=" WHERE a.tenant_id=? AND a.empresa_id=? AND a.customer_id=? AND a.currency_id=? AND a.status IN('PENDING','PARTIALLY_PAID') AND a.original_amount>a.applied_amount ";
         Long total=jdbc.queryForObject("SELECT count(*) FROM customer_accounts_receivable a"+where,Long.class,tenant,empresa,cliente,moneda);
         List<FacturaPendienteCobroDto> rows=jdbc.query("""
-            SELECT a.id,a.sales_invoice_id,f.internal_number,f.invoice_date,a.due_date,a.currency_id,f.currency_code,
+            SELECT a.id,a.sales_invoice_id,coalesce(n.debit_note_number,f.internal_number) internal_number,coalesce(n.issue_date,f.invoice_date) invoice_date,a.due_date,a.currency_id,f.currency_code,
                    a.original_amount-a.applied_amount AS balance
-              FROM customer_accounts_receivable a JOIN sales_invoice f ON f.id=a.sales_invoice_id
-            """+where+" ORDER BY a.due_date,a.sales_invoice_id LIMIT ? OFFSET ?",this::factura,
+              FROM customer_accounts_receivable a JOIN sales_invoice f ON f.id=a.sales_invoice_id LEFT JOIN sales_debit_note n ON n.id=a.sales_debit_note_id AND n.tenant_id=a.tenant_id AND n.empresa_id=a.empresa_id
+            """+where+" ORDER BY a.due_date,a.sales_invoice_id,a.id LIMIT ? OFFSET ?",this::factura,
             tenant,empresa,cliente,moneda,size,page*size);
         return new PageImpl<>(rows,PageRequest.of(page,size),total==null?0:total);
     }
@@ -145,8 +145,8 @@ public class CobroClienteRepository {
     public CuentaBloqueada bloquearCuenta(UUID id,UUID tenant,UUID empresa){
         return jdbc.query("""
             SELECT a.id,a.sales_invoice_id,a.customer_id,a.currency_id,a.original_amount-a.applied_amount balance,
-                   f.internal_number,f.invoice_date FROM customer_accounts_receivable a JOIN sales_invoice f ON f.id=a.sales_invoice_id
-             WHERE a.id=? AND a.tenant_id=? AND a.empresa_id=? FOR UPDATE
+                   coalesce(n.debit_note_number,f.internal_number) internal_number,coalesce(n.issue_date,f.invoice_date) invoice_date FROM customer_accounts_receivable a JOIN sales_invoice f ON f.id=a.sales_invoice_id LEFT JOIN sales_debit_note n ON n.id=a.sales_debit_note_id AND n.tenant_id=a.tenant_id AND n.empresa_id=a.empresa_id
+             WHERE a.id=? AND a.tenant_id=? AND a.empresa_id=? FOR UPDATE OF a
             """,rs->{if(!rs.next())return null;return new CuentaBloqueada(uuid(rs,"id"),uuid(rs,"sales_invoice_id"),uuid(rs,"customer_id"),uuid(rs,"currency_id"),rs.getBigDecimal("balance"),rs.getString("internal_number"),rs.getDate("invoice_date").toLocalDate());},id,tenant,empresa);
     }
 

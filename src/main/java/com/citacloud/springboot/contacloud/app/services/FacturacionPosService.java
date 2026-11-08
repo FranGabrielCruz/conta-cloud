@@ -346,45 +346,8 @@ public class FacturacionPosService {
     }
 
     private List<AplicacionValidada> validarAplicaciones(List<AplicacionCobroInput> entradas,BigDecimal total,ContextoPos ctx,Set<String> permisos){
-        if(entradas==null||entradas.isEmpty())throw new ReglaNegocioException("Agrega al menos un método de pago.");
-        if(entradas.size()>20)throw new ReglaNegocioException("El cobro excede el máximo de 20 aplicaciones.");
-        List<AplicacionValidada> resultado=new ArrayList<>();int efectivo=0;
-        for(AplicacionCobroInput entrada:entradas){
-            if(entrada==null||entrada.metodoPagoId()==null)throw new ReglaNegocioException("Selecciona un método de pago válido.");
-            MetodoPagoVenta metodo=metodosPago.bloquearActivo(entrada.metodoPagoId(),ctx.principal.tenantId(),ctx.empresa)
-                .orElseThrow(()->new ReglaNegocioException("El método de pago ya no está disponible."));
-            if(metodo.getType()==TipoMetodoPagoVenta.BANK_TRANSFER&&!permisos.contains("facturas.cobrar_transferencia"))
-                throw new ReglaNegocioException("No tienes permiso para cobrar mediante transferencia.");
-            if(metodo.getType()==TipoMetodoPagoVenta.CHECK&&!permisos.contains("facturas.cobrar_cheque"))
-                throw new ReglaNegocioException("No tienes permiso para cobrar mediante cheque.");
-            BigDecimal monto=escala(entrada.monto());
-            if(monto.signum()<=0)throw new ReglaNegocioException("Todos los montos aplicados deben ser mayores que cero.");
-            String referencia=texto(entrada.referencia(),100);String banco=texto(entrada.banco(),120);
-            if(metodo.isRequiresReference()&&referencia==null)throw new ReglaNegocioException("Indica la referencia de "+metodo.getName()+".");
-            CuentaBancaria cuenta=null;
-            if(entrada.cuentaBancariaId()!=null)cuenta=cuentasBancarias.findByIdAndTenantIdAndEmpresaId(entrada.cuentaBancariaId(),ctx.principal.tenantId(),ctx.empresa)
-                .filter(CuentaBancaria::isActivo).orElseThrow(()->new ReglaNegocioException("La cuenta bancaria ya no está disponible."));
-            if(cuenta==null&&metodo.getFinancialBankAccountId()!=null)cuenta=cuentasBancarias.findByIdAndTenantIdAndEmpresaId(
-                metodo.getFinancialBankAccountId(),ctx.principal.tenantId(),ctx.empresa).filter(CuentaBancaria::isActivo)
-                .orElseThrow(()->new ReglaNegocioException("La cuenta financiera configurada para "+metodo.getName()+" ya no está disponible."));
-            if(metodo.isRequiresBankAccount()&&cuenta==null)throw new ReglaNegocioException("Selecciona la cuenta destino.");
-            if(cuenta!=null&&!ctx.caja.getMonedaId().equals(cuenta.getMonedaId()))throw new ReglaNegocioException("La cuenta destino utiliza una moneda distinta a la venta.");
-            BigDecimal recibido=null,cambio=BigDecimal.ZERO.setScale(SCALE);
-            if(metodo.isCash()){
-                if(++efectivo>1)throw new ReglaNegocioException("El efectivo debe registrarse en una sola aplicación.");
-                recibido=escala(entrada.recibido()==null?monto:entrada.recibido());
-                if(recibido.compareTo(monto)<0)throw new ReglaNegocioException("El efectivo recibido no puede ser menor que el monto aplicado.");
-                cambio=CobroVentaCalculo.cambio(monto,recibido);
-            }else if(entrada.recibido()!=null&&escala(entrada.recibido()).compareTo(monto)!=0){
-                throw new ReglaNegocioException("Solo el efectivo puede generar cambio.");
-            }
-            resultado.add(new AplicacionValidada(metodo,monto,recibido,cambio,cuenta,referencia,banco));
-        }
-        BigDecimal aplicado=CobroVentaCalculo.totalAplicado(resultado.stream().map(AplicacionValidada::monto).toList());
-        int comparacion=aplicado.compareTo(total.setScale(SCALE,RoundingMode.HALF_UP));
-        if(comparacion<0)throw new ReglaNegocioException("El cobro está incompleto. Queda un saldo pendiente de "+total.subtract(aplicado).setScale(2,RoundingMode.HALF_UP)+".");
-        if(comparacion>0)throw new ReglaNegocioException("El total aplicado no puede superar el total de la venta.");
-        return resultado;
+        return CobroContadoValidacion.validar(entradas,total,ctx.principal.tenantId(),ctx.empresa,ctx.caja.getMonedaId(),permisos,metodosPago,cuentasBancarias).stream()
+            .map(x->new AplicacionValidada(x.metodo(),x.monto(),x.recibido(),x.cambio(),x.cuenta(),x.referencia(),x.banco())).toList();
     }
 
     private void registrarConversionCotizacion(Cotizacion cotizacion,FacturaVenta factura,List<CalculoLinea> calculos,UUID usuario){

@@ -35,6 +35,11 @@ public interface FinancialMovementRepository extends JpaRepository<MovimientoFin
           and exists(select 1 from customer_receipt_payment cp where cp.tenant_id=r.tenant_id and cp.empresa_id=r.empresa_id
             and cp.customer_receipt_id=r.id and cp.cash_register_session_id=:sesion)
         union all
+        select p.payment_method_id::text,p.method_name,p.amount
+        from sales_debit_note_payment p join sales_debit_note n on n.id=p.sales_debit_note_id and n.tenant_id=p.tenant_id and n.empresa_id=p.empresa_id
+        where n.tenant_id=:tenant and n.empresa_id=:empresa and n.status='CONFIRMED'
+          and exists(select 1 from sales_debit_note_payment cp where cp.tenant_id=n.tenant_id and cp.empresa_id=n.empresa_id and cp.sales_debit_note_id=n.id and cp.cash_register_session_id=:sesion)
+        union all
         select 'LEGACY_' || m.payment_method,m.payment_method,m.monto
         from movimientos_financieros m where m.tenant_id=:tenant and m.empresa_id=:empresa
           and m.cash_register_session_id=:sesion and m.estado='REGISTERED' and m.tipo_movimiento='INCOME'

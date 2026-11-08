@@ -174,6 +174,16 @@ public class CashRegisterSessionService {
         auditoria.registrar(evento,"SesionCaja",s.getId(),detalle(s));return mapper.toDto(s);
     }
 
+    /** Read-only context discovery. The chosen session is locked again when money is posted. */
+    @Transactional(readOnly=true)
+    public Map<UUID,UUID> sesionesDisponiblesCobro(Collection<UUID> cajasIds){
+        if(cajasIds==null||cajasIds.isEmpty())return Map.of();
+        var p=TenantContext.principalActual();
+        return sessions.findAllByTenantIdAndEmpresaIdAndCajaIdInAndStatus(p.tenantId(),p.empresaId(),cajasIds,EstadoSesionCaja.OPEN).stream()
+            .filter(s->EmpresaContext.permiteSucursal(s.getSucursalId()))
+            .collect(Collectors.toUnmodifiableMap(SesionCaja::getCajaId,SesionCaja::getId));
+    }
+
     @Transactional
     public UUID requerirSesionAbierta(UUID cajaId){
         var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();SesionCaja lectura=sessions.findByTenantIdAndEmpresaIdAndCajaIdAndStatus(
