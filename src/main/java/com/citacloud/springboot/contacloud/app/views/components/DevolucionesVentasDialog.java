@@ -34,6 +34,7 @@ public class DevolucionesVentasDialog extends Dialog {
     private java.util.function.BiFunction<UUID,UUID,Boolean> imprimir;
     private String terminalToken;
     private UUID claveOperacion=UUID.randomUUID(); private Button confirmar;
+    private final Span resumen=new Span();
 
     public DevolucionesVentasDialog(DevolucionVentaService service,Consumer<UUID> abrirPdf,Runnable alCerrar){
         this.service=service;this.abrirPdf=abrirPdf;this.alCerrar=alCerrar;setHeaderTitle("DEVOLUCIONES DE VENTAS");
@@ -84,30 +85,44 @@ public class DevolucionesVentasDialog extends Dialog {
 
     private void mostrarDetalle(){
         cuerpo.removeAll();cantidades.clear();
-        Div cabecera=new Div();cabecera.addClassName("cc-sales-return-invoice");cabecera.add(new Span("Factura "+detalle.facturaNumero()),new Span(DATE_TIME.format(detalle.fechaFactura())),new Span(detalle.cliente()),new Span(detalle.estado()),new Span(detalle.moneda()+" "+money(detalle.totalFactura())));
-        Grid<DevolucionVentaDetalleDto.Linea> grid=new Grid<>();grid.addClassName("cc-sales-return-detail-grid");grid.setAllRowsVisible(true);
+        Div cabecera=new Div();cabecera.addClassName("cc-sales-return-invoice");
+        Div datos=new Div();datos.addClassName("cc-sales-return-invoice-data");
+        datos.add(datoFactura("Factura",detalle.facturaNumero()),datoFactura("Fecha",DATE_TIME.format(detalle.fechaFactura())),
+                datoFactura("Cliente",detalle.cliente()),datoFactura("Estado",detalle.estado()),
+                datoFactura("Total",detalle.moneda()+" "+money(detalle.totalFactura())));
+        cabecera.add(datos);
+        Grid<DevolucionVentaDetalleDto.Linea> grid=new Grid<>();grid.addClassName("cc-sales-return-detail-grid");grid.setWidthFull();grid.setAllRowsVisible(true);
         grid.addColumn(l->l.codigo()+" · "+l.producto()).setHeader("Producto").setFlexGrow(1);grid.addColumn(DevolucionVentaDetalleDto.Linea::unidad).setHeader("Unidad").setAutoWidth(true);
         grid.addColumn(l->qty(l.facturado())).setHeader("Facturado").setAutoWidth(true);grid.addColumn(l->qty(l.devuelto())).setHeader("Devuelto").setAutoWidth(true);grid.addColumn(l->qty(l.disponible())).setHeader("Disponible").setAutoWidth(true);
-        grid.addColumn(new ComponentRenderer<>(l->cantidades.computeIfAbsent(l.lineaFacturaId(),id->{BigDecimalField c=new BigDecimalField();c.setWidth("120px");c.setValue(BigDecimal.ZERO);c.setLabel("Devolver");c.setHelperText("Máx. "+qty(l.disponible()));c.addValueChangeListener(e->actualizarResumen());c.addBlurListener(e->{BigDecimal actual=c.getValue();if(actual!=null){BigDecimal normalizado=PosNumberFormatter.quantityInput(actual);if(!actual.equals(normalizado))c.setValue(normalizado);}});return c;}))).setHeader("Devolver").setWidth("150px").setFlexGrow(0);
-        PosDialogPagination paginacionDetalle=new PosDialogPagination(request->{int inicio=Math.min(request.page()*request.size(),detalle.lineas().size());int fin=Math.min(inicio+request.size(),detalle.lineas().size());grid.setItems(detalle.lineas().subList(inicio,fin));});
+        grid.addColumn(new ComponentRenderer<>(l->cantidades.computeIfAbsent(l.lineaFacturaId(),id->{BigDecimalField c=new BigDecimalField();c.setWidthFull();c.getStyle().set("min-width","0");c.setValue(BigDecimal.ZERO);c.setAriaLabel("Cantidad a devolver de "+l.producto());c.setEnabled(l.disponible().signum()>0);c.setHelperText("Máx. "+qty(l.disponible()));c.addValueChangeListener(e->actualizarResumen());c.addBlurListener(e->{BigDecimal actual=c.getValue();if(actual!=null){BigDecimal normalizado=PosNumberFormatter.quantityInput(actual);if(!actual.equals(normalizado))c.setValue(normalizado);}});return c;}))).setHeader("Devolver").setWidth("150px").setFlexGrow(0);
+        PosDialogPagination paginacionDetalle=PosDialogPagination.fixed(request->{int inicio=Math.min(request.page()*request.size(),detalle.lineas().size());int fin=Math.min(inicio+request.size(),detalle.lineas().size());grid.setItems(detalle.lineas().subList(inicio,fin));});
         paginacionDetalle.setTotal(detalle.lineas().size());int finInicial=Math.min(PosDialogPagination.DEFAULT_PAGE_SIZE,detalle.lineas().size());grid.setItems(detalle.lineas().subList(0,finInicial));
         ComboBox<DevolucionVentaDetalleDto.Motivo> motivo=new ComboBox<>("Motivo");motivo.setItems(detalle.motivos());motivo.setItemLabelGenerator(DevolucionVentaDetalleDto.Motivo::nombre);motivo.setRequiredIndicatorVisible(true);
         TextArea observacion=new TextArea("Observación");observacion.setMaxLength(1000);observacion.setWidthFull();
         Checkbox inventario=new Checkbox("Los productos físicos retornan al inventario");ComboBox<DevolucionVentaDetalleDto.Almacen> almacen=new ComboBox<>("Almacén destino");almacen.setItems(detalle.almacenes());almacen.setItemLabelGenerator(DevolucionVentaDetalleDto.Almacen::nombre);almacen.setVisible(false);
         inventario.addValueChangeListener(e->{almacen.setVisible(e.getValue());if(!e.getValue())almacen.clear();});
-        Span resumen=new Span();resumen.setId("cc-sales-return-summary");resumen.addClassName("cc-sales-return-summary");
+        resumen.setId("cc-sales-return-summary");resumen.addClassName("cc-sales-return-summary");
         confirmar=new AppActionButton(ActionType.ACCEPT,ButtonSize.MAIN,"Confirmar devolución",e->confirmar(motivo.getValue(),observacion.getValue(),inventario.getValue(),almacen.getValue()));
         confirmar.setVisible(TenantContext.principalActual().permisos().contains("devoluciones_venta.confirmar"));
         Button volver=new AppActionButton(ActionType.BACK,ButtonSize.MAIN,"Volver a facturas",e->mostrarBusqueda());Button cancelar=new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cerrar",e->cerrar());
-        HorizontalLayout formulario=new HorizontalLayout(motivo,almacen);formulario.setWidthFull();formulario.setAlignItems(FlexComponent.Alignment.END);formulario.setFlexGrow(1,motivo,almacen);
+        Div retorno=new Div(inventario,almacen);retorno.addClassName("cc-sales-return-inventory");
+        motivo.setWidthFull();almacen.setWidthFull();
+        Div formulario=new Div(motivo,retorno);formulario.addClassName("cc-sales-return-invoice-controls");cabecera.add(formulario);
+        paginacionDetalle.addClassName("cc-sales-return-pagination");
         UUID facturaId=detalle.facturaId();Button historial=new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Ver devoluciones confirmadas",e->mostrarHistorial(facturaId));historial.setVisible(puedeImprimir());
         HorizontalLayout acciones=new HorizontalLayout(confirmar,historial,volver,cancelar);acciones.getStyle().set("flex-wrap","wrap");acciones.setWidthFull();acciones.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        cuerpo.add(cabecera,grid,paginacionDetalle,formulario,inventario,observacion,resumen,acciones);actualizarResumen();
+        cuerpo.add(cabecera,grid,paginacionDetalle,observacion,resumen,acciones);actualizarResumen();
+    }
+
+    private static Div datoFactura(String etiqueta,String valor){
+        Span label=new Span(etiqueta);label.addClassName("cc-detail-label");
+        Span contenido=new Span(valor);contenido.addClassName("cc-detail-value");
+        Div dato=new Div(label,contenido);dato.addClassName("cc-sales-return-invoice-field");return dato;
     }
 
     private void actualizarResumen(){
         if(detalle==null)return;BigDecimal total=BigDecimal.ZERO;for(var l:detalle.lineas()){BigDecimal c=Optional.ofNullable(cantidades.get(l.lineaFacturaId())).map(BigDecimalField::getValue).orElse(BigDecimal.ZERO);if(c!=null&&c.signum()>0&&l.facturado().signum()>0)total=total.add(l.total().multiply(c.divide(l.facturado(),12,RoundingMode.HALF_UP)));}
-        getElement().executeJs("const e=this.querySelector('#cc-sales-return-summary'); if(e)e.textContent=$0", "Total estimado: "+detalle.moneda()+" "+money(total));
+        resumen.setText("Total estimado: "+detalle.moneda()+" "+money(total));
     }
 
     private void confirmar(DevolucionVentaDetalleDto.Motivo motivo,String observacion,boolean retorna,DevolucionVentaDetalleDto.Almacen almacen){

@@ -1201,8 +1201,10 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 }
 
 .cc-sales-return-dialog .cc-sales-return-invoice {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   gap: var(--lumo-space-s);
   padding: var(--lumo-space-m);
   border: 1px solid var(--lumo-contrast-20pct);
@@ -1235,8 +1237,8 @@ vaadin-dialog-overlay.cc-sales-discount-dialog::part(footer) {
 }
 
 @media (max-width: 800px) {
-  .cc-sales-return-dialog .cc-sales-return-filters,
-  .cc-sales-return-dialog .cc-sales-return-invoice { grid-template-columns: 1fr; }
+  .cc-sales-return-dialog .cc-sales-return-filters { grid-template-columns: 1fr; }
+  .cc-sales-return-dialog .cc-sales-return-invoice-data { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .cc-cash-count-dialog::part(content) { overflow: auto; }
@@ -1309,3 +1311,15 @@ vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
 .cc-detail-four .cc-detail-value { overflow-wrap:anywhere; min-width:0; white-space:normal; }
 @media(max-width:900px){ .cc-detail-four .cc-detail-grid {grid-template-columns:repeat(2,minmax(0,1fr));} }
 @media(max-width:600px){ .cc-detail-four .cc-detail-grid {grid-template-columns:minmax(0,1fr);} }
+
+.cc-sales-return-invoice-data { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+.cc-sales-return-invoice-field { display:flex; flex-direction:column; min-width:0; overflow-wrap:anywhere; }
+.cc-sales-return-invoice-controls { display:grid; grid-template-columns:minmax(0,65fr) minmax(0,35fr); gap:16px; align-items:end; }
+.cc-sales-return-inventory { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.cc-sales-return-dialog .cc-sales-return-pagination { justify-content:flex-end; }
+.cc-sales-return-detail-grid::part(body-cell) { white-space:normal; text-overflow:clip; }
+.cc-sales-return-detail-grid::part(header-cell) { text-overflow:clip; }
+@media (max-width:600px) {
+  .cc-sales-return-dialog .cc-sales-return-invoice-data,
+  .cc-sales-return-dialog .cc-sales-return-invoice-controls { grid-template-columns:minmax(0,1fr); }
+}
