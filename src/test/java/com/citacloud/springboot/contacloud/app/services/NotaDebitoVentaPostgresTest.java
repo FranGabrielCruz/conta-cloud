@@ -204,16 +204,68 @@ class NotaDebitoVentaPostgresTest {
       var historical=query.documento(d.id());assertThat(historical.condicionNota()).isEqualTo(com.citacloud.springboot.contacloud.app.models.TipoCondicionPago.CREDIT);assertThat(historical.pagos()).isEmpty();tx.execute(x->service.anular(voidInput(d.id())));assertThat(balance()).isEqualByComparingTo("100");
     }
 
-    @Test void unReciboPuedeCobrarFacturaYNotaEnLaMismaTransaccion(){
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void unReciboPuedeCobrarFacturaYNotaEnLaMismaTransaccion(boolean cerrarTurno){
       prepararCajaPrueba();receivable(0);
       tx.execute(status->{
         var d=service.emitir(input("50"));UUID original=jdbc.queryForObject("select id from customer_accounts_receivable where sales_invoice_id=? and sales_debit_note_id is null",UUID.class,invoice);
         UUID noteAccount=jdbc.queryForObject("select id from customer_accounts_receivable where sales_debit_note_id=?",UUID.class,d.id());
-        var request=new CobroClienteInput(customer,currency,branch,LocalDate.now(),new BigDecimal("50"),"REF-TEST","Cobro aislado de factura y nota",testCash,testSession,UUID.randomUUID(),List.of(new CobroClienteInput.AplicacionFactura(original,invoice,new BigDecimal("20")),new CobroClienteInput.AplicacionFactura(noteAccount,invoice,new BigDecimal("30"))),List.of(new AplicacionCobroInput(method("CASH"),new BigDecimal("50"),null,null,null,null)));
+        UUID banco=jdbc.queryForObject("select id from cuentas_bancarias where tenant_id=? and empresa_id=? and moneda_id=? and activo order by id limit 1",UUID.class,tenant,company,currency);
+        var request=new CobroClienteInput(customer,currency,branch,LocalDate.now(),new BigDecimal("50"),"REF-TEST","Cobro aislado de factura y nota",testCash,testSession,UUID.randomUUID(),List.of(new CobroClienteInput.AplicacionFactura(original,invoice,new BigDecimal("20")),new CobroClienteInput.AplicacionFactura(noteAccount,invoice,new BigDecimal("30"))),List.of(new AplicacionCobroInput(method("CASH"),new BigDecimal("30"),null,null,null,null),
+            new AplicacionCobroInput(method("CREDIT_CARD"),new BigDecimal("20"),null,banco,"REF-TEST",null)));
         var receipt=receiptService.confirmar(request);assertThat(receipt.aplicado()).isEqualByComparingTo("50");assertThat(query.ciclo(d.id(),false).saldo()).isEqualByComparingTo("20");
         assertThat(jdbc.queryForObject("select count(*) from customer_receipt_application where customer_receipt_id=?",Integer.class,receipt.id())).isEqualTo(2);
         assertThat(jdbc.queryForList("select invoice_number_snapshot from customer_receipt_application where customer_receipt_id=?",String.class,receipt.id())).contains(d.numero());
-        receiptService.anular(receipt.id(),"Reversión de prueba");assertThat(query.ciclo(d.id(),false).saldo()).isEqualByComparingTo("50");service.anular(voidInput(d.id()));assertThat(balance()).isEqualByComparingTo("100");
+        var recibos=new CobroClienteRepository(jdbc);
+        var historial=recibos.historial(tenant,company,true,Set.of(),d.numero(),"",null,null,false,0,10);
+        assertThat(historial.getContent()).singleElement().satisfies(r->{
+          assertThat(r.id()).isEqualTo(receipt.id());assertThat(r.documentos()).containsExactlyInAnyOrder(d.numero(),recibos.detalle(receipt.id(),tenant,company).aplicaciones().stream().filter(a->a.notaDebitoId()==null).findFirst().orElseThrow().factura());
+        });
+        var detalle=recibos.detalle(receipt.id(),tenant,company);
+        assertThat(detalle.aplicaciones()).anySatisfy(a->{assertThat(a.notaDebitoId()).isEqualTo(d.id());assertThat(a.totalDocumento()).isEqualByComparingTo("50");assertThat(a.monto()).isEqualByComparingTo("30");});
+        assertThat(detalle.aplicaciones()).anySatisfy(a->{assertThat(a.notaDebitoId()).isNull();assertThat(a.totalDocumento()).isEqualByComparingTo("100");assertThat(a.monto()).isEqualByComparingTo("20");});
+        assertThat(recibos.historial(tenant,company,false,Set.of(UUID.randomUUID()),receipt.numero(),"",null,null,null,0,10)).isEmpty();
+        assertThat(recibos.recibosAnulables(tenant,company,List.of(receipt.id()),false,Set.of(branch))).containsExactly(receipt.id());
+        assertThat(recibos.recibosAnulables(tenant,company,List.of(receipt.id()),false,Set.of(UUID.randomUUID()))).isEmpty();
+        assertThat(recibos.recibosAnulables(UUID.randomUUID(),company,List.of(receipt.id()),true,Set.of())).isEmpty();
+        if(cerrarTurno){
+          jdbc.update("update cash_register_session set status='CLOSED',closed_at=current_timestamp,closed_by=?,expected_cash_amount=30,counted_cash_amount=30,difference_amount=0 where id=?",user,testSession);
+          // Simula que el cierre se observó en otra petición, sin reutilizar el turno leído durante el cobro.
+          EntityManagerFactoryUtils.getTransactionalEntityManager(emf.getObject()).clear();
+          var p=new TenantPrincipal(user,tenant,company,null,"TEST","Prueba","test","",true,true,Set.of(),Set.of("recibos.ver","recibos.anular"));
+          SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));
+          var factory=new JpaRepositoryFactory(SharedEntityManagerCreator.createSharedEntityManager(emf.getObject()));
+          var vista=new ReciboHistorialService(receiptService,recibos,new PaymentReceiptSnapshotRepository(jdbc),
+              factory.getRepository(EmpresaRepository.class),factory.getRepository(DatosEmpresaRepository.class));
+          var documento=vista.detalle(receipt.id());
+          assertThat(documento.recibo().id()).isEqualTo(receipt.id());
+          assertThat(documento.anulable()).isFalse();
+          assertThat(vista.buscar(receipt.numero(),null,null,false,0,10).getContent())
+              .singleElement().satisfies(x->assertThat(x.id()).isEqualTo(receipt.id()));
+          assertThatThrownBy(()->receiptService.anular(receipt.id(),"Prueba"))
+              .hasMessage("El recibo no puede anularse porque pertenece a una sesión de caja cerrada.");
+          status.setRollbackOnly();return null;
+        }
+        assertThatThrownBy(()->receiptService.anularConResultado(receipt.id(),"   "))
+            .hasMessage("El motivo de anulación es obligatorio.");
+        String razon="Dijo \"error\"\n al cobrar";
+        var anulado=receiptService.anularConResultado(receipt.id(),"  "+razon+"  ");
+        assertThat(anulado.yaAnulado()).isFalse();
+        assertThat(anulado.recibo().id()).isEqualTo(receipt.id());
+        assertThat(anulado.recibo().numero()).isEqualTo(receipt.numero());
+        assertThat(anulado.recibo().motivoAnulacion()).isEqualTo(razon);
+        assertThat(anulado.recibo().aplicaciones()).allMatch(CobroClienteDto.Aplicacion::revertida);
+        assertThat(recibos.datosAnulacion(receipt.id(),tenant,company).fecha()).isNotNull();
+        assertThat(receiptService.anularConResultado(receipt.id(),"Otro intento").yaAnulado()).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from auditoria where registro_id=? and accion='CUSTOMER_RECEIPT_VOIDED'",Integer.class,receipt.id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select detalle->>'motivo' from auditoria where registro_id=? and accion='CUSTOMER_RECEIPT_VOIDED'",String.class,receipt.id())).isEqualTo(razon);
+        moneyMovements.flush();
+        assertThat(jdbc.queryForObject("""
+            select count(*) from customer_receipt_payment p join movimientos_financieros m on m.id=p.financial_movement_id
+            where p.customer_receipt_id=? and m.estado='VOIDED'
+            """,Integer.class,receipt.id())).isEqualTo(2);
+        assertThat(recibos.recibosAnulables(tenant,company,List.of(receipt.id()),true,Set.of())).isEmpty();assertThat(query.ciclo(d.id(),false).saldo()).isEqualByComparingTo("50");service.anular(voidInput(d.id()));assertThat(balance()).isEqualByComparingTo("100");
         status.setRollbackOnly();return null;
       });
     }
@@ -229,5 +281,33 @@ class NotaDebitoVentaPostgresTest {
     }
     @Test void ausenciaDeSesionAbiertaNoEmiteNiRegistraDeuda(){
       sucursalAislada();assertThatThrownBy(()->issue(pagoAutomatico())).hasMessage("No existe una sesión de caja abierta disponible para registrar este cobro.");assertThat(notes()).isZero();assertThat(balance()).isZero();
+    }
+
+    @Test void reciboContadoConsumidorFinalCompartePagoPosSinDuplicarlo(){
+      tx.execute(status->{
+        jdbc.update("update sales_invoice set customer_id=null, customer_name='Consumidor Final',customer_identification=null where id=? and tenant_id=? and empresa_id=?",invoice,tenant,company);
+        var factory=new JpaRepositoryFactory(SharedEntityManagerCreator.createSharedEntityManager(emf.getObject()));
+        var f=factory.getRepository(FacturaVentaRepository.class).findByIdAndTenantIdAndEmpresaId(invoice,tenant,company).orElseThrow();
+        var metodo=factory.getRepository(MetodoPagoVentaRepository.class).findById(method("CASH")).orElseThrow();
+        var pago=factory.getRepository(PagoVentaRepository.class).saveAndFlush(new com.citacloud.springboot.contacloud.app.models.PagoVenta(f,new BigDecimal("100"),new BigDecimal("20"),user));
+        var medio=factory.getRepository(AplicacionPagoVentaRepository.class).saveAndFlush(new com.citacloud.springboot.contacloud.app.models.AplicacionPagoVenta(pago,metodo,new BigDecimal("100"),new BigDecimal("120"),new BigDecimal("20"),null,null,null,1));
+        var r=new CobroClienteRepository(jdbc);
+        String numero="TEST-REC-"+invoice.toString().substring(0,18);
+        String nombreSucursal=jdbc.queryForObject("select nombre from sucursales where id=? and tenant_id=? and empresa_id=?",String.class,branch,tenant,company);
+        UUID id=r.insertarReciboVentaPos(f,nombreSucursal,numero);r.conservarImpresionVentaPos(id,tenant,company,f.getCajaId());
+        var h=r.historial(tenant,company,true,Set.of(),f.getNumero(),"",f.getFecha(),f.getFecha(),false,0,10);
+        assertThat(h.getContent()).singleElement().satisfies(x->{assertThat(x.id()).isEqualTo(id);assertThat(x.cliente()).isEqualTo("Consumidor Final");assertThat(x.documentos()).containsExactly(f.getNumero());});
+        assertThat(r.recibosAnulables(tenant,company,List.of(id),true,Set.of())).isEmpty();
+        var d=r.detalle(id,tenant,company);assertThat(d.clienteId()).isNull();assertThat(d.recibido()).isEqualByComparingTo("100");
+        assertThat(d.medios()).singleElement().satisfies(x->{assertThat(x.id()).isEqualTo(medio.getId());assertThat(x.monto()).isEqualByComparingTo("100");});
+        var snapshots=new PaymentReceiptSnapshotRepository(jdbc);
+        var doc=snapshots.documento(snapshots.obtener(id,tenant,company));
+        assertThat(doc.receiptNumber()).isEqualTo(numero);assertThat(doc.documents().getFirst().originalTotal()).isEqualByComparingTo("100");
+        assertThat(jdbc.queryForObject("select count(*) from customer_receipt_payment where customer_receipt_id=?",Integer.class,id)).isZero();
+        assertThat(r.detalle(id,UUID.randomUUID(),company)).isNull();
+        assertThat(r.detalle(id,tenant,UUID.randomUUID())).isNull();
+        assertThatThrownBy(()->receiptService.anular(id,"Prueba")).hasMessageContaining("flujo de devolución");
+        status.setRollbackOnly();return null;
+      });
     }
 }

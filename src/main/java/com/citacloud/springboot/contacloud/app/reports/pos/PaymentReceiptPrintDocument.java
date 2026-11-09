@@ -9,14 +9,19 @@ public record PaymentReceiptPrintDocument(CompanySnapshot company,String receipt
     CustomerSnapshot customer,String branch,String cashRegister,String operator,String concept,String currency,
     List<PaidDocument> documents,BigDecimal totalApplied,List<PaymentMethod> paymentMethods,BigDecimal totalCollected,
     BigDecimal previousBalance,BigDecimal amountApplied,BigDecimal remainingBalance,List<String> footer) {
-    public record CompanySnapshot(String name,String identification,String address,String phone,String countryCode) {
+    public record CompanySnapshot(String name,String identification,String address,String phone,String countryCode,String logoObjectKey) {
+        public CompanySnapshot(String name,String identification,String address,String phone,String countryCode) {
+            this(name,identification,address,phone,countryCode,null);
+        }
         public CompanySnapshot {required(name,200);optional(identification,60);optional(address,500);optional(phone,60);required(countryCode,2);}
     }
     public record CustomerSnapshot(String name,String identification) {
         public CustomerSnapshot {required(name,200);optional(identification,60);}
     }
-    public record PaidDocument(String documentNumber,BigDecimal amount) {
-        public PaidDocument {required(documentNumber,150);money(amount);}
+    public record PaidDocument(String documentNumber,BigDecimal amount,java.time.LocalDate date,BigDecimal originalTotal,
+            String documentType,java.util.UUID documentId) {
+        public PaidDocument(String documentNumber,BigDecimal amount) {this(documentNumber,amount,null,null,null,null);}
+        public PaidDocument {required(documentNumber,150);money(amount);optionalMoney(originalTotal);}
     }
     /** Public references only; card details must already be masked. */
     public record PaymentMethod(String name,BigDecimal amount,String reference) {

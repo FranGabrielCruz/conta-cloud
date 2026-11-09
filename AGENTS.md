@@ -926,6 +926,8 @@ Todos deben tener tooltip descriptivo.
 
 No utilizar botones grandes con texto dentro de las tablas.
 
+Mostrar las acciones de cada fila como iconos directos, con tooltip, nombre accesible y foco de teclado. No agrupar acciones de un Grid en menús de tres puntos ni en desplegables equivalentes. Cuando el espacio sea limitado, trasladar las acciones secundarias al detalle.
+
 ---
 
 # 21. Formato de datos

@@ -312,6 +312,13 @@ public class FacturacionPosService {
                     cobro.recibido,cobro.cambio,cobro.cuenta==null?null:cobro.cuenta.getId(),cobro.referencia,cobro.banco,ordenPago++));
                 registrarMovimientoCobro(ctx,factura,aplicacion,cobro,p.usuarioId());
             }
+            if (aplicado.signum()>0) {
+                String recibo="REC-"+String.format(Locale.ROOT,"%06d",cuentasCobrar.siguienteNumero(p.tenantId(),empresa));
+                UUID reciboId=cuentasCobrar.insertarReciboVentaPos(factura,ctx.caja.getSucursal().getNombre(),recibo);
+                cuentasCobrar.conservarImpresionVentaPos(reciboId,p.tenantId(),empresa,ctx.caja.getId());
+                auditoria.registrar("CUSTOMER_RECEIPT_CONFIRMED","CobroCliente",reciboId,
+                    "{\"numero\":\""+recibo+"\",\"facturaId\":\""+factura.getId()+"\"}");
+            }
         }
         auditoria.registrar("SALES_INVOICE_CONFIRMED","FacturaVenta",factura.getId(),"{\"numero\":\""+numero+"\",\"total\":"+total+
             ",\"descuento\":"+descuentoTotal+",\"recargo\":"+recargoTotal+",\"ventaCredito\":"+input.ventaCredito()+",\"aplicaciones\":"+cobros.size()+",\"mixto\":"+CobroVentaCalculo.mixto(cobros.size())+"}");

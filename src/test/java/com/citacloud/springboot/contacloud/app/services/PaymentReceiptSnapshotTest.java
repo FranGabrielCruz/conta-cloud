@@ -17,14 +17,14 @@ class PaymentReceiptSnapshotTest {
     JdbcTemplate jdbc;PaymentReceiptSnapshotRepository snapshots;java.sql.Connection migrationConnection;
     @BeforeEach void schema() throws Exception {
         var ds=new DriverManagerDataSource("jdbc:h2:mem:receipt-"+UUID.randomUUID()+";MODE=PostgreSQL;DB_CLOSE_DELAY=-1","sa","");jdbc=new JdbcTemplate(ds);snapshots=new PaymentReceiptSnapshotRepository(jdbc);
-        jdbc.execute("CREATE TABLE empresas(id UUID,tenant_id UUID,nombre VARCHAR,identificacion_fiscal VARCHAR,pais_codigo VARCHAR,zona_horaria VARCHAR)");
+        jdbc.execute("CREATE TABLE empresas(id UUID,tenant_id UUID,nombre VARCHAR,identificacion_fiscal VARCHAR,pais_codigo VARCHAR,zona_horaria VARCHAR,logo_object_key VARCHAR)");
         jdbc.execute("CREATE TABLE datos_empresa(empresa_id UUID,nombre_comercial VARCHAR,direccion VARCHAR,telefono VARCHAR)");
         jdbc.execute("CREATE TABLE cajas(tenant_id UUID,empresa_id UUID,sucursal_id UUID,id UUID,nombre VARCHAR,UNIQUE(tenant_id,empresa_id,sucursal_id,id))");
         jdbc.execute("CREATE TABLE customer_receipt(id UUID,tenant_id UUID,empresa_id UUID,branch_id UUID,status VARCHAR)");
         jdbc.execute("CREATE TABLE billing_print_jobs(document_type VARCHAR CONSTRAINT ck_billing_print_document_type CHECK(document_type IN ('SALES_INVOICE','SALES_RETURN')))");
         jdbc.execute("CREATE TABLE customer_receipt_payment(customer_receipt_id UUID,tenant_id UUID,empresa_id UUID,method_name VARCHAR,amount NUMERIC(19,2),reference VARCHAR,method_type VARCHAR,line_order INT)");
         migrationConnection=ds.getConnection();ScriptUtils.executeSqlScript(migrationConnection,new ClassPathResource("db/migration/V103__impresion_pos_recibos_cobro.sql"));
-        jdbc.update("INSERT INTO empresas VALUES(?,?,?,?,?,?)",company,tenant,"DEMO","124543678","DO","America/Santo_Domingo");
+        jdbc.update("INSERT INTO empresas(id,tenant_id,nombre,identificacion_fiscal,pais_codigo,zona_horaria) VALUES(?,?,?,?,?,?)",company,tenant,"DEMO","124543678","DO","America/Santo_Domingo");
         jdbc.update("INSERT INTO cajas VALUES(?,?,?,?,?)",tenant,company,branch,cash,"Caja 1");
         jdbc.update("INSERT INTO customer_receipt(id,tenant_id,empresa_id,branch_id,status) VALUES(?,?,?,?,?)",id,tenant,company,branch,"APPLIED");
         jdbc.update("INSERT INTO customer_receipt_payment VALUES(?,?,?,?,?,?,?,?)",id,tenant,company,"Transferencia",new BigDecimal("7500"),"TRX-123","BANK_TRANSFER",1);

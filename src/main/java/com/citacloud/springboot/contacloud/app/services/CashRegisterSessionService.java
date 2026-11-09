@@ -195,6 +195,17 @@ public class CashRegisterSessionService {
         validarSucursal(s);return s.getId();
     }
 
+    @Transactional
+    public void bloquearParaAnularRecibo(UUID sesionId){
+        if(sesionId==null)return;
+        var p=TenantContext.principalActual();
+        var sesion=sessions.bloquear(sesionId,p.tenantId(),EmpresaContext.requerirEmpresaId())
+            .orElseThrow(()->new RecursoNoEncontradoException("Turno de caja no encontrado."));
+        validarSucursal(sesion);
+        if(sesion.getStatus()!=EstadoSesionCaja.OPEN)
+            throw new ReglaNegocioException("El recibo no puede anularse porque pertenece a una sesión de caja cerrada.");
+    }
+
     @Transactional(readOnly=true)
     public void validarMovimientoModificable(UUID sesionId){
         if(sesionId==null)return;SesionCaja s=sesionSegura(sesionId);

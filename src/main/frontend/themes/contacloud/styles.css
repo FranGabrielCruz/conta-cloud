@@ -1361,3 +1361,13 @@ vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
  .cc-debit-note-data > :last-child { grid-column:auto; }
  .cc-debit-cash-selector { width:100%; }
 }
+
+.cc-receipt-detail h4 { margin: 0; }
+.cc-receipt-detail .cc-detail-value { overflow-wrap: anywhere; white-space: normal; }
+
+.cc-receipt-grid-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding: 4px;
+}

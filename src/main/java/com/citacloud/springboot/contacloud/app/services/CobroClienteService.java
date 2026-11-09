@@ -16,6 +16,8 @@ import java.util.*;
 @Service
 public class CobroClienteService {
     private static final int PAGE_SIZE=5;
+    public static final int LONGITUD_MOTIVO_ANULACION=500;
+    private static final tools.jackson.databind.json.JsonMapper JSON=tools.jackson.databind.json.JsonMapper.builder().build();
     private final CobroClienteRepository receipts;
     private final ClienteRepository customers;
     private final MonedaRepository currencies;
@@ -131,16 +133,63 @@ public class CobroClienteService {
 
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.anular')")
-    public CobroClienteDto anular(UUID id,String reason){String clean=textoObligatorio(reason,500,"El motivo de anulación es obligatorio.");var p=TenantContext.principalActual();UUID empresa=EmpresaContext.requerirEmpresaId();CobroClienteDto receipt=receipts.bloquearRecibo(id,p.tenantId(),empresa);
-        if(receipt==null)throw new RecursoNoEncontradoException("Recibo no encontrado.");autorizarSucursal(receipt);if(receipt.estado()==EstadoReciboCliente.VOIDED)return detalle(id);
+    public CobroClienteDto anular(UUID id,String motivo) {
+        return anularConResultado(id,motivo).recibo();
+    }
+
+    public record ResultadoAnulacion(CobroClienteDto recibo,boolean yaAnulado) {}
+
+    @Transactional
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.anular')")
+    public ResultadoAnulacion anularConResultado(UUID id,String motivo) {
+        String clean=textoObligatorio(motivo,LONGITUD_MOTIVO_ANULACION,"El motivo de anulación es obligatorio.");
+        var p=TenantContext.principalActual();
+        UUID empresa=EmpresaContext.requerirEmpresaId();
+        var receipt=receipts.bloquearRecibo(id,p.tenantId(),empresa);
+        if(receipt==null)throw new RecursoNoEncontradoException("Recibo no encontrado.");
+        autorizarSucursal(receipt);
+        if(receipt.estado()==EstadoReciboCliente.VOIDED)return new ResultadoAnulacion(detalle(id),true);
+        if(receipts.esReciboVentaPos(id,p.tenantId(),empresa))
+            throw new ReglaNegocioException("Este recibo documenta un pago de factura al contado. Corrija la venta mediante el flujo de devolución correspondiente.");
         receipts.bloquearClienteImpresion(p.tenantId(),empresa,receipt.clienteId());
+        // Serialize with cash closing before changing balances or locking ledger rows.
+        receipts.sesionesDelRecibo(id,p.tenantId(),empresa).forEach(cashSessions::bloquearParaAnularRecibo);
+        var medios=detalle(id).medios();
+        var movimientos=receipts.movimientos(id,p.tenantId(),empresa);
+        if(movimientos.isEmpty()||movimientos.size()!=medios.size())
+            throw new ReglaNegocioException("El recibo no conserva todos sus movimientos financieros y no puede anularse.");
         for(var app:receipts.aplicacionesActivas(id,p.tenantId(),empresa)){
             if(receipts.bloquearCuenta(app.cuentaId(),p.tenantId(),empresa)==null)
                 throw new ReglaNegocioException("No fue posible bloquear una cuenta por cobrar del recibo.");
-            receipts.revertirAplicacion(app,clean,p.usuarioId());
+            receipts.revertirAplicacion(app,p.tenantId(),empresa,clean,p.usuarioId());
         }
-        for(UUID movementId:receipts.movimientos(id,p.tenantId(),empresa)){MovimientoFinanciero movement=movements.buscarParaActualizar(movementId,p.tenantId(),empresa,TipoMovimientoFinanciero.INCOME).orElseThrow(()->new ReglaNegocioException("No fue posible revertir un movimiento financiero del recibo."));if(reconciliation.existsByMovimientoFinancieroId(movementId))throw new ReglaNegocioException("El recibo posee un movimiento conciliado y no puede anularse.");cashSessions.validarMovimientoModificable(movement.getSesionCajaId());movement.anular(clean,p.usuarioId());movements.save(movement);}
-        receipts.anular(id,p.tenantId(),empresa,clean,p.usuarioId());audit.registrar("CUSTOMER_RECEIPT_VOIDED","CobroCliente",id,"{\"motivo\":\""+clean.replace("\"","'")+"\"}");return detalle(id);}
+
+        Set<UUID> mediosIds=new HashSet<>(medios.stream().map(CobroClienteDto.Medio::id).toList());
+        for(UUID movementId:movimientos){
+            var movimiento=movements.buscarParaActualizar(movementId,p.tenantId(),empresa,TipoMovimientoFinanciero.INCOME)
+                .orElseThrow(()->new ReglaNegocioException("No fue posible revertir un movimiento financiero del recibo."));
+            if(movimiento.getEstado()!=EstadoMovimientoFinanciero.REGISTERED||movimiento.getTipoOrigen()!=TipoOrigenMovimiento.CUSTOMER_RECEIPT
+                    ||!mediosIds.remove(movimiento.getOrigenId()))
+                throw new ReglaNegocioException("Los movimientos del recibo cambiaron y no pueden revertirse.");
+            if(reconciliation.existsByMovimientoFinancieroId(movementId))
+                throw new ReglaNegocioException("El recibo posee un movimiento conciliado y no puede anularse.");
+            cashSessions.bloquearParaAnularRecibo(movimiento.getSesionCajaId());
+            movimiento.anular(clean,p.usuarioId());movements.save(movimiento);
+        }
+        var fechaAnulacion=receipts.anular(id,p.tenantId(),empresa,clean,p.usuarioId());
+        var traceId=com.citacloud.springboot.contacloud.app.errors.TraceContext.currentOrCreate();
+        audit.registrar("CUSTOMER_RECEIPT_VOIDED","CobroCliente",id,JSON.writeValueAsString(Map.of(
+            "numero",receipt.numero(),"motivo",clean,"sucursalId",receipt.sucursalId(),
+            "anuladoEn",fechaAnulacion.toString(),"movimientos",movimientos,"traceId",traceId)));
+        var anulado=detalle(id);
+        org.slf4j.LoggerFactory.getLogger(CobroClienteService.class).atInfo()
+            .addKeyValue("ReceiptId",id).addKeyValue("ReceiptNumber",receipt.numero())
+            .addKeyValue("TenantId",p.tenantId()).addKeyValue("CompanyId",empresa)
+            .addKeyValue("BranchId",receipt.sucursalId()).addKeyValue("UserId",p.usuarioId())
+            .addKeyValue("AnnulledAt",fechaAnulacion).addKeyValue("TraceId",traceId)
+            .log("customer_receipt_voided");
+        return new ResultadoAnulacion(anulado,false);
+    }
 
     private List<MedioValidado> medios(CobroClienteInput input,BigDecimal received,Moneda currency,UUID tenant,UUID empresa){
         if(input.medios()==null||input.medios().isEmpty())throw new ReglaNegocioException("Agrega al menos un medio de pago.");List<MedioValidado> out=new ArrayList<>();BigDecimal sum=BigDecimal.ZERO;int cash=0;

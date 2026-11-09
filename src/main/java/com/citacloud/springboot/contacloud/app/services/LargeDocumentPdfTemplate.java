@@ -52,6 +52,37 @@ final class LargeDocumentPdfTemplate {
     static String debitNote(boolean logo,int corporateHeight,int boxHeight,int noteHeight,boolean voided)throws IOException{
         return creditNote(logo,corporateHeight,boxHeight,noteHeight,voided).replace("NOTA DE CRÉDITO","NOTA DE DÉBITO").replace("sales_credit_note","sales_debit_note");
     }
+
+    static String receipt(boolean logo,int corporateHeight,int boxHeight,boolean voided)throws IOException{
+        int noteY=corporateHeight+boxHeight+9;
+        String base=creditNote(logo,corporateHeight,boxHeight,22,voided)
+            .replace("NOTA DE CRÉDITO","RECIBO DE COBRO").replace("sales_credit_note","customer_receipt_large")
+            .replace("DOCUMENTO AFECTADO","DATOS DEL RECIBO").replace("ANULADA","ANULADO")
+            .replace(staticText("INFORMACIÓN DE LA NOTA",0,noteY,782,13,"Section","Left"),"")
+            .replace(field("$P{noteInformation}",0,noteY+16,782,4,"Base","Left",true),"")
+            .replace("height=\""+(corporateHeight+boxHeight+32)+"\" splitType=\"Stretch\"","height=\""+(corporateHeight+boxHeight+8)+"\" splitType=\"Stretch\"");
+        base=replaceSection(base,"columnHeader","");
+        String detail=section(base,"detail");
+        int firstBandEnd=detail.indexOf("</band>")+7;
+        int[] widths={342,108,166,166};
+        String[] labels={"DOCUMENTO","FECHA","TOTAL DOCUMENTO","APLICADO"};
+        String[] expressions={"$F{descripcion}","$F{rowLabel}","$F{precioUnitario}","$F{total}"};
+        var headings=new StringBuilder("<band height=\"24\" splitType=\"Prevent\">").append(when("DOC_HEADER"));
+        var rows=new StringBuilder("<band height=\"21\" splitType=\"Prevent\">").append(when("LINE"));
+        int x=0;
+        for(int i=0;i<widths.length;i++){
+            String align=i>=2?"Right":"Left";
+            headings.append(staticText(labels[i],x,0,widths[i],24,"TableHeader",align));
+            rows.append(field(expressions[i],x+3,3,widths[i]-6,16,"Base",align,false));
+            x+=widths[i];
+        }
+        headings.append("</band>");rows.append("</band>");
+        detail="<detail>"+headings+rows+detail.substring(firstBandEnd);
+        detail=detail.replace(field("$F{rowLabel}",520,8,120,22,"Heading","Right",false),
+            field("$F{rowLabel}",350,8,290,22,"Heading","Right",false));
+        return replaceSection(base,"detail",detail);
+    }
+
     private static String when(String kind){return "<printWhenExpression><![CDATA[\""+kind+"\".equals($F{rowKind})]]></printWhenExpression>";}
     private static String staticText(String text,int x,int y,int w,int h,String style,String align){return "<staticText><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\" verticalAlignment=\"Middle\"/><text><![CDATA["+text+"]]></text></staticText>";}
     private static String field(String expression,int x,int y,int w,int h,String style,String align,boolean stretch){return "<textField pattern=\"#,##0.00\""+(stretch?" textAdjust=\"StretchHeight\"":"")+"><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\"/><textFieldExpression><![CDATA["+expression+"]]></textFieldExpression></textField>";}

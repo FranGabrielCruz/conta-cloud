@@ -10,6 +10,12 @@ public record CobroClienteDto(UUID id,String numero,UUID clienteId,String client
         BigDecimal aplicado,BigDecimal disponible,EstadoReciboCliente estado,String referencia,String observacion,
         String usuario,String motivoAnulacion,List<Aplicacion> aplicaciones,List<Medio> medios) {
     public record Aplicacion(UUID id,UUID facturaId,String factura,LocalDate fechaFactura,OffsetDateTime aplicadaEn,
-            BigDecimal saldoAnterior,BigDecimal monto,BigDecimal saldoRestante,boolean revertida) {}
+            BigDecimal saldoAnterior,BigDecimal monto,BigDecimal saldoRestante,boolean revertida,
+            BigDecimal totalDocumento,UUID notaDebitoId) {
+        public Aplicacion(UUID id,UUID facturaId,String factura,LocalDate fechaFactura,OffsetDateTime aplicadaEn,
+                BigDecimal saldoAnterior,BigDecimal monto,BigDecimal saldoRestante,boolean revertida) {
+            this(id,facturaId,factura,fechaFactura,aplicadaEn,saldoAnterior,monto,saldoRestante,revertida,null,null);
+        }
+    }
     public record Medio(UUID id,String medio,String destino,String referencia,BigDecimal monto) {}
 }

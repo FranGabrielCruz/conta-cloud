@@ -1,98 +1,121 @@
 package com.citacloud.springboot.contacloud.app.services;
 
 import com.citacloud.springboot.contacloud.app.dto.*;
-import com.citacloud.springboot.contacloud.app.models.*;
-import com.citacloud.springboot.contacloud.app.repositories.*;
-import com.citacloud.springboot.contacloud.app.security.TenantContext;
+import com.citacloud.springboot.contacloud.app.models.EstadoReciboCliente;
+import com.citacloud.springboot.contacloud.app.reports.pos.InvoiceFormats;
+import com.citacloud.springboot.contacloud.app.errors.TraceContext;
 import net.sf.jasperreports.engine.*;
 import net.sf.jasperreports.engine.data.JRMapCollectionDataSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.*;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class CobroClientePdfService {
-    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private final CobroClienteService receipts;
-    private final EmpresaRepository companies;
-    private final DatosEmpresaRepository companyData;
+    private static final DateTimeFormatter DATE=DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter TIME=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private final ReciboHistorialService historial;
     private final LocalFileStorageService storage;
-    private volatile ReportBundle reports;
+    private final Map<String,JasperReport> templates=new HashMap<>();
 
-    public CobroClientePdfService(CobroClienteService receipts, EmpresaRepository companies,
-                                  DatosEmpresaRepository companyData, LocalFileStorageService storage) {
-        this.receipts = receipts; this.companies = companies; this.companyData = companyData; this.storage = storage;
+    public CobroClientePdfService(ReciboHistorialService historial,LocalFileStorageService storage){
+        this.historial=historial;this.storage=storage;
     }
 
-    @Transactional(readOnly = true)
-    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.imprimir')")
-    public ArchivoPdfDto generar(UUID id) {
-        var principal = TenantContext.principalActual();
-        CobroClienteDto receipt = receipts.detalle(id);
-        Empresa company = companies.findByIdAndTenantId(principal.empresaId(), principal.tenantId())
-                .orElseThrow(() -> new ReglaNegocioException("No fue posible identificar la empresa del recibo."));
-        DatosEmpresa data = companyData.findByEmpresaId(principal.empresaId()).orElse(null);
-        byte[] logo = company.getLogoObjectKey() == null ? null
-                : storage.load(company.getLogoObjectKey(), 5L * 1024 * 1024).orElse(null);
-        Map<String, Object> params = new HashMap<>();
-        params.put("companyName", data == null ? company.getNombre() : first(data.getNombreComercial(), company.getNombre()));
-        params.put("companyTaxId", PurchaseOrderPdfService.formatTaxIdentification(company.getIdentificacionFiscal()));
-        params.put("companyAddress", data == null ? null : data.getDireccion());
-        params.put("companyPhone", data == null ? null : PurchaseOrderPdfService.formatPhone(data.getTelefono()));
-        params.put("companyEmail", data == null ? null : data.getCorreo());
-        params.put("companyLogo", logo == null ? null : new ByteArrayInputStream(logo));
-        params.put("number", receipt.numero()); params.put("date", DATE.format(receipt.fecha()));
-        params.put("customer", receipt.cliente()); params.put("customerId", value(receipt.identificacion()));
-        params.put("branch", receipt.sucursal());
-        params.put("currency", receipt.moneda()); params.put("status", receipt.estado().name());
-        params.put("reference", value(receipt.referencia())); params.put("notes", value(receipt.observacion()));
-        params.put("user", value(receipt.usuario())); params.put("received", receipt.recibido());
-        params.put("applied", receipt.aplicado()); params.put("available", receipt.disponible());
-        ReportBundle templates = reports();
-        params.put("applicationsReport", templates.applications());
-        Collection<Map<String,?>> applicationRows=new ArrayList<>();
-        receipt.aplicaciones().forEach(a -> applicationRows.add(Map.of(
-                "invoice",a.factura()+(a.revertida()?" (REVERTIDA)":""),"previous",a.saldoAnterior(),
-                "applied",a.monto(),"remaining",a.saldoRestante())));
-        params.put("applicationsDataSource", new JRMapCollectionDataSource(applicationRows));
-        params.put("methodsReport", templates.methods());
-        Collection<Map<String,?>> methodRows=new ArrayList<>();
-        receipt.medios().forEach(m -> methodRows.add(Map.of("method",m.medio(),"destination",value(m.destino()),
-                "reference",value(m.referencia()),"amount",m.monto())));
-        params.put("methodsDataSource", new JRMapCollectionDataSource(methodRows));
-        try {
-            byte[] bytes = JasperExportManager.exportReportToPdf(
-                    JasperFillManager.fillReport(templates.main(), params, new JREmptyDataSource()));
-            return new ArchivoPdfDto("Recibo_" + receipt.numero() + ".pdf", bytes);
-        } catch (JRException ex) { throw new ReglaNegocioException("No fue posible generar el PDF del recibo.", ex); }
+    @PreAuthorize("@empresaModuloService.habilitado('VENTAS') and hasAuthority('recibos.ver') and hasAuthority('recibos.imprimir')")
+    public ArchivoPdfDto generar(UUID id){
+        var detalle=historial.detalle(id);
+        var pdf=new ArchivoPdfDto("Recibo_"+InvoiceFormats.fileName(detalle.recibo().numero()),render(detalle));
+        LoggerFactory.getLogger(getClass()).atDebug().addKeyValue("ReceiptId",id)
+            .addKeyValue("TraceId",TraceContext.currentOrCreate()).log("receipt_large_pdf_rendered");
+        return pdf;
     }
 
-    private ReportBundle reports() {
-        if (reports != null) return reports;
-        synchronized (this) {
-            if (reports == null) {
-                try {
-                    reports = new ReportBundle(compile("/reports/customer-receipt/customer-receipt-compact.jrxml"),
-                            compile("/reports/customer-receipt/customer-receipt-applications.jrxml"),
-                            compile("/reports/customer-receipt/customer-receipt-methods.jrxml"));
-                } catch (JRException ex) {
-                    throw new ReglaNegocioException("No fue posible compilar la plantilla del recibo.", ex);
-                }
-            }
-            return reports;
+    byte[] render(ReciboHistorialDto detalle){
+        var r=detalle.recibo();var d=detalle.documento();var empresa=d.company();
+        boolean voided=r.estado()==EstadoReciboCliente.VOIDED;
+        String cliente=lines(d.customer().name(),optional("RNC/Cédula",d.customer().identification()));
+        String datos=lines(optional("Sucursal",d.branch()),optional("Caja",d.cashRegister()),optional("Cajero",d.operator()),"Estado: "+(voided?"Anulado":"Emitido"));
+        try{
+            byte[] logo=empresa.logoObjectKey()==null?null:storage.load(empresa.logoObjectKey(),5L*1024*1024).orElse(null);
+            int header=Math.max(96,78+Math.max(0,lineCount(empresa.name(),430,15)-1)*18
+                +Math.max(0,lineCount(empresa.address(),430,9)-1)*11)+(voided?20:0);
+            int box=28+Math.max(lineCount(cliente,365,9),lineCount(datos,370,9))*11;
+            Map<String,Object> params=new HashMap<>();
+            params.put("companyTradeName",clean(empresa.name()));
+            params.put("companyTaxIdentification","DO".equals(empresa.countryCode())?PurchaseOrderPdfService.formatTaxIdentification(empresa.identification()):clean(empresa.identification()));
+            params.put("companyAddress",clean(empresa.address()));
+            params.put("companyPhone","DO".equals(empresa.countryCode())?PurchaseOrderPdfService.formatPhone(empresa.phone()):clean(empresa.phone()));
+            params.put("companyLogo",logo==null?null:new ByteArrayInputStream(logo));
+            params.put("orderNumber",d.receiptNumber());params.put("orderDate",DATE.format(d.receiptDateTime()));params.put("currencyCode",d.currency());
+            params.put("supplierName",clean(d.customer().name()));params.put("clientInformation",cliente);params.put("affectedInformation",datos);
+            params.put("emissionFooter",lines(optional("Emitido por",d.operator()),"Emisión: "+TIME.format(d.receiptDateTime())).replace('\n',' '));
+            return JasperExportManager.exportReportToPdf(JasperFillManager.fillReport(template(logo!=null,header,box,voided),
+                params,new JRMapCollectionDataSource(rows(detalle))));
+        }catch(IOException|JRException|IllegalArgumentException|UncheckedIOException ex){
+            throw new ReglaNegocioException("No fue posible generar el PDF del recibo. Puede volver a intentar la impresión.",ex);
         }
     }
-    private JasperReport compile(String resource) throws JRException {
-        try(InputStream input=getClass().getResourceAsStream(resource)){
-            if(input==null)throw new ReglaNegocioException("No se encontró la plantilla del recibo.");
-            return JasperCompileManager.compileReport(input);
-        }catch(IOException ex){throw new ReglaNegocioException("No fue posible leer la plantilla del recibo.",ex);}
+
+    private synchronized JasperReport template(boolean logo,int header,int box,boolean voided)throws IOException,JRException{
+        String key=logo+":"+header+":"+box+":"+voided;
+        JasperReport report=templates.get(key);
+        if(report==null){
+            if(templates.size()>=32)templates.clear();
+            report=JasperCompileManager.compileReport(new ByteArrayInputStream(LargeDocumentPdfTemplate.receipt(logo,header,box,voided).getBytes(StandardCharsets.UTF_8)));
+            templates.put(key,report);
+        }
+        return report;
     }
-    private static String first(String first, String fallback) { return first == null || first.isBlank() ? fallback : first.trim(); }
-    private static String value(String value) { return value == null || value.isBlank() ? "—" : value.trim(); }
-    private record ReportBundle(JasperReport main,JasperReport applications,JasperReport methods){}
+
+    static List<Map<String,?>> rows(ReciboHistorialDto detalle){
+        var d=detalle.documento();var r=detalle.recibo();
+        List<Map<String,?>> rows=new ArrayList<>();
+        rows.add(row("SECTION","DOCUMENTOS PAGADOS",null));
+        if(d.documents().isEmpty())rows.add(row("TEXT","Sin documentos aplicados al emitir este recibo.",null));
+        else{
+            rows.add(row("DOC_HEADER",null,null));
+            for(var doc:d.documents()){
+                var legacy=r.aplicaciones().stream().filter(a->Objects.equals(a.factura(),doc.documentNumber())).findFirst().orElse(null);
+                var fecha=doc.date()!=null?doc.date():legacy==null?null:legacy.fechaFactura();
+                var original=doc.originalTotal()!=null?doc.originalTotal():legacy==null?null:legacy.totalDocumento();
+                var fields=row("LINE",fecha==null?"—":DATE.format(fecha),null);
+                fields.put("descripcion",clean(doc.documentNumber()));fields.put("precioUnitario",original);fields.put("total",doc.amount());
+                rows.add(fields);
+            }
+        }
+        rows.add(row("MONEY","Total aplicado",d.totalApplied()));
+        rows.add(row("SECTION","FORMAS DE PAGO",null));
+        for(var m:d.paymentMethods())if(m.amount().signum()>0)
+            rows.add(row("FINANCE",clean(m.name())+(m.reference()==null?"":" · "+clean(m.reference())),m.amount()));
+        rows.add(row("TOTAL","TOTAL COBRADO "+d.currency(),d.totalCollected()));
+        var ref=com.citacloud.springboot.contacloud.app.repositories.PaymentReceiptSnapshotRepository.safeReference(r.referencia(),null);
+        if(ref!=null)rows.add(row("TEXT",optional("Referencia",ref),null));
+        if(r.observacion()!=null&&!r.observacion().isBlank())rows.add(row("TEXT",optional("Observación",r.observacion()),null));
+        if(r.estado()==EstadoReciboCliente.VOIDED){
+            rows.add(row("SECTION","ANULACIÓN",null));
+            rows.add(row("TEXT",lines(optional("Motivo",r.motivoAnulacion()),optional("Anulado por",detalle.anuladoPor()),
+                detalle.anuladoEn()==null?null:"Fecha: "+TIME.format(detalle.anuladoEn())),null));
+        }
+        return rows;
+    }
+    private static Map<String,Object> row(String kind,String label,BigDecimal amount){
+        var fields=new HashMap<String,Object>();fields.put("rowKind",kind);fields.put("rowLabel",label);fields.put("rowAmount",amount);return fields;
+    }
+    private static String clean(String value){return value==null?null:value.replaceAll("[\\p{Cntrl}&&[^\\n]]"," ");}
+    private static String optional(String label,String value){return value==null||value.isBlank()?null:label+": "+clean(value);}
+    private static String lines(String... values){return Arrays.stream(values).filter(x->x!=null&&!x.isBlank()).map(CobroClientePdfService::clean).collect(Collectors.joining("\n"));}
+    private static int lineCount(String text,int width,int size){
+        if(text==null||text.isBlank())return 0;
+        var font=new java.awt.Font("SansSerif",java.awt.Font.PLAIN,size);
+        var ctx=new java.awt.font.FontRenderContext(null,true,true);
+        return Arrays.stream(text.split("\n",-1)).mapToInt(p->Math.max(1,(int)Math.ceil(font.getStringBounds(p,ctx).getWidth()/width))).sum();
+    }
 }

@@ -3,10 +3,7 @@ import com.citacloud.springboot.contacloud.app.dto.ArchivoPdfDto;
 import com.citacloud.springboot.contacloud.app.models.TipoDocumentoImpresion;
 import com.citacloud.springboot.contacloud.app.services.BillingPrintApplicationService;
 import com.citacloud.springboot.contacloud.app.errors.UiErrorHandler;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.server.*;
-import java.io.ByteArrayInputStream;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 /** One presentation handler for every registered billing document. No fallback changes the output mode. */
@@ -23,5 +20,5 @@ public class BillingPrintUi {
  public AppActionButton boton(TipoDocumentoImpresion type,UUID id,ButtonSize size,String label){
   return new BillingPrintActionButton(id,size,label,(document,attempt)->imprimir(type,document,attempt));
  }
- void mostrarPdf(ArchivoPdfDto file){var resource=new StreamResource(file.nombreArchivo(),()->new ByteArrayInputStream(file.contenido()));resource.setContentType("application/pdf");resource.setCacheTime(0);var registration=VaadinSession.getCurrent().getResourceRegistry().registerResource(resource);UI.getCurrent().getPage().open(registration.getResourceUri().toString(),"_blank");}
+ void mostrarPdf(ArchivoPdfDto file){PdfEnPestana.abrir(file);}
 }
