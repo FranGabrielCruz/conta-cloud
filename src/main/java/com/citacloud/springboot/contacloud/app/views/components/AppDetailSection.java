@@ -1,5 +1,6 @@
 package com.citacloud.springboot.contacloud.app.views.components;
 
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
@@ -17,14 +18,22 @@ public class AppDetailSection extends Div {
     }
 
     public AppDetailSection field(String label, String value) {
-        var item = new Div();
-        item.addClassName("cc-detail-field");
-        var fieldLabel = new Span(label);
-        fieldLabel.addClassName("cc-detail-label");
         String displayValue = value == null || value.isBlank() ? "No especificado" : value;
         var fieldValue = new Span(displayValue);
         fieldValue.addClassName("cc-detail-value");
         fieldValue.getElement().setAttribute("title", displayValue);
+        return addField(label, fieldValue);
+    }
+
+    public AppDetailSection badge(String label, AppStatusBadge value) {
+        return addField(label, new Div(value));
+    }
+
+    private AppDetailSection addField(String label, Component fieldValue) {
+        var item = new Div();
+        item.addClassName("cc-detail-field");
+        var fieldLabel = new Span(label);
+        fieldLabel.addClassName("cc-detail-label");
         item.add(fieldLabel, fieldValue);
         fields.add(item);
         return this;

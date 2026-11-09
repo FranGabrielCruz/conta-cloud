@@ -104,6 +104,8 @@ class RecibosVentaViewTest {
         assertThat(pie(detalle)).extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Cerrar");
         assertThat(descendientes(detalle).map(c->c.getElement().getText()))
             .contains("Anulado","ANULACIÓN","Cobro incorrecto","DOP 10.00");
+        assertThat(descendientes(detalle).filter(com.citacloud.springboot.contacloud.app.views.components.AppStatusBadge.class::isInstance))
+            .singleElement().satisfies(badge -> assertThat(badge.getElement().getThemeList()).contains("badge", "error"));
         verify(historial).buscar("",null,null,null,0,10);
     }
 

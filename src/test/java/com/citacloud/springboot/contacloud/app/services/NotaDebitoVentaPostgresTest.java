@@ -209,12 +209,26 @@ class NotaDebitoVentaPostgresTest {
     void unReciboPuedeCobrarFacturaYNotaEnLaMismaTransaccion(boolean cerrarTurno){
       prepararCajaPrueba();receivable(0);
       tx.execute(status->{
+        UUID termino=jdbc.queryForObject("select id from condiciones_pago where tenant_id=? and empresa_id=? and activo and dias>0 order by dias limit 1",UUID.class,tenant,company);
+        jdbc.update("update sales_invoice set payment_condition='Crédito',payment_term_id=?,credit_days=30,due_date=current_date+30,received_amount=0,change_amount=0 where id=?",termino,invoice);
+        var cartera=new CuentasCobrarConsultaRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var alcance=new CuentasCobrarConsultaRepository.Alcance(tenant,company,true,Set.of(),java.time.ZoneId.of("America/Santo_Domingo"));
+        var consulta=new CuentasCobrarConsultaRepository.Consulta(alcance,
+            new CarteraCobrarDto.Filtro(customer,CarteraCobrarDto.Estado.TODOS,null,null,""),LocalDate.now(alcance.zona()));
         var d=service.emitir(input("50"));UUID original=jdbc.queryForObject("select id from customer_accounts_receivable where sales_invoice_id=? and sales_debit_note_id is null",UUID.class,invoice);
         UUID noteAccount=jdbc.queryForObject("select id from customer_accounts_receivable where sales_debit_note_id=?",UUID.class,d.id());
+        assertThat(cartera.cuenta(consulta,original).orElseThrow().saldo()).isEqualByComparingTo("100");
+        assertThat(cartera.cuenta(consulta,noteAccount).orElseThrow().total()).isEqualByComparingTo("50");
         UUID banco=jdbc.queryForObject("select id from cuentas_bancarias where tenant_id=? and empresa_id=? and moneda_id=? and activo order by id limit 1",UUID.class,tenant,company,currency);
         var request=new CobroClienteInput(customer,currency,branch,LocalDate.now(),new BigDecimal("50"),"REF-TEST","Cobro aislado de factura y nota",testCash,testSession,UUID.randomUUID(),List.of(new CobroClienteInput.AplicacionFactura(original,invoice,new BigDecimal("20")),new CobroClienteInput.AplicacionFactura(noteAccount,invoice,new BigDecimal("30"))),List.of(new AplicacionCobroInput(method("CASH"),new BigDecimal("30"),null,null,null,null),
             new AplicacionCobroInput(method("CREDIT_CARD"),new BigDecimal("20"),null,banco,"REF-TEST",null)));
-        var receipt=receiptService.confirmar(request);assertThat(receipt.aplicado()).isEqualByComparingTo("50");assertThat(query.ciclo(d.id(),false).saldo()).isEqualByComparingTo("20");
+        var receipt=receiptService.confirmar(request);
+        assertThat(cartera.cuenta(consulta,original).orElseThrow().saldo()).isEqualByComparingTo("80");
+        assertThat(cartera.cuenta(consulta,noteAccount).orElseThrow().saldo()).isEqualByComparingTo("20");
+        assertThat(cartera.aplicaciones(consulta,noteAccount)).singleElement().satisfies(a->{
+            assertThat(a.documento()).isEqualTo(receipt.numero());assertThat(a.revertida()).isFalse();
+        });
+        assertThat(receipt.aplicado()).isEqualByComparingTo("50");assertThat(query.ciclo(d.id(),false).saldo()).isEqualByComparingTo("20");
         assertThat(jdbc.queryForObject("select count(*) from customer_receipt_application where customer_receipt_id=?",Integer.class,receipt.id())).isEqualTo(2);
         assertThat(jdbc.queryForList("select invoice_number_snapshot from customer_receipt_application where customer_receipt_id=?",String.class,receipt.id())).contains(d.numero());
         var recibos=new CobroClienteRepository(jdbc);
@@ -256,6 +270,19 @@ class NotaDebitoVentaPostgresTest {
         assertThat(anulado.recibo().numero()).isEqualTo(receipt.numero());
         assertThat(anulado.recibo().motivoAnulacion()).isEqualTo(razon);
         assertThat(anulado.recibo().aplicaciones()).allMatch(CobroClienteDto.Aplicacion::revertida);
+        assertThat(cartera.cuenta(consulta,original).orElseThrow().saldo()).isEqualByComparingTo("100");
+        assertThat(cartera.cuenta(consulta,noteAccount).orElseThrow().saldo()).isEqualByComparingTo("50");
+        assertThat(cartera.aplicaciones(consulta,original)).singleElement().satisfies(a->assertThat(a.revertida()).isTrue());
+        jdbc.update("update sales_invoice set invoice_date=current_date-3,confirmed_at=current_timestamp-interval '3 days' where id=? and tenant_id=? and empresa_id=?",invoice,tenant,company);
+        jdbc.update("update customer_receipt set receipt_date=current_date-2,confirmed_at=current_timestamp-interval '2 days' where id=? and tenant_id=? and empresa_id=?",receipt.id(),tenant,company);
+        jdbc.update("update customer_receipt_application set applied_at=current_timestamp-interval '2 days' where customer_receipt_id=? and accounts_receivable_id=? and tenant_id=? and empresa_id=?",receipt.id(),original,tenant,company);
+        var facturaCartera=cartera.cuenta(consulta,original).orElseThrow();
+        var corteAnterior=new CuentasCobrarConsultaRepository.Consulta(alcance,
+            new CarteraCobrarDto.Filtro(customer,CarteraCobrarDto.Estado.ACTIVA,null,null,facturaCartera.documento()),
+            consulta.corte().minusDays(1));
+        assertThat(cartera.corteReconstruible(corteAnterior)).isTrue();
+        assertThat(cartera.antiguedad(corteAnterior,true)).singleElement()
+            .satisfies(edad->assertThat(edad.total()).isEqualByComparingTo("80"));
         assertThat(recibos.datosAnulacion(receipt.id(),tenant,company).fecha()).isNotNull();
         assertThat(receiptService.anularConResultado(receipt.id(),"Otro intento").yaAnulado()).isTrue();
         assertThat(jdbc.queryForObject("select count(*) from auditoria where registro_id=? and accion='CUSTOMER_RECEIPT_VOIDED'",Integer.class,receipt.id())).isEqualTo(1);
@@ -307,6 +334,74 @@ class NotaDebitoVentaPostgresTest {
         assertThat(r.detalle(id,UUID.randomUUID(),company)).isNull();
         assertThat(r.detalle(id,tenant,UUID.randomUUID())).isNull();
         assertThatThrownBy(()->receiptService.anular(id,"Prueba")).hasMessageContaining("flujo de devolución");
+        status.setRollbackOnly();return null;
+      });
+    }
+
+    @Test void carteraPaginadaYAntiguedadUsanElConjuntoCompletoYRespetanAlcance(){
+      tx.execute(status->{
+        UUID termino=jdbc.queryForObject("select id from condiciones_pago where tenant_id=? and empresa_id=? and activo and dias>0 order by dias limit 1",UUID.class,tenant,company);
+        String codigo="CXC-"+invoice.toString().substring(0,8);
+        jdbc.update("""
+            insert into sales_invoice
+            select (jsonb_populate_record(null::sales_invoice,to_jsonb(f)||jsonb_build_object(
+                'id',gen_random_uuid(),'idempotency_key',gen_random_uuid(),'internal_number',?||(case when i<=37 then '-F-' else '-O-' end)||i,
+                'invoice_date',current_date-180,'confirmed_at',current_timestamp-interval '180 days',
+                'payment_condition','Crédito','payment_term_id',?::uuid,'credit_days',30,
+                'due_date',current_date-(case mod(i,5) when 0 then -15 when 1 then 15 when 2 then 45 when 3 then 75 else 120 end),
+                'received_amount',0,'change_amount',0))).*
+              from sales_invoice f cross join generate_series(1,100) i where f.id=? and f.tenant_id=? and f.empresa_id=?
+            """,codigo,termino,invoice,tenant,company);
+        jdbc.update("""
+            insert into customer_accounts_receivable(tenant_id,empresa_id,sales_invoice_id,customer_id,currency_id,
+                due_date,original_amount,applied_amount,status)
+            select tenant_id,empresa_id,id,customer_id,currency_id,due_date,total,0,'PENDING'
+              from sales_invoice where tenant_id=? and empresa_id=? and internal_number like ?
+            """,tenant,company,codigo+"-%");
+        var repo=new CuentasCobrarConsultaRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var zona=java.time.ZoneId.of("America/Santo_Domingo");
+        var alcance=new CuentasCobrarConsultaRepository.Alcance(tenant,company,true,Set.of(),zona);
+        LocalDate hoy=jdbc.queryForObject("select current_date",LocalDate.class);
+        var filtro=new CarteraCobrarDto.Filtro(customer,CarteraCobrarDto.Estado.ACTIVA,null,null,codigo);
+        var consulta=new CuentasCobrarConsultaRepository.Consulta(alcance,filtro,hoy);
+        var pagina=repo.cuentas(consulta,org.springframework.data.domain.PageRequest.of(0,10));
+        assertThat(pagina.getContent()).hasSize(10);
+        assertThat(pagina.getTotalElements()).isEqualTo(100);
+        assertThat(repo.carteraCompleta(consulta)).hasSize(100);
+        var filtrada=new CuentasCobrarConsultaRepository.Consulta(alcance,
+            new CarteraCobrarDto.Filtro(customer,CarteraCobrarDto.Estado.ACTIVA,null,null,codigo+"-F-"),hoy);
+        assertThat(repo.cuentas(filtrada,org.springframework.data.domain.PageRequest.of(0,10)).getTotalElements()).isEqualTo(37);
+        assertThat(repo.carteraCompleta(filtrada)).hasSize(37);
+        assertThat(repo.indicadores(filtrada).monedas()).singleElement()
+            .satisfies(m->assertThat(m.saldo()).isEqualByComparingTo("3700"));
+        assertThat(repo.clientes(consulta,org.springframework.data.domain.PageRequest.of(0,10)).getContent())
+            .singleElement().satisfies(c->assertThat(c.saldo()).isEqualByComparingTo("10000"));
+        assertThat(repo.opciones(consulta,0,10)).singleElement().satisfies(c->assertThat(c.id()).isEqualTo(customer));
+        var resumen=repo.indicadores(consulta);
+        assertThat(resumen.clientes()).isEqualTo(1);
+        assertThat(resumen.monedas()).singleElement().satisfies(m->{
+          assertThat(m.saldo()).isEqualByComparingTo("10000");
+          assertThat(m.corriente()).isEqualByComparingTo("2000");
+          assertThat(m.vencido()).isEqualByComparingTo("8000");
+        });
+        assertThat(repo.antiguedad(consulta,false)).singleElement().satisfies(m->{
+          assertThat(List.of(m.corriente(),m.hasta30(),m.hasta60(),m.hasta90(),m.mas90()))
+              .allSatisfy(x->assertThat(x).isEqualByComparingTo("2000"));
+          assertThat(m.total()).isEqualByComparingTo("10000");
+        });
+        var historica=new CuentasCobrarConsultaRepository.Consulta(alcance,filtro,hoy.minusDays(1));
+        assertThat(repo.corteReconstruible(historica)).isTrue();
+        assertThat(repo.antiguedad(historica,true)).singleElement().satisfies(m->assertThat(m.total()).isEqualByComparingTo("10000"));
+        var ajena=new CuentasCobrarConsultaRepository.Consulta(
+            new CuentasCobrarConsultaRepository.Alcance(UUID.randomUUID(),company,true,Set.of(),zona),filtro,hoy);
+        assertThat(repo.carteraCompleta(ajena)).isEmpty();
+        assertThat(repo.cuenta(ajena,pagina.getContent().getFirst().id())).isEmpty();
+        var otraSucursal=new CuentasCobrarConsultaRepository.Consulta(
+            new CuentasCobrarConsultaRepository.Alcance(tenant,company,false,Set.of(UUID.randomUUID()),zona),filtro,hoy);
+        assertThat(repo.carteraCompleta(otraSucursal)).isEmpty();
+        var literal=new CuentasCobrarConsultaRepository.Consulta(alcance,
+            new CarteraCobrarDto.Filtro(customer,CarteraCobrarDto.Estado.ACTIVA,null,null,codigo+"-%"),hoy);
+        assertThat(repo.carteraCompleta(literal)).isEmpty();
         status.setRollbackOnly();return null;
       });
     }

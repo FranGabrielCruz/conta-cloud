@@ -1371,3 +1371,11 @@ vaadin-button.cc-cash-refresh { --cc-action-color:var(--cc-action-new); }
   flex-wrap: nowrap;
   padding: 4px;
 }
+
+vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
+.cc-cartera-indicadores { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 12px; width: 100%; margin-bottom: 12px; }
+.cc-cartera-indicadores .cc-card { padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.cc-cartera-importe { font-size: var(--lumo-font-size-l); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cc-cartera-filtros { display: grid; grid-template-columns: minmax(180px,1.3fr) minmax(125px,.75fr) repeat(2,minmax(130px,.8fr)) minmax(200px,1.5fr); gap: 12px; width: 100%; align-items: end; }
+.cc-cartera-filtros > * { width: 100%; min-width: 0; }
+@media (max-width: 1000px) { .cc-cartera-filtros { grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); } }

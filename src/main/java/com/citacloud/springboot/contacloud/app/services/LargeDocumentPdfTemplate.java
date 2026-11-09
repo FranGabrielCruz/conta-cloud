@@ -83,6 +83,40 @@ final class LargeDocumentPdfTemplate {
         return replaceSection(base,"detail",detail);
     }
 
+    static String cartera(boolean logo,int corporateHeight,int boxHeight,boolean antiguedad)throws IOException{
+        String titulo=antiguedad?"ANTIGÜEDAD DE SALDOS":"CUENTAS POR COBRAR";
+        String base=receipt(logo,corporateHeight,boxHeight,false)
+            .replace("RECIBO DE COBRO",titulo).replace("customer_receipt_large",antiguedad?"receivable_aging":"receivable_portfolio")
+            .replace("DATOS DEL RECIBO","FILTROS APLICADOS")
+            .replace("\"Moneda: \" + $P{currencyCode}","\"Cartera por moneda\"");
+        int[] anchos=antiguedad?new int[]{202,55,87,87,87,87,87,90}:new int[]{102,65,65,235,55,90,90,80};
+        String[] etiquetas=antiguedad
+            ?new String[]{"CLIENTE","MONEDA","CORRIENTE","1–30 DÍAS","31–60 DÍAS","61–90 DÍAS","+90 DÍAS","TOTAL"}
+            :new String[]{"DOCUMENTO","FECHA","VENCE","CLIENTE","MONEDA","TOTAL","SALDO","ESTADO"};
+        String campos=java.util.stream.IntStream.range(0,anchos.length)
+            .mapToObj(i->"<field name=\"dato"+i+"\" class=\"java.lang.String\"/>").collect(java.util.stream.Collectors.joining());
+        int primerCampo=base.indexOf("<field ");
+        base=base.substring(0,primerCampo)+campos+base.substring(primerCampo);
+        var columnas=new StringBuilder("<columnHeader><band height=\"24\">");
+        var detalle=new StringBuilder("<detail><band height=\"20\" splitType=\"Prevent\">").append(when("LINE"));
+        int x=0;
+        for(int i=0;i<anchos.length;i++){
+            boolean importe=antiguedad?i>=2:i==5||i==6;
+            String alineacion=importe?"Right":"Left";
+            columnas.append(staticText(etiquetas[i],x,0,anchos[i],24,"TableHeader",alineacion)
+                .replace("<textElement","<box leftPadding=\"4\" rightPadding=\"4\"/><textElement"));
+            detalle.append(field("$F{dato"+i+"}",x+3,3,anchos[i]-6,16,"Base",alineacion,i==(antiguedad?0:3)));
+            x+=anchos[i];
+        }
+        columnas.append("</band></columnHeader>");
+        detalle.append("</band>");
+        String anterior=section(base,"detail");
+        // Reutiliza las bandas de sección, observaciones y totales del documento grande.
+        int bandasComunes=anterior.indexOf("</band>",anterior.indexOf("</band>")+7)+7;
+        base=replaceSection(base,"detail",detalle+anterior.substring(bandasComunes));
+        return base.replace("<detail>",columnas+"<detail>");
+    }
+
     private static String when(String kind){return "<printWhenExpression><![CDATA[\""+kind+"\".equals($F{rowKind})]]></printWhenExpression>";}
     private static String staticText(String text,int x,int y,int w,int h,String style,String align){return "<staticText><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\" verticalAlignment=\"Middle\"/><text><![CDATA["+text+"]]></text></staticText>";}
     private static String field(String expression,int x,int y,int w,int h,String style,String align,boolean stretch){return "<textField pattern=\"#,##0.00\""+(stretch?" textAdjust=\"StretchHeight\"":"")+"><reportElement style=\""+style+"\" x=\""+x+"\" y=\""+y+"\" width=\""+w+"\" height=\""+h+"\"/><textElement textAlignment=\""+align+"\"/><textFieldExpression><![CDATA["+expression+"]]></textFieldExpression></textField>";}

@@ -55,14 +55,14 @@ class NotasCreditoVentaViewTest {
 
     @Test void listadoSoloOfreceVerInclusoSiTienePermisoPdf(){
         var v=view(Set.of("notas_credito.ver","notas_credito.pdf"));var row=new com.citacloud.springboot.contacloud.app.repositories.NotaCreditoVentaConsultaRepository.Resumen(UUID.randomUUID(),"NC-1",java.time.LocalDate.now(),"Consumidor Final","FAC-1",null,"DOP",java.math.BigDecimal.TEN,"VOIDED");
-        var action=v.acciones(row);assertThat(action).isInstanceOf(Button.class);assertThat(((Button)action).getAriaLabel()).contains("Ver nota de crédito");assertThat(action.getChildren().filter(Button.class::isInstance)).isEmpty();assertThat(NotasCreditoVentaView.estadoNota(row.estado())).isEqualTo("Anulada");
+        var action=v.acciones(row);assertThat(action).isInstanceOf(Button.class);assertThat(((Button)action).getAriaLabel()).contains("Ver nota de crédito");assertThat(action.getChildren().filter(Button.class::isInstance)).isEmpty();
     }
 
     @Test void detalleTieneDoceCamposEnCuatroColumnasYSeparaOrigen(){
         var d=mock(com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaDocumento.class);when(d.fecha()).thenReturn(java.time.LocalDate.now());when(d.fechaFactura()).thenReturn(java.time.LocalDate.now());when(d.factura()).thenReturn("FAC-1");when(d.moneda()).thenReturn("DOP");
         var direct=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(UUID.randomUUID(),null,null,0,"CONFIRMED",true,null,null,null);var section=NotasCreditoVentaView.informacionNota(d,direct);
-        assertThat(section.getClassNames()).contains("cc-detail-four");assertThat(tree(section).filter(c->c.hasClassName("cc-detail-label")).map(c->c.getElement().getText())).containsExactly("Fecha","Estado","Cliente","RNC/Cédula","Factura","Fecha factura","NCF afectado","NCF de la nota","Moneda","Origen","Documento origen","Estado origen");assertThat(tree(section).map(c->c.getElement().getText())).contains("Consumidor Final","Crédito financiero","Emitida","—");
-        when(d.devolucion()).thenReturn("DEV-1");var returned=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(direct.facturaId(),UUID.randomUUID(),"CONFIRMED",1,"VOIDED",false,"Error","Operador",java.time.LocalDateTime.now());assertThat(tree(NotasCreditoVentaView.informacionNota(d,returned)).map(c->c.getElement().getText())).contains("Devolución","DEV-1","Confirmada","Anulada");
+        assertThat(section.getClassNames()).contains("cc-detail-four");assertThat(tree(section).filter(c->c.hasClassName("cc-detail-label")).map(c->c.getElement().getText())).containsExactly("Fecha","Estado","Cliente","RNC/Cédula","Factura","Fecha factura","NCF afectado","NCF de la nota","Moneda","Origen","Documento origen","Estado origen");assertThat(tree(section).map(c->c.getElement().getText())).contains("Consumidor Final","Crédito financiero","Emitido","—");
+        when(d.devolucion()).thenReturn("DEV-1");var returned=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(direct.facturaId(),UUID.randomUUID(),"CONFIRMED",1,"VOIDED",false,"Error","Operador",java.time.LocalDateTime.now());assertThat(tree(NotasCreditoVentaView.informacionNota(d,returned)).map(c->c.getElement().getText())).contains("Devolución","DEV-1","Confirmada","Anulado");
     }
 
     @Test void detalleOfreceSoloImprimirAnularYCerrarSegunEstado(){

@@ -12,8 +12,7 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import jakarta.annotation.security.PermitAll;
 
-@Route(value = "cuentas-por-cobrar", layout = MainLayout.class)
-@RouteAlias(value = "catalogo-cuentas", layout = MainLayout.class)
+@Route(value = "catalogo-cuentas", layout = MainLayout.class)
 @RouteAlias(value = "asientos", layout = MainLayout.class)
 @RouteAlias(value = "libro-diario", layout = MainLayout.class)
 @RouteAlias(value = "libro-mayor", layout = MainLayout.class)

@@ -49,12 +49,12 @@ public class NotasCreditoVentaView extends VerticalLayout implements BeforeEnter
         grid.addColumn(Resumen::numero).setHeader("Nº nota").setAutoWidth(true);grid.addColumn(x->DATE.format(x.fecha())).setHeader("Fecha").setAutoWidth(true);
         grid.addColumn(Resumen::cliente).setHeader("Cliente").setFlexGrow(1);grid.addColumn(Resumen::factura).setHeader("Factura").setAutoWidth(true);
         grid.addColumn(x->valor(x.ncf())).setHeader("NCF").setAutoWidth(true);grid.addColumn(x->money(x.moneda(),x.total())).setHeader("Total").setAutoWidth(true).setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(x->estadoNota(x.estado())).setHeader("Estado").setAutoWidth(true);grid.addComponentColumn(this::acciones).setHeader("Acciones").setAutoWidth(true).setFlexGrow(0);grid.setEmptyStateText("No se encontraron notas de crédito.");
+        grid.addComponentColumn(x->EstadoDocumentoVenta.nota(x.estado())).setHeader("Estado").setKey("estado").setAutoWidth(true).setFlexGrow(0);grid.addComponentColumn(this::acciones).setHeader("Acciones").setAutoWidth(true).setFlexGrow(0);grid.setEmptyStateText("No se encontraron notas de crédito.");
         Div filtros=new Div(buscar,cliente,estado,desde,hasta);filtros.addClassNames("cc-filter-bar","cc-credit-note-filters");add(filtros,grid,pagination);
     }
     @Override public void beforeEnter(BeforeEnterEvent event){if(!modulos.habilitado("VENTAS")||!puede("notas_credito.ver")){Notification.show("No tienes permiso para acceder a esta opción.");event.rerouteTo(DashboardView.class);return;}cargar();}
     Component acciones(Resumen n){return new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver nota de crédito",e->{try{ver(service.obtener(n.id()));}catch(RuntimeException ex){error(ex);}});}
-    static String estadoNota(String value){return "VOIDED".equals(value)?"Anulada":"Emitida";}
+
     private void cargar(){try{var p=pagination.currentRequest();var page=service.buscar(buscar.getValue(),cliente.getValue(),desde.getValue(),hasta.getValue(),p.page(),p.size(),estado.getValue()==null?"":"Anulada".equals(estado.getValue())?"VOIDED":"CONFIRMED");grid.setItems(page.getContent());pagination.setTotal(page.getTotalElements());}catch(RuntimeException ex){grid.setItems(List.of());pagination.setTotal(0);error(ex);}}
     private void reiniciar(){pagination.reset();cargar();}
     private void nueva(){
@@ -141,7 +141,7 @@ public class NotasCreditoVentaView extends VerticalLayout implements BeforeEnter
         return acciones;
     }
     static AppDetailSection informacionNota(NotaCreditoVentaDocumento n,NotaCreditoVentaCicloDto c){
-        var section=new AppDetailSection("INFORMACIÓN / DOCUMENTO ORIGEN").field("Fecha",DATE.format(n.fecha())).field("Estado",estadoNota(c.estado())).field("Cliente",NotaCreditoVentaService.nombreCliente(n.cliente())).field("RNC/Cédula",valor(n.identificacion())).field("Factura",n.factura()).field("Fecha factura",DATE.format(n.fechaFactura())).field("NCF afectado",valor(n.ncfFactura())).field("NCF de la nota",valor(n.ncf())).field("Moneda",n.moneda()).field("Origen",c.devolucionId()==null?"Crédito financiero":"Devolución").field("Documento origen",valor(n.devolucion())).field("Estado origen",c.estadoOrigen()==null?"—":"CONFIRMED".equals(c.estadoOrigen())?"Confirmada":"VOIDED".equals(c.estadoOrigen())?"Anulada":c.estadoOrigen());section.addClassName("cc-detail-four");return section;
+        var section=new AppDetailSection("INFORMACIÓN / DOCUMENTO ORIGEN").field("Fecha",DATE.format(n.fecha())).badge("Estado",EstadoDocumentoVenta.nota(c.estado())).field("Cliente",NotaCreditoVentaService.nombreCliente(n.cliente())).field("RNC/Cédula",valor(n.identificacion())).field("Factura",n.factura()).field("Fecha factura",DATE.format(n.fechaFactura())).field("NCF afectado",valor(n.ncfFactura())).field("NCF de la nota",valor(n.ncf())).field("Moneda",n.moneda()).field("Origen",c.devolucionId()==null?"Crédito financiero":"Devolución").field("Documento origen",valor(n.devolucion())).field("Estado origen",c.estadoOrigen()==null?"—":"CONFIRMED".equals(c.estadoOrigen())?"Confirmada":"VOIDED".equals(c.estadoOrigen())?"Anulada":c.estadoOrigen());section.addClassName("cc-detail-four");return section;
     }
     private void confirmarAnulacion(Dialog parent,NotaCreditoVentaDocumento n,NotaCreditoVentaCicloDto state){
         Dialog confirm=new Dialog();confirm.setHeaderTitle("ANULAR NOTA DE CRÉDITO");confirm.add(new Paragraph("Está a punto de anular la nota "+n.numero()+". Se revertirán únicamente sus efectos financieros y quedará registrada en el historial."));

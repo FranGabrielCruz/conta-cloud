@@ -19,6 +19,7 @@ public enum ActionType {
     ISSUE("Emitir", VaadinIcon.PAPERPLANE, "success"),
     PDF("Ver PDF", VaadinIcon.FILE_TEXT_O, "view"),
     PRINT("Imprimir", VaadinIcon.PRINT, "view"),
+    ANALYTICS("Análisis", VaadinIcon.BAR_CHART, "analytics"),
     REFRESH("Actualizar", VaadinIcon.REFRESH, "neutral"),
     DUPLICATE("Duplicar", VaadinIcon.COPY, "neutral"),
     RECOVER("Recuperar", VaadinIcon.PLAY, "view"),

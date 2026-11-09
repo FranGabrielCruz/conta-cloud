@@ -53,7 +53,7 @@ public class RecibosVentaView extends VerticalLayout implements BeforeEnterObser
         grid.addColumn(ReciboHistorialDto.Resumen::cliente).setHeader("Cliente").setFlexGrow(2);
         grid.addComponentColumn(r->documentos(r.documentos())).setHeader("Documento(s)").setAutoWidth(true);
         grid.addColumn(r->importe(r.moneda(),r.total())).setHeader("Total").setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-        grid.addColumn(r->estado(r.estado())).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
+        grid.addComponentColumn(r->EstadoDocumentoVenta.recibo(r.estado())).setHeader("Estado").setKey("estado").setAutoWidth(true).setFlexGrow(0);
         grid.addComponentColumn(this::acciones)
             .setHeader("Acc.").setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.CENTER);
         grid.setEmptyStateText("No se encontraron recibos.");
@@ -109,7 +109,7 @@ public class RecibosVentaView extends VerticalLayout implements BeforeEnterObser
         var info=new AppDetailSection("INFORMACIÓN")
             .field("Fecha",FECHA.format(d.receiptDateTime())).field("Cliente",d.customer().name())
             .field("RNC/Cédula",valor(d.customer().identification())).field("Moneda",r.moneda())
-            .field("Estado",estado(r.estado())).field("Total cobrado",importe(r.moneda(),d.totalCollected()))
+            .badge("Estado",EstadoDocumentoVenta.recibo(r.estado())).field("Total cobrado",importe(r.moneda(),d.totalCollected()))
             .field("Caja",valor(d.cashRegister())).field("Usuario",valor(d.operator()));
         info.addClassName("cc-detail-four");
         var aplicaciones=new AppGrid<CobroClienteDto.Aplicacion>(CobroClienteDto.Aplicacion.class);
@@ -216,7 +216,7 @@ public class RecibosVentaView extends VerticalLayout implements BeforeEnterObser
         var d=new DatePicker(label);d.setLocale(Locale.forLanguageTag("es-DO"));
         d.setI18n(new DatePicker.DatePickerI18n().setDateFormat("dd/MM/yyyy"));d.setClearButtonVisible(true);return d;
     }
-    static String estado(EstadoReciboCliente estado){return estado==EstadoReciboCliente.VOIDED?"Anulado":"Emitido";}
+
     static String importe(String moneda,BigDecimal valor){return valor==null?"—":moneda+" "+PosNumberFormatter.money(valor);}
     private static String valor(String s){return s==null||s.isBlank()?"—":s;}
     private static boolean permiso(String permiso){return TenantContext.principalActual().permisos().contains(permiso);}

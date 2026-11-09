@@ -45,7 +45,7 @@ public class UsuariosView extends VerticalLayout implements BeforeEnterObserver 
         grid.addColumn(u->u.nombre()+" "+u.apellido()).setHeader("Nombre completo");
         grid.addColumn(UsuarioDto::correo).setHeader("Correo");grid.addColumn(UsuarioDto::telefono).setHeader("Teléfono");
         grid.addColumn(UsuarioDto::rolNombre).setHeader("Rol");grid.addColumn(UsuarioDto::sucursalesResumen).setHeader("Sucursales");
-        grid.addComponentColumn(u->estado(u.activo())).setHeader("Estado");
+        grid.addComponentColumn(u->AppStatusBadge.activo(u.activo())).setHeader("Estado");
         grid.addComponentColumn(this::acciones).setHeader("Acciones").setAutoWidth(true).setFlexGrow(0);
     }
     private Component acciones(UsuarioDto u){var row=new HorizontalLayout();row.setPadding(false);row.setSpacing(false);
@@ -77,7 +77,7 @@ public class UsuariosView extends VerticalLayout implements BeforeEnterObserver 
     }
     private void ver(UsuarioDto u){var d=new Dialog();d.setHeaderTitle("Detalle del usuario");d.add(new AppDetailSection("Información").field("Usuario",u.usuario()).field("Nombre",u.nombre()+" "+u.apellido()).field("Correo",u.correo()).field("Teléfono",u.telefono()).field("Rol",u.rolNombre()).field("Sucursales",u.sucursalesResumen()).field("Estado",u.activo()?"Activo":"Inactivo"));d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}
     private void confirmarDesactivar(UsuarioDto u){var c=new ConfirmDialog();c.setHeader("Desactivar usuario");c.setText("¿Desea desactivar el acceso de "+u.usuario()+" a esta empresa?");c.setCancelable(true);c.setCancelText("Cancelar");c.setConfirmText("Desactivar");c.setConfirmButtonTheme("error primary");c.addConfirmListener(e->{try{service.desactivar(u.accesoId());cargar();notificar("Usuario desactivado.");}catch(RuntimeException ex){com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex,"No fue posible desactivar el usuario.");}});c.open();}
-    private static Span estado(boolean activo){var s=new Span(activo?"Activo":"Inactivo");s.getElement().getThemeList().add("badge "+(activo?"success":"contrast"));return s;}
+
     private static boolean puede(String a,String b){var p=TenantContext.principalActual().permisos();return p.contains(a)||p.contains(b);}
     private static String valor(String v){return v==null?"":v;} private static void notificar(String m){com.vaadin.flow.component.notification.Notification.show(m==null?"No fue posible completar la operación.":m);}
 }

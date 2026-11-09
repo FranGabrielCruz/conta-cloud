@@ -35,7 +35,7 @@ public final class PhaseTwoNavigation {
             item("Recibos", "recibos", "RECORDS", VENTAS, "recibos.ver",
                 "Consulta los recibos de cobro emitidos."),
             item("Cuentas por cobrar", "cuentas-por-cobrar", "MONEY_DEPOSIT", VENTAS, "cuentas_cobrar.ver",
-                "Consulta y administra las cuentas pendientes de cobro."))),
+                "Consulta saldos, vencimientos y aplicaciones de cartera."))),
         new Section("COMPRAS", List.of(
             item("Proveedores", "proveedores", "TRUCK", COMPRAS, "proveedores.ver",
                 "Administra los proveedores de la empresa."),
