@@ -105,7 +105,8 @@ public final class PhaseTwoNavigation {
             item("IT-1", "fiscal/it-1", "CLIPBOARD_TEXT", FISCAL, "fiscal_it1.ver", placeholder("IT-1")),
             item("IR-17", "fiscal/ir-17", "CLIPBOARD_TEXT", FISCAL, "fiscal_ir17.ver", placeholder("IR-17")))),
         new Section("ACTIVOS FIJOS", List.of(
-            item("Activos", "activos-fijos", "BUILDING", ACTIVOS_FIJOS, "activos_fijos.ver", placeholder("Activos")),
+            item("Activos", "activos-fijos", "BUILDING", ACTIVOS_FIJOS, "activos_fijos.ver",
+                "Administra el registro maestro de activos fijos."),
             item("Depreciaciones", "activos-fijos/depreciaciones", "TRENDING_DOWN", ACTIVOS_FIJOS, "depreciaciones.ver", placeholder("Depreciaciones")),
             item("Mantenimiento", "activos-fijos/mantenimiento", "WRENCH", ACTIVOS_FIJOS, "mantenimiento_activos.ver", placeholder("Mantenimiento")),
             item("Bajas", "activos-fijos/bajas", "TRASH", ACTIVOS_FIJOS, "bajas_activos.ver", placeholder("Bajas")))),

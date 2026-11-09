@@ -93,6 +93,76 @@ final class LargeDocumentPdfTemplate {
         String[] etiquetas=antiguedad
             ?new String[]{"CLIENTE","MONEDA","CORRIENTE","1–30 DÍAS","31–60 DÍAS","61–90 DÍAS","+90 DÍAS","TOTAL"}
             :new String[]{"DOCUMENTO","FECHA","VENCE","CLIENTE","MONEDA","TOTAL","SALDO","ESTADO"};
+        return tablaReporte(base,anchos,etiquetas,i->(antiguedad?i>=2:i==5||i==6)?"Right":"Left",i->i==(antiguedad?0:3));
+    }
+
+    static String activosFijos(boolean logo,boolean conFiltros)throws IOException{
+        String base=receipt(logo,90,36,false)
+            .replace("RECIBO DE COBRO","REPORTE DE ACTIVOS FIJOS")
+            .replace("customer_receipt_large","fixed_asset_register");
+        int primerParametro=base.indexOf("<parameter ");
+        base=base.substring(0,primerParametro)
+            +"<style name=\"AssetMetric\" style=\"Heading\" fontSize=\"12\"/>"
+            +base.substring(primerParametro);
+        int primerCampo=base.indexOf("<field ");
+        String parametros=java.util.stream.Stream.of("assetFilters","assetCount","assetCost","assetDepreciation","assetBook")
+            .map(p->"<parameter name=\""+p+"\" class=\"java.lang.String\"/>")
+            .collect(java.util.stream.Collectors.joining());
+        base=base.substring(0,primerCampo)+parametros+base.substring(primerCampo);
+        var titulo=section(base,"title");
+        int banda=titulo.indexOf("<band ");
+        String empresa=titulo.substring(titulo.indexOf('>',banda)+1,titulo.indexOf("<rectangle"))
+            .replace("\"Moneda: \" + $P{currencyCode}","\"\"");
+
+        int resumenY=conFiltros?106:89;
+        var cabecera=new StringBuilder("<title><band height=\""+(resumenY+53)+"\" splitType=\"Stretch\">")
+            .append(empresa);
+        if(conFiltros)cabecera.append(field("$P{assetFilters}",0,84,782,14,"Base","Left",true));
+        cabecera.append("<frame><reportElement positionType=\"Float\" x=\"0\" y=\"").append(resumenY)
+            .append("\" width=\"782\" height=\"49\"/>")
+            .append(lineaHorizontal(0,"#CBD5E1"))
+            .append(staticText("RESUMEN",0,4,782,12,"Section","Left"))
+            .append(metricaActivo("ACTIVOS INCLUIDOS","assetCount",0,156));
+        String[] etiquetas={"COSTO DE ADQUISICIÓN","DEPRECIACIÓN ACUM.","VALOR EN LIBROS"};
+        String[] metricas={"assetCost","assetDepreciation","assetBook"};
+        cabecera.append("<frame><reportElement x=\"156\" y=\"0\" width=\"626\" height=\"49\">")
+            .append("<printWhenExpression><![CDATA[$P{assetCost} != null]]></printWhenExpression></reportElement>");
+        for(int i=0;i<metricas.length;i++)cabecera.append(metricaActivo(etiquetas[i],metricas[i],i*208,208));
+        cabecera.append("</frame></frame></band></title>");
+        base=replaceSection(base,"title",cabecera.toString());
+        base=replaceSection(base,"pageHeader","<pageHeader><band height=\"26\" splitType=\"Prevent\">"
+            +"<printWhenExpression><![CDATA[$V{PAGE_NUMBER} > 1]]></printWhenExpression>"
+            +field("$P{companyTradeName}",0,2,410,20,"AssetMetric","Left",false)
+            +staticText("REPORTE DE ACTIVOS FIJOS",449,0,333,12,"Section","Right")
+            +field("\"Fecha: \" + $P{orderDate}",449,12,333,12,"Base","Right",false)
+            +"</band></pageHeader>");
+
+        int[] anchos={77,167,122,74,51,95,95,101};
+        base=tablaReporte(base,anchos,
+            new String[]{"CÓDIGO","ACTIVO","CATEGORÍA","ADQUISICIÓN","MONEDA","COSTO","DEP. ACUM.","VALOR EN LIBROS"},
+            i->i>=5?"Right":i>=3?"Center":"Left",i->i==1||i==2);
+        var totales=new StringBuilder("<band height=\"23\" splitType=\"Prevent\">").append(when("ASSET_TOTAL"))
+            .append(lineaHorizontal(0,"#CBD5E1"))
+            .append(field("$F{dato0}",3,5,anchos[0]+anchos[1]-6,15,"Section","Left",false));
+        int x=java.util.Arrays.stream(anchos,0,5).sum();
+        for(int i=5;i<anchos.length;i++){
+            totales.append(field("$F{dato"+i+"}",x+3,5,anchos[i]-6,15,"Section","Right",false));
+            x+=anchos[i];
+        }
+        return base.replace("</detail>",totales+"</band></detail>");
+    }
+
+    private static String metricaActivo(String etiqueta,String parametro,int x,int ancho){
+        return staticText(etiqueta,x,17,ancho,12,"Section","Left")
+            +field("$P{"+parametro+"}",x,30,ancho,17,"AssetMetric","Left",false);
+    }
+
+    private static String lineaHorizontal(int y,String color){
+        return "<line><reportElement x=\"0\" y=\""+y+"\" width=\"782\" height=\"1\" forecolor=\""+color+"\"/></line>";
+    }
+
+    private static String tablaReporte(String base,int[] anchos,String[] etiquetas,
+            java.util.function.IntFunction<String> alinear,java.util.function.IntPredicate expandir){
         String campos=java.util.stream.IntStream.range(0,anchos.length)
             .mapToObj(i->"<field name=\"dato"+i+"\" class=\"java.lang.String\"/>").collect(java.util.stream.Collectors.joining());
         int primerCampo=base.indexOf("<field ");
@@ -101,11 +171,10 @@ final class LargeDocumentPdfTemplate {
         var detalle=new StringBuilder("<detail><band height=\"20\" splitType=\"Prevent\">").append(when("LINE"));
         int x=0;
         for(int i=0;i<anchos.length;i++){
-            boolean importe=antiguedad?i>=2:i==5||i==6;
-            String alineacion=importe?"Right":"Left";
+            String alineacion=alinear.apply(i);
             columnas.append(staticText(etiquetas[i],x,0,anchos[i],24,"TableHeader",alineacion)
                 .replace("<textElement","<box leftPadding=\"4\" rightPadding=\"4\"/><textElement"));
-            detalle.append(field("$F{dato"+i+"}",x+3,3,anchos[i]-6,16,"Base",alineacion,i==(antiguedad?0:3)));
+            detalle.append(field("$F{dato"+i+"}",x+3,3,anchos[i]-6,16,"Base",alineacion,expandir.test(i)));
             x+=anchos[i];
         }
         columnas.append("</band></columnHeader>");
