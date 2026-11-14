@@ -7,6 +7,7 @@ import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import com.citacloud.springboot.contacloud.app.services.ActivoFijoPdfService;
 import com.citacloud.springboot.contacloud.app.services.ActivoFijoService;
 import com.citacloud.springboot.contacloud.app.services.MantenimientoService;
+import com.citacloud.springboot.contacloud.app.services.BajaActivoService;
 import com.citacloud.springboot.contacloud.app.views.components.*;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -54,12 +55,14 @@ public class ActivosFijosView extends VerticalLayout implements BeforeEnterObser
     private final AppPagination paginacion=new AppPagination(p->cargar());
 
     private final MantenimientoService mantenimiento;
+    private final BajaActivoService bajas;
 
     public ActivosFijosView(ActivoFijoService servicio, ActivoFijoPdfService pdf, ModuleAuthorization autorizacion,
-                            MantenimientoService mantenimiento) {
+                            MantenimientoService mantenimiento, BajaActivoService bajas) {
         this.servicio=servicio;
         this.autorizacion=autorizacion;
         this.mantenimiento=mantenimiento;
+        this.bajas=bajas;
         setPadding(false);
         setSpacing(false);
         addClassName("cc-page");
@@ -190,6 +193,15 @@ public class ActivosFijosView extends VerticalLayout implements BeforeEnterObser
                 historial.setItems(mantenimiento.historialActivo(id));
                 historial.setEmptyStateText("Sin mantenimientos registrados.");
                 dialogo.add(new com.vaadin.flow.component.details.Details("Historial de mantenimiento",historial));
+            }
+            if (detalle.activo().resumen().estado() == Estado.BAJA && puede("bajas_activos.ver")) {
+                bajas.confirmadaDeActivo(id).ifPresent(baja -> {
+                    var seccion = new AppDetailSection("BAJA DEL ACTIVO");
+                    seccion.addClassName("cc-detail-three");
+                    dialogo.add(seccion.field("Código", baja.codigo()).field("Tipo", baja.snapshot().tipo())
+                        .field("Fecha efectiva", FECHA.format(baja.datos().fecha())).field("Motivo", baja.datos().motivo()),
+                        BajasActivosView.economia(baja.activo(), baja.datos().obtenido()));
+                });
             }
             if (puede(EDITAR) && detalle.activo().resumen().estado()!=Estado.BAJA)
                 dialogo.getFooter().add(new AppActionButton(ActionType.EDIT,ButtonSize.MAIN,"Editar activo",

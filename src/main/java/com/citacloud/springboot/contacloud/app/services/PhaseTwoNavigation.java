@@ -111,7 +111,7 @@ public final class PhaseTwoNavigation {
                 "Calcula y consulta la depreciación mensual de activos fijos."),
             item("Mantenimiento", "activos-fijos/mantenimiento", "WRENCH", ACTIVOS_FIJOS, "mantenimiento_activos.ver",
                 "Programa y consulta el mantenimiento de activos fijos."),
-            item("Bajas", "activos-fijos/bajas", "TRASH", ACTIVOS_FIJOS, "bajas_activos.ver", placeholder("Bajas")))),
+            item("Bajas", "activos-fijos/bajas", "TRASH", ACTIVOS_FIJOS, "bajas_activos.ver", "Consulta y registra bajas de activos fijos."))),
         new Section("FINANZAS", List.of(
             item("Presupuestos", "presupuestos", "CALC_BOOK", FINANZAS, "presupuestos.ver", placeholder("Presupuestos")),
             item("Flujo de efectivo", "flujo-efectivo", "EXCHANGE", FINANZAS, "flujo_efectivo.ver", placeholder("Flujo de efectivo")),

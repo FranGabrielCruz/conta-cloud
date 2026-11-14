@@ -142,7 +142,7 @@ class ActivosFijosViewTest {
         when(auth.canAccess(MODULO,VER)).thenReturn(true);
         when(servicio.filtros()).thenReturn(opciones);
         when(servicio.consultar(any(Filtro.class),eq(0),eq(10))).thenReturn(new Listado(Page.empty(),List.of()));
-        var vista=new ActivosFijosView(servicio,null,auth,null);
+        var vista=new ActivosFijosView(servicio,null,auth,null,null);
         vista.beforeEnter(mock(BeforeEnterEvent.class));
         assertThat(arbol(vista).filter(AppActionButton.class::isInstance).map(AppActionButton.class::cast))
             .noneMatch(b->b.isVisible() && b.getAriaLabel().stream().anyMatch(s->s.equals("Nuevo activo")||s.equals("Reporte de activos")));

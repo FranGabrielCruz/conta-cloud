@@ -101,6 +101,7 @@ class PhaseTwoNavigationTest {
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(com.citacloud.springboot.contacloud.app.views.MantenimientoActivosView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.BajasActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.ActivosFijosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CuentasCobrarView.class.getAnnotation(Route.class).value(),

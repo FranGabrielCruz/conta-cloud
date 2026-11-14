@@ -29,7 +29,6 @@ import jakarta.annotation.security.PermitAll;
 @RouteAlias(value = "fiscal/609", layout = MainLayout.class)
 @RouteAlias(value = "fiscal/it-1", layout = MainLayout.class)
 @RouteAlias(value = "fiscal/ir-17", layout = MainLayout.class)
-@RouteAlias(value = "activos-fijos/bajas", layout = MainLayout.class)
 @RouteAlias(value = "presupuestos", layout = MainLayout.class)
 @RouteAlias(value = "flujo-efectivo", layout = MainLayout.class)
 @RouteAlias(value = "proyecciones", layout = MainLayout.class)
