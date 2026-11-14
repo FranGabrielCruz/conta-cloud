@@ -161,6 +161,23 @@ final class LargeDocumentPdfTemplate {
         return "<line><reportElement x=\"0\" y=\""+y+"\" width=\"782\" height=\"1\" forecolor=\""+color+"\"/></line>";
     }
 
+    static String depreciacion(boolean logo)throws IOException{
+        String base=receipt(logo,94,78,false)
+            .replace("RECIBO DE COBRO","DEPRECIACIÓN DE ACTIVOS FIJOS")
+            .replace("customer_receipt_large","fixed_asset_depreciation")
+            .replace("style=\"Heading\" x=\"560\" y=\"0\" width=\"222\" height=\"24\"",
+                "style=\"Heading\" x=\"485\" y=\"0\" width=\"297\" height=\"24\"")
+            .replace("style=\"Section\" x=\"560\" y=\"0\" width=\"222\" height=\"14\"",
+                "style=\"Section\" x=\"485\" y=\"0\" width=\"297\" height=\"14\"")
+            .replace("<![CDATA[CLIENTE]]>","<![CDATA[INFORMACIÓN DEL PROCESO]]>")
+            .replace("DATOS DEL RECIBO","RESUMEN")
+            .replace("\"Cliente: \" + $P{supplierName}","\" \"")
+            .replace("\"Moneda: \" + $P{currencyCode}","$P{currencyCode}");
+        return tablaReporte(base,new int[]{72,141,55,101,101,101,101,110},
+            new String[]{"CÓDIGO","ACTIVO","MONEDA","COSTO","DEP. ANTERIOR","DEP. PERÍODO","DEP. ACUM.","VALOR EN LIBROS"},
+            i->i>=3?"Right":i==2?"Center":"Left",i->i==1);
+    }
+
     private static String tablaReporte(String base,int[] anchos,String[] etiquetas,
             java.util.function.IntFunction<String> alinear,java.util.function.IntPredicate expandir){
         String campos=java.util.stream.IntStream.range(0,anchos.length)

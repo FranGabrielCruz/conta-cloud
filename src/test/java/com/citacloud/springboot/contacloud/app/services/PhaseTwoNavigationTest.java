@@ -79,7 +79,7 @@ class PhaseTwoNavigationTest {
         assertThat(section("FISCAL").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("NCF", "e-CF", "Impuestos", "Retenciones", "606", "607", "608", "609", "IT-1", "IR-17");
         assertThat(section("ACTIVOS FIJOS").items()).extracting(PhaseTwoNavigation.Item::title)
-            .containsExactly("Activos", "Depreciaciones", "Mantenimiento", "Bajas");
+            .containsExactly("Activos", "Depreciación", "Mantenimiento", "Bajas");
         assertThat(section("FINANZAS").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("Presupuestos", "Flujo de efectivo", "Proyecciones", "Rentabilidad");
         assertThat(section("REPORTES").items()).extracting(PhaseTwoNavigation.Item::title)
@@ -100,7 +100,8 @@ class PhaseTwoNavigationTest {
             .map(RouteAlias::value);
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
-            Stream.of(com.citacloud.springboot.contacloud.app.views.ActivosFijosView.class.getAnnotation(Route.class).value(),
+            Stream.of(com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.ActivosFijosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CuentasCobrarView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.RecibosVentaView.class.getAnnotation(Route.class).value(),
                 NotasDebitoVentaView.class.getAnnotation(Route.class).value(),

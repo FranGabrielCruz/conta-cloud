@@ -107,7 +107,8 @@ public final class PhaseTwoNavigation {
         new Section("ACTIVOS FIJOS", List.of(
             item("Activos", "activos-fijos", "BUILDING", ACTIVOS_FIJOS, "activos_fijos.ver",
                 "Administra el registro maestro de activos fijos."),
-            item("Depreciaciones", "activos-fijos/depreciaciones", "TRENDING_DOWN", ACTIVOS_FIJOS, "depreciaciones.ver", placeholder("Depreciaciones")),
+            item("Depreciación", "activos-fijos/depreciaciones", "TRENDING_DOWN", ACTIVOS_FIJOS, "depreciaciones.ver",
+                "Calcula y consulta la depreciación mensual de activos fijos."),
             item("Mantenimiento", "activos-fijos/mantenimiento", "WRENCH", ACTIVOS_FIJOS, "mantenimiento_activos.ver", placeholder("Mantenimiento")),
             item("Bajas", "activos-fijos/bajas", "TRASH", ACTIVOS_FIJOS, "bajas_activos.ver", placeholder("Bajas")))),
         new Section("FINANZAS", List.of(

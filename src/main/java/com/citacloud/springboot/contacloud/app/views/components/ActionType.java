@@ -23,6 +23,8 @@ public enum ActionType {
     REFRESH("Actualizar", VaadinIcon.REFRESH, "neutral"),
     DUPLICATE("Duplicar", VaadinIcon.COPY, "neutral"),
     RECOVER("Recuperar", VaadinIcon.PLAY, "view"),
+    PROCESS("Procesar", VaadinIcon.PLAY, "success"),
+    CALCULATE("Calcular", VaadinIcon.CALC, "view"),
     ACCEPT("Aceptar", VaadinIcon.CHECK, "success"),
     REJECT("Rechazar", VaadinIcon.CLOSE, "danger"),
     CREATE_INVOICE("Crear factura", VaadinIcon.FILE_TEXT_O, "success"),
