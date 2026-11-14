@@ -5,7 +5,7 @@ import com.vaadin.flow.component.html.Span;
 /** Etiqueta compacta de estado con los colores semánticos del tema Lumo. */
 public final class AppStatusBadge extends Span {
     public enum Variant {
-        SUCCESS("success"), NEUTRAL("contrast"), DANGER("error"), WARNING("warning");
+        SUCCESS("success"), NEUTRAL("contrast"), DANGER("error"), WARNING("warning"), PRIMARY("primary");
 
         private final String theme;
 

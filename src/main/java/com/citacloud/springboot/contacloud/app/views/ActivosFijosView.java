@@ -6,6 +6,7 @@ import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import com.citacloud.springboot.contacloud.app.services.ActivoFijoPdfService;
 import com.citacloud.springboot.contacloud.app.services.ActivoFijoService;
+import com.citacloud.springboot.contacloud.app.services.MantenimientoService;
 import com.citacloud.springboot.contacloud.app.views.components.*;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -52,9 +53,13 @@ public class ActivosFijosView extends VerticalLayout implements BeforeEnterObser
     private final AppGrid<Resumen> grid=new AppGrid<>(Resumen.class);
     private final AppPagination paginacion=new AppPagination(p->cargar());
 
-    public ActivosFijosView(ActivoFijoService servicio, ActivoFijoPdfService pdf, ModuleAuthorization autorizacion) {
+    private final MantenimientoService mantenimiento;
+
+    public ActivosFijosView(ActivoFijoService servicio, ActivoFijoPdfService pdf, ModuleAuthorization autorizacion,
+                            MantenimientoService mantenimiento) {
         this.servicio=servicio;
         this.autorizacion=autorizacion;
+        this.mantenimiento=mantenimiento;
         setPadding(false);
         setSpacing(false);
         addClassName("cc-page");
@@ -179,6 +184,13 @@ public class ActivosFijosView extends VerticalLayout implements BeforeEnterObser
         try {
             var detalle=servicio.detalle(id);
             var dialogo=detalle(detalle);
+            if (puede(MantenimientoService.RECURSO+"ver")) {
+                var historial=new AppGrid<>(com.citacloud.springboot.contacloud.app.dto.MantenimientoDto.Fila.class);
+                MantenimientoActivosView.configurarTabla(historial,true);
+                historial.setItems(mantenimiento.historialActivo(id));
+                historial.setEmptyStateText("Sin mantenimientos registrados.");
+                dialogo.add(new com.vaadin.flow.component.details.Details("Historial de mantenimiento",historial));
+            }
             if (puede(EDITAR) && detalle.activo().resumen().estado()!=Estado.BAJA)
                 dialogo.getFooter().add(new AppActionButton(ActionType.EDIT,ButtonSize.MAIN,"Editar activo",
                     e->formulario(detalle.activo(),dialogo)));

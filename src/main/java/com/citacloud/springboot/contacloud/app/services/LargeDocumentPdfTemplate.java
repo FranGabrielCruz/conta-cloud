@@ -161,6 +161,35 @@ final class LargeDocumentPdfTemplate {
         return "<line><reportElement x=\"0\" y=\""+y+"\" width=\"782\" height=\"1\" forecolor=\""+color+"\"/></line>";
     }
 
+    static String mantenimiento(boolean logo)throws IOException{
+        String base=receipt(logo,94,105,false)
+            .replace("RECIBO DE COBRO","MANTENIMIENTO DE ACTIVO")
+            .replace("customer_receipt_large","fixed_asset_maintenance")
+            .replace("\"Cliente: \" + $P{supplierName}","$P{supplierName}")
+            .replace("\"Moneda: \" + $P{currencyCode}","\"\"");
+        String titulo=section(base,"title");
+        String empresa=titulo.substring(titulo.indexOf('>',titulo.indexOf("<band "))+1,titulo.indexOf("<rectangle"));
+        int moneda=empresa.lastIndexOf("<textField>");
+        empresa=empresa.substring(0,moneda);
+        base=replaceSection(base,"title","<title><band height=\"94\" splitType=\"Stretch\">"+empresa+"</band></title>");
+
+        int primerCampo=base.indexOf("<field ");
+        var campos=new StringBuilder();
+        var filas=new StringBuilder("<band height=\"31\" splitType=\"Prevent\">").append(when("FIELDS"));
+        for(int i=0;i<3;i++){
+            campos.append("<field name=\"label").append(i).append("\" class=\"java.lang.String\"/>")
+                .append("<field name=\"value").append(i).append("\" class=\"java.lang.String\"/>");
+            filas.append(field("$F{label"+i+"}",i*262,1,248,11,"Section","Left",false))
+                .append(field("$F{value"+i+"}",i*262,14,248,14,"Base","Left",true));
+        }
+        base=base.substring(0,primerCampo)+campos+base.substring(primerCampo);
+        String seccion="<band height=\"23\" splitType=\"Prevent\">"+when("SECTION")
+            +lineaHorizontal(3,"#CBD5E1")+field("$F{rowLabel}",0,8,782,13,"Section","Left",false)+"</band>";
+        String texto="<band height=\"16\" splitType=\"Stretch\">"+when("TEXT")
+            +field("$F{rowLabel}",0,0,782,15,"Base","Left",true)+"</band>";
+        return replaceSection(base,"detail","<detail>"+seccion+filas+"</band>"+texto+"</detail>");
+    }
+
     static String depreciacion(boolean logo)throws IOException{
         String base=receipt(logo,94,78,false)
             .replace("RECIBO DE COBRO","DEPRECIACIÓN DE ACTIVOS FIJOS")
