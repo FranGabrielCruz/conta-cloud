@@ -97,10 +97,21 @@ final class LargeDocumentPdfTemplate {
     }
 
     static String catalogoCuentas(boolean logo, boolean conFiltros) throws IOException {
-        String titulo = "CATÁLOGO DE CUENTAS";
+        return tablaContable(logo,conFiltros,"CATÁLOGO DE CUENTAS","accounting_chart",
+            new int[]{145,280,94,94,92,77},
+            new String[]{"CÓDIGO","CUENTA","TIPO","CLASIFICACIÓN","NATURALEZA","ESTADO"},false);
+    }
+
+    static String asientoContable(boolean logo) throws IOException {
+        return tablaContable(logo,true,"ASIENTO CONTABLE","journal_entry",new int[]{277,269,118,118},
+            new String[]{"CUENTA","DESCRIPCIÓN","DÉBITO","CRÉDITO"},true);
+    }
+
+    private static String tablaContable(boolean logo,boolean conFiltros,String titulo,String nombre,
+                                        int[] anchos,String[] etiquetas,boolean monetaria) throws IOException {
         String base = receipt(logo, 90, 36, false)
             .replace("RECIBO DE COBRO", titulo)
-            .replace("customer_receipt_large", "accounting_chart");
+            .replace("customer_receipt_large", nombre);
         int primerCampo = base.indexOf("<field ");
         base = base.substring(0, primerCampo) + "<parameter name=\"chartFilters\" class=\"java.lang.String\"/>"
             + base.substring(primerCampo);
@@ -117,9 +128,7 @@ final class LargeDocumentPdfTemplate {
             + staticText(titulo, 449, 0, 333, 12, "Section", "Right")
             + field("\"Fecha: \" + $P{orderDate}", 449, 12, 333, 12, "Base", "Right", false)
             + "</band></pageHeader>");
-        return tablaReporte(base, new int[]{145, 280, 94, 94, 92, 77},
-            new String[]{"CÓDIGO", "CUENTA", "TIPO", "CLASIFICACIÓN", "NATURALEZA", "ESTADO"},
-            i -> "Left", i -> i <= 1);
+        return tablaReporte(base,anchos,etiquetas,i -> monetaria&&i>=2?"Right":"Left", i -> i <= 1);
     }
 
     static String activosFijos(boolean logo,boolean conFiltros)throws IOException{

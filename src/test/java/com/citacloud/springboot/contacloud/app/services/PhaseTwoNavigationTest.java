@@ -74,7 +74,7 @@ class PhaseTwoNavigationTest {
             .containsExactly("Productos", "Categorías", "Unidades de medida", "Almacenes", "Existencias", "Movimientos", "Transferencias",
                 "Ajustes", "Conteo físico");
         assertThat(section("CONTABILIDAD").items()).extracting(PhaseTwoNavigation.Item::title)
-            .containsExactly("Catálogo de cuentas", "Asientos", "Libro diario", "Libro mayor", "Balanza",
+            .containsExactly("Catálogo de cuentas", "Asientos contables", "Libro diario", "Libro mayor", "Balanza",
                 "Centros de costos", "Cierres");
         assertThat(section("FISCAL").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("NCF", "e-CF", "Impuestos", "Retenciones", "606", "607", "608", "609", "IT-1", "IR-17");
@@ -101,6 +101,7 @@ class PhaseTwoNavigationTest {
         var registered = Stream.concat(
             Stream.concat(Stream.of(principal), aliases),
             Stream.of(com.citacloud.springboot.contacloud.app.views.MantenimientoActivosView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.AsientosContablesView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CatalogoCuentasView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BajasActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),

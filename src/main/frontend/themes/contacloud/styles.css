@@ -234,6 +234,71 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 }
 .cc-maintenance-filters > * { min-width: 0; }
 .cc-chart-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cc-journal-filters .cc-maintenance-search { grid-column: 2 / -1; }
+.cc-journal-editor::part(content) {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cc-journal-editor::part(footer) {
+  flex: none;
+  justify-content: flex-end;
+  border-top: 1px solid var(--cc-border);
+}
+.cc-journal-general,
+.cc-journal-reference {
+  display: grid;
+  align-items: end;
+  gap: 4px 12px;
+}
+.cc-journal-general { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cc-journal-reference { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.cc-journal-datum { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cc-journal-general > .cc-journal-datum { align-self: center; }
+.cc-journal-notes { max-height: 106px; }
+.cc-journal-notes::part(textarea) { min-height: 2em; overflow-y: auto; }
+.cc-journal-editor .cc-detail-heading { margin-block: 6px; }
+.cc-journal-editor .cc-detail-heading h3 { margin: 0; }
+.cc-journal-movements { overflow-x: auto; padding-inline: 2px; }
+.cc-journal-line {
+  display: grid;
+  grid-template-columns: minmax(0, 32fr) minmax(0, 30fr) repeat(2, minmax(0, 16fr)) 36px;
+  gap: 8px;
+  align-items: start;
+  min-width: 590px;
+  padding-block: 2px;
+}
+.cc-journal-line > * { min-width: 0; }
+.cc-journal-line > vaadin-button { justify-self: center; margin-top: 4px; }
+.cc-journal-line > vaadin-big-decimal-field::part(input-field) { text-align: end; }
+.cc-journal-columns {
+  color: var(--cc-muted);
+  font-size: var(--lumo-font-size-s);
+  font-weight: 600;
+  border-bottom: 1px solid var(--cc-border);
+  padding-bottom: 5px;
+}
+.cc-journal-columns > :nth-child(3),
+.cc-journal-columns > :nth-child(4) { text-align: end; }
+.cc-journal-columns > :last-child { text-align: center; }
+.cc-journal-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  justify-content: end;
+  text-align: end;
+  gap: 6px clamp(8px, 3vw, 32px);
+  border-top: 1px solid var(--cc-border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+@media (max-width: 1024px) {
+  .cc-journal-general { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .cc-journal-general,
+  .cc-journal-reference { grid-template-columns: minmax(0, 1fr); }
+  .cc-journal-filters .cc-maintenance-search { grid-column: 1 / -1; }
+}
 @media (min-width: 701px) {
   .cc-chart-form-general > .cc-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
