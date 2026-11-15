@@ -1510,3 +1510,25 @@ vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
 .cc-cartera-filtros { display: grid; grid-template-columns: minmax(180px,1.3fr) minmax(125px,.75fr) repeat(2,minmax(130px,.8fr)) minmax(200px,1.5fr); gap: 12px; width: 100%; align-items: end; }
 .cc-cartera-filtros > * { width: 100%; min-width: 0; }
 @media (max-width: 1000px) { .cc-cartera-filtros { grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); } }
+
+.cc-general-ledger { gap: 12px; }
+.cc-general-ledger-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  width: 100%;
+}
+.cc-general-ledger-filters > * { width: 100%; min-width: 0; }
+.cc-general-ledger-card { width: 100%; box-sizing: border-box; padding: 14px 18px; }
+.cc-general-ledger-card h3 { margin: 0 0 6px; }
+.cc-general-ledger-card > div { margin-top: 8px; }
+.cc-general-ledger-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 12px; }
+.cc-general-ledger-cell { display: grid; gap: 2px; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .cc-general-ledger-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-general-ledger-filters > :first-child,
+  .cc-general-ledger-filters > :last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .cc-general-ledger-filters { grid-template-columns: minmax(0, 1fr); }
+}

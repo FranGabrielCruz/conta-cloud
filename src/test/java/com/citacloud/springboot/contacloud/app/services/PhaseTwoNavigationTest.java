@@ -103,6 +103,7 @@ class PhaseTwoNavigationTest {
             Stream.of(com.citacloud.springboot.contacloud.app.views.MantenimientoActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.AsientosContablesView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.LibroDiarioView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.LibroMayorView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CatalogoCuentasView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BajasActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),

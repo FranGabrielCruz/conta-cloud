@@ -31,7 +31,8 @@ public class SecurityConfig {
             .requestMatchers("/actuator/health", "/favicon.svg").permitAll()
             .requestMatchers("/api/print-agents/pair", "/api/print-agents/refresh").permitAll()
             .requestMatchers("/api/print-agents/me", "/api/print-agents/heartbeat", "/api/print-agents/jobs/**").hasAuthority("PRINT_AGENT")
-            .requestMatchers("/api/company/logo", "/api/accounting/general-journal", "/api/accounting/general-journal/pdf").authenticated());
+            .requestMatchers("/api/company/logo", "/api/accounting/general-journal", "/api/accounting/general-journal/pdf",
+                "/api/accounting/general-ledger", "/api/accounting/general-ledger/pdf").authenticated());
         http.with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer.loginView(LoginView.class));
         return http.build();
     }

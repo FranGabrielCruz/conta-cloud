@@ -6,6 +6,7 @@ import com.citacloud.springboot.contacloud.app.services.VinculacionAgenteExcepti
 import io.micrometer.core.instrument.Metrics;
 import java.io.UncheckedIOException;
 import java.util.Locale;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -66,7 +67,7 @@ public final class ErrorClassifier {
             return expected(ErrorCategory.CONFLICT, ErrorCode.CONFLICT, HttpStatus.CONFLICT,
                 "No fue posible guardar porque la información entra en conflicto con un registro existente.");
         }
-        if (error instanceof IllegalArgumentException) {
+        if (error instanceof IllegalArgumentException || error instanceof TypeMismatchException) {
             return expected(ErrorCategory.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR,
                 HttpStatus.BAD_REQUEST, "Revisa los datos ingresados.");
         }

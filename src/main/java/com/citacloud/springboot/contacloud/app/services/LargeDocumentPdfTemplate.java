@@ -138,8 +138,23 @@ final class LargeDocumentPdfTemplate {
         return base.replace("<title>",grupo+"<title>");
     }
 
+    static String libroMayor(boolean logo,boolean agrupadora) throws IOException {
+        String base=encabezadoContable(logo,70,"LIBRO MAYOR","general_ledger")
+            .replace("\"Fecha: \" + $P{orderDate}","\"Período: \" + $P{orderDate}");
+        int concepto=agrupadora?3:2;
+        return tablaReporte(base,agrupadora?new int[]{66,155,74,217,84,84,102}:new int[]{72,95,325,90,90,110},
+            agrupadora?new String[]{"FECHA","CUENTA","ASIENTO","CONCEPTO / REFERENCIA","DÉBITO","CRÉDITO","SALDO"}
+                :new String[]{"FECHA","ASIENTO","CONCEPTO / REFERENCIA","DÉBITO","CRÉDITO","SALDO"},
+            i->i>concepto?"Right":"Left",i->(i>0 && i<=concepto)||i==concepto+3);
+    }
+
     private static String tablaContable(boolean logo,boolean conFiltros,String titulo,String nombre,
                                         int[] anchos,String[] etiquetas,boolean monetaria) throws IOException {
+        return tablaReporte(encabezadoContable(logo,conFiltros?18:0,titulo,nombre),anchos,etiquetas,
+            i -> monetaria&&i>=2?"Right":"Left", i -> i <= 1);
+    }
+
+    private static String encabezadoContable(boolean logo,int alturaFiltros,String titulo,String nombre) throws IOException {
         String base = receipt(logo, 90, 36, false)
             .replace("RECIBO DE COBRO", titulo)
             .replace("customer_receipt_large", nombre);
@@ -150,16 +165,15 @@ final class LargeDocumentPdfTemplate {
         String empresa = original.substring(original.indexOf('>', original.indexOf("<band ")) + 1,
             original.indexOf("<rectangle"));
         empresa = empresa.substring(0, empresa.lastIndexOf("<textField>"));
-        String filtros = conFiltros ? field("$P{chartFilters}", 0, 90, 782, 15, "Base", "Left", true) : "";
-        base = replaceSection(base, "title", "<title><band height=\"" + (conFiltros ? 108 : 90)
+        String filtros = alturaFiltros>0 ? field("$P{chartFilters}", 0, 90, 782, alturaFiltros-3, "Base", "Left", true) : "";
+        base = replaceSection(base, "title", "<title><band height=\"" + (90+alturaFiltros)
             + "\" splitType=\"Stretch\">" + empresa + filtros + "</band></title>");
-        base = replaceSection(base, "pageHeader", "<pageHeader><band height=\"26\" splitType=\"Prevent\">"
+        return replaceSection(base, "pageHeader", "<pageHeader><band height=\"26\" splitType=\"Prevent\">"
             + "<printWhenExpression><![CDATA[$V{PAGE_NUMBER} > 1]]></printWhenExpression>"
             + field("$P{companyTradeName}", 0, 2, 410, 20, "Section", "Left", false)
             + staticText(titulo, 449, 0, 333, 12, "Section", "Right")
             + field("\"Fecha: \" + $P{orderDate}", 449, 12, 333, 12, "Base", "Right", false)
             + "</band></pageHeader>");
-        return tablaReporte(base,anchos,etiquetas,i -> monetaria&&i>=2?"Right":"Left", i -> i <= 1);
     }
 
     static String activosFijos(boolean logo,boolean conFiltros)throws IOException{

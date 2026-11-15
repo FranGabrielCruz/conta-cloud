@@ -24,7 +24,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> invalidBody(MethodArgumentNotValidException exception, HttpServletRequest request) {
         List<FieldErrorResponse> fields = exception.getBindingResult().getFieldErrors().stream()
-            .map(error -> new FieldErrorResponse(error.getField(), "INVALID", safe(error.getDefaultMessage())))
+            .map(error -> new FieldErrorResponse(error.getField(), "INVALID",
+                error.isBindingFailure() ? "Valor inválido." : safe(error.getDefaultMessage())))
             .toList();
         return response(new ClassifiedError(ErrorCategory.VALIDATION_ERROR, ErrorCode.VALIDATION_ERROR,
             org.springframework.http.HttpStatus.BAD_REQUEST, "Revisa los datos enviados.", true), request, fields);

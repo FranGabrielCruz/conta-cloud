@@ -245,6 +245,104 @@ class AsientoContablePostgresTest {
         });
     }
 
+    @Test void mayorConservaSaldoRealAlFiltrarPaginarYConsolidar() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var asientos=servicio(jdbc);
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var bancos=cuenta(jdbc,"BANK_DEFAULT");
+            var venta=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            var activos=cuenta(jdbc,"ASSETS_ROOT");
+            var base=entrada(caja,venta,BigDecimal.TEN);
+            asientos.guardarYContabilizar(null,0,new Entrada(fecha.minusDays(1),Tipo.APERTURA,moneda,
+                "Apertura histórica",null,null,base.lineas()),UUID.randomUUID());
+            asientos.crear(base,UUID.randomUUID());
+            for(int i=0;i<35;i++) asientos.guardarYContabilizar(null,0,base,UUID.randomUUID());
+            var original=asientos.detalle(asientos.listar(new Filtro(null,null,null,Estado.CONTABILIZADO,null,"AS-000003"),0,10)
+                .getContent().getFirst().id());
+            asientos.reversar(original.fila().id(),original.version(),fecha,"Oculto por filtro",UUID.randomUUID());
+            asientos.guardarYContabilizar(null,0,entrada(bancos,venta,BigDecimal.TEN),UUID.randomUUID());
+            asientos.guardarYContabilizar(null,0,base,UUID.randomUUID());
+            jdbc.update("UPDATE cuenta_contable SET activo=false WHERE id=?",caja);
+            var empresaRepo=mock(EmpresaRepository.class);
+            var emisor=mock(Empresa.class);
+            when(emisor.getNombre()).thenReturn("Empresa del Mayor");
+            when(emisor.getZonaHoraria()).thenReturn("America/Caracas");
+            when(empresaRepo.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(emisor));
+            var mayor=new LibroMayorService(new LibroMayorRepository(new NamedParameterJdbcTemplate(jdbc)),
+                empresaRepo,mock(DatosEmpresaRepository.class));
+            var f=new com.citacloud.springboot.contacloud.app.dto.LibroMayorDto.Filtro(activos,fecha,fecha,Tipo.DIARIO,Origen.MANUAL,"REF-01");
+            var primera=mayor.consultar(f,0,10);
+            var segunda=mayor.consultar(f,1,10);
+            var ultima=mayor.consultar(f,3,10);
+            assertThat(primera.total()).isEqualTo(37);
+            assertThat(primera.cuenta().agrupadora()).isTrue();
+            assertThat(primera.movimientos().getFirst().estado()).isEqualTo(Estado.REVERSADO);
+            assertThat(primera.movimientos().getLast().saldo().importe()).isEqualByComparingTo("110");
+            assertThat(segunda.movimientos().getFirst().saldo().importe()).isEqualByComparingTo("120");
+            assertThat(ultima.movimientos()).hasSize(7).extracting(m->m.cuentaId()).contains(bancos);
+            assertThat(ultima.movimientos().getLast().saldo().importe()).isEqualByComparingTo("370");
+            var t=primera.resumen().getFirst();
+            assertThat(t.inicial().importe()).isEqualByComparingTo("10");
+            assertThat(t.debitos()).isEqualByComparingTo("370");
+            assertThat(t.creditos()).isZero();
+            assertThat(t.cierre().importe()).isEqualByComparingTo("370");
+            assertThat(ultima.resumen()).isEqualTo(primera.resumen());
+            var inactiva=new com.citacloud.springboot.contacloud.app.dto.LibroMayorDto.Filtro(caja,fecha,fecha,null,null,"");
+            assertThat(mayor.cuentas()).anySatisfy(c->{assertThat(c.id()).isEqualTo(caja);assertThat(c.activo()).isFalse();});
+            var resultado=mayor.consultar(inactiva,0,50);
+            assertThat(resultado.movimientos()).hasSize(37).anySatisfy(m->assertThat(m.tipo()).isEqualTo(Tipo.REVERSION));
+            assertThat(resultado.movimientos()).allSatisfy(m->assertThat(m.cuentaId()).isEqualTo(caja));
+            var sinCoincidencias=new com.citacloud.springboot.contacloud.app.dto.LibroMayorDto.Filtro(caja,fecha,fecha,null,null,"' OR 1=1 --");
+            assertThat(mayor.consultar(sinCoincidencias,0,10).movimientos()).isEmpty();
+            assertThat(mayor.consultar(sinCoincidencias,0,10).resumen().getFirst().cierre().importe()).isEqualByComparingTo("360");
+            var pdfService=new LibroMayorPdfService(mayor,mock(LocalFileStorageService.class));
+            try(var pdf=Loader.loadPDF(pdfService.generar(f).contenido())) {
+                assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+                assertThat(new PDFTextStripper().getText(pdf)).contains("LIBRO MAYOR","Empresa del Mayor","CUENTA","AS-000040",
+                    "Caja General","RESUMEN DEL PERÍODO","370.00 DB","Página 1 de").doesNotContain("ContaCloud","AS-000002");
+            } catch(java.io.IOException ex) {throw new AssertionError(ex);}
+            try(var pdf=Loader.loadPDF(pdfService.generar(inactiva).contenido())) {
+                assertThat(new PDFTextStripper().getText(pdf)).contains("Inactiva","Reversión","360.00 DB");
+            } catch(java.io.IOException ex) {throw new AssertionError(ex);}
+            autenticar(tenant,UUID.randomUUID());
+            assertThatThrownBy(()->mayor.consultar(f,0,10)).isInstanceOf(RecursoNoEncontradoException.class);
+            autenticar(UUID.randomUUID(),empresa);
+            assertThatThrownBy(()->pdfService.generar(f)).isInstanceOf(RecursoNoEncontradoException.class);
+        });
+    }
+
+    @Test void mayorPaginaUnaCuentaConMilMovimientosYOrdenEstable() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var ventas=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            var asientos=servicio(jdbc);
+            var lineas=new ArrayList<Movimiento>();
+            for(int i=0;i<200;i++) lineas.add(new Movimiento(caja,null,BigDecimal.ONE,BigDecimal.ZERO));
+            lineas.add(new Movimiento(ventas,null,BigDecimal.ZERO,BigDecimal.valueOf(200)));
+            var e=new Entrada(fecha,Tipo.DIARIO,moneda,"Prueba de volumen",null,null,lineas);
+            for(int i=0;i<5;i++) asientos.guardarYContabilizar(null,0,e,UUID.randomUUID());
+            var mayor=new LibroMayorService(new LibroMayorRepository(new NamedParameterJdbcTemplate(jdbc)),null,null);
+            var f=new com.citacloud.springboot.contacloud.app.dto.LibroMayorDto.Filtro(caja,fecha,fecha,null,null,"");
+            var inicio=mayor.consultar(f,0,10);
+            var finalPeriodo=mayor.consultar(f,99,10);
+            assertThat(inicio.total()).isEqualTo(1000);
+            assertThat(inicio.movimientos().getFirst().saldo().importe()).isEqualByComparingTo("1");
+            assertThat(finalPeriodo.movimientos().getFirst().saldo().importe()).isEqualByComparingTo("991");
+            assertThat(finalPeriodo.movimientos().getLast().saldo().importe()).isEqualByComparingTo("1000");
+            assertThat(finalPeriodo.resumen()).isEqualTo(inicio.resumen());
+        });
+    }
+
     private long ledger(JdbcTemplate j,UUID id) {
         return j.queryForObject("SELECT count(*) FROM asiento_movimiento_contable WHERE asiento_id=?",Long.class,id);
     }
