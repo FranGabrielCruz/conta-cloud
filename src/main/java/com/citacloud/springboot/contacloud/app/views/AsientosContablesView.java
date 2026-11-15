@@ -33,7 +33,7 @@ import java.util.*;
 @Route(value="asientos",layout=MainLayout.class)
 @PageTitle("Asientos contables | ContaCloud")
 @PermitAll
-public class AsientosContablesView extends VerticalLayout implements BeforeEnterObserver {
+public class AsientosContablesView extends VerticalLayout implements BeforeEnterObserver, AfterNavigationObserver {
     private static final DateTimeFormatter FECHA=DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA=DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm xxx");
     private final AsientoContableService servicio;
@@ -48,6 +48,7 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
     private final ComboBox<Origen> origen=combo("Origen",Origen::etiqueta,List.of(Origen.values()));
     private final TextField buscar=texto("Buscar",150);
     private final AppActionButton nuevo;
+    private UUID asientoSolicitado;
 
     public AsientosContablesView(AsientoContableService servicio,AsientoContablePdfService pdf,ModuleAuthorization autorizacion) {
         this.servicio=servicio;
@@ -87,6 +88,16 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
         }
         nuevo.setVisible(puede("crear"));
         cargar();
+        asientoSolicitado=event.getLocation().getQueryParameters().getSingleParameter("id").map(valor->{
+            try { return UUID.fromString(valor); }
+            catch(IllegalArgumentException ex) { return null; }
+        }).orElse(null);
+    }
+
+    @Override public void afterNavigation(AfterNavigationEvent event) {
+        var id=asientoSolicitado;
+        asientoSolicitado=null;
+        if(id!=null) ver(id);
     }
 
     private void reiniciar() { pagina.reset(); cargar(); }

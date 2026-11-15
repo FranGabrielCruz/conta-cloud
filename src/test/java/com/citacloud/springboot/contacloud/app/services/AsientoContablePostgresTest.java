@@ -196,6 +196,55 @@ class AsientoContablePostgresTest {
         }
     }
 
+    @Test void diarioPaginaAsientosCompletosYExportaTodoElFiltro() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var asientos=servicio(jdbc);
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var ventas=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            var entrada=entrada(caja,ventas,BigDecimal.TEN);
+            var borrador=asientos.crear(entrada,UUID.randomUUID());
+            for(int i=0;i<10;i++) asientos.guardarYContabilizar(null,0,entrada,UUID.randomUUID());
+            var original=asientos.detalle(asientos.listar(new Filtro(null,null,null,Estado.CONTABILIZADO,null,"AS-000002"),0,10)
+                .getContent().getFirst().id());
+            var reversa=asientos.reversar(original.fila().id(),original.version(),fecha,"Prueba Diario",UUID.randomUUID());
+            var empresaRepo=mock(EmpresaRepository.class);
+            var emisor=mock(Empresa.class);
+            when(emisor.getNombre()).thenReturn("Empresa del Diario");
+            when(emisor.getZonaHoraria()).thenReturn("America/Caracas");
+            when(empresaRepo.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(emisor));
+            var diario=new LibroDiarioService(new LibroDiarioRepository(new NamedParameterJdbcTemplate(jdbc)),
+                empresaRepo,mock(DatosEmpresaRepository.class));
+            var f=new com.citacloud.springboot.contacloud.app.dto.LibroDiarioDto.Filtro(fecha,fecha,null,Origen.MANUAL,"Caja General");
+            var primera=diario.consultar(f,0,10);
+            var segunda=diario.consultar(f,1,10);
+            assertThat(primera.totalAsientos()).isEqualTo(11);
+            assertThat(primera.asientos()).hasSize(10).allSatisfy(a->{
+                assertThat(a.id()).isNotEqualTo(borrador);
+                assertThat(a.movimientos()).hasSize(2);
+            });
+            assertThat(primera.asientos().getFirst().estado()).isEqualTo(Estado.REVERSADO);
+            assertThat(segunda.asientos()).singleElement().satisfies(a->assertThat(a.id()).isEqualTo(reversa));
+            assertThat(segunda.totales()).isEqualTo(primera.totales());
+            assertThat(primera.totales().getFirst().total().debito()).isEqualByComparingTo("110");
+            assertThat(primera.totales().getFirst().total().diferencia()).isZero();
+            var soloReversion=new com.citacloud.springboot.contacloud.app.dto.LibroDiarioDto.Filtro(fecha,fecha,Tipo.REVERSION,null,"");
+            assertThat(diario.consultar(soloReversion,0,10).totalAsientos()).isEqualTo(1);
+            var archivo=new LibroDiarioPdfService(diario,mock(LocalFileStorageService.class)).generar(f);
+            try(var pdf=Loader.loadPDF(archivo.contenido())) {
+                assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+                assertThat(new PDFTextStripper().getText(pdf)).contains("LIBRO DIARIO","Empresa del Diario","AS-000012",
+                    "TOTALES DEL PERÍODO","Diferencia: 0.00","Origen: Manual").doesNotContain("AS-000001","ContaCloud");
+            } catch(java.io.IOException ex) {throw new AssertionError(ex);}
+            autenticar(tenant,UUID.randomUUID());
+            assertThat(diario.consultar(f,0,10).asientos()).isEmpty();
+        });
+    }
+
     private long ledger(JdbcTemplate j,UUID id) {
         return j.queryForObject("SELECT count(*) FROM asiento_movimiento_contable WHERE asiento_id=?",Long.class,id);
     }

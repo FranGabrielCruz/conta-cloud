@@ -107,6 +107,37 @@ final class LargeDocumentPdfTemplate {
             new String[]{"CUENTA","DESCRIPCIÓN","DÉBITO","CRÉDITO"},true);
     }
 
+    static String libroDiario(boolean logo) throws IOException {
+        String base=tablaContable(logo,true,"LIBRO DIARIO","general_journal",new int[]{277,269,118,118},
+            new String[]{"CUENTA / ASIENTO","DESCRIPCIÓN","DÉBITO","CRÉDITO"},true);
+        base=base.replace("\"Fecha: \" + $P{orderDate}","\"Período: \" + $P{orderDate}");
+        int campo=base.indexOf("<field ");
+        String campos="""
+            <field name="journalNumber" class="java.lang.String"/>
+            <field name="journalHeading" class="java.lang.String"/>
+            <field name="journalConcept" class="java.lang.String"/>
+            <field name="journalMetadata" class="java.lang.String"/>
+            """;
+        base=base.substring(0,campo)+campos+base.substring(campo);
+        String grupo="""
+            <group name="Journal" keepTogether="true" isReprintHeaderOnEachPage="true">
+              <groupExpression><![CDATA[$F{journalNumber}]]></groupExpression>
+              <groupHeader>
+                <band height="19" splitType="Prevent">
+                  <printWhenExpression><![CDATA[$F{journalNumber} != null]]></printWhenExpression>
+            """
+            +field("$V{Journal_COUNT} > 1 ? $F{journalNumber} + \" — CONTINUACIÓN\" : $F{journalHeading}",
+                0,4,782,14,"Section","Left",false)
+            +"""
+                </band>
+                <band height="33" splitType="Stretch">
+                  <printWhenExpression><![CDATA[$F{journalNumber} != null && $V{Journal_COUNT} <= 1]]></printWhenExpression>
+            """
+            +field("$F{journalConcept} + \"\\n\" + $F{journalMetadata}",0,0,782,30,"Base","Left",true)
+            +"</band></groupHeader></group>";
+        return base.replace("<title>",grupo+"<title>");
+    }
+
     private static String tablaContable(boolean logo,boolean conFiltros,String titulo,String nombre,
                                         int[] anchos,String[] etiquetas,boolean monetaria) throws IOException {
         String base = receipt(logo, 90, 36, false)

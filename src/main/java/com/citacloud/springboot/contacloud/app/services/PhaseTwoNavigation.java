@@ -88,7 +88,7 @@ public final class PhaseTwoNavigation {
         new Section("CONTABILIDAD", List.of(
             item("Catálogo de cuentas", "catalogo-cuentas", "BOOK_DOLLAR", CONTABILIDAD, "catalogo_cuentas.ver", "Administra la estructura de cuentas contables."),
             item("Asientos contables", "asientos", "EDIT", CONTABILIDAD, "asientos.ver", "Consulta y registra asientos contables."),
-            item("Libro diario", "libro-diario", "BOOK", CONTABILIDAD, "libro_diario.ver", placeholder("Libro diario")),
+            item("Libro diario", "libro-diario", "BOOK", CONTABILIDAD, "libro_diario.ver", "Consulta los asientos contabilizados en orden cronológico."),
             item("Libro mayor", "libro-mayor", "BOOK", CONTABILIDAD, "libro_mayor.ver", placeholder("Libro mayor")),
             item("Balanza", "balanza", "SCALE", CONTABILIDAD, "balanza.ver", placeholder("Balanza")),
             item("Centros de costos", "centros-costos", "GROUP", CONTABILIDAD, "centros_costos.ver", placeholder("Centros de costos")),
