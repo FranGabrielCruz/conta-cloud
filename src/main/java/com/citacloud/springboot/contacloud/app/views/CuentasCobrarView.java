@@ -63,7 +63,7 @@ public class CuentasCobrarView extends VerticalLayout implements BeforeEnterObse
         setSpacing(false);
         setWidthFull();
         addClassName("cc-page");
-        cartera=new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Reporte de cuentas por cobrar",e->abrirCartera());
+        cartera=AppActionButton.verPdf(e->abrirCartera());
         antiguedad=new AppActionButton(ActionType.ANALYTICS,ButtonSize.MAIN,"Reporte de antigüedad de saldos",e->solicitarCorte());
         add(new AppPageHeader("CUENTAS POR COBRAR","Consulta los saldos y vencimientos de tus clientes.",cartera,antiguedad));
         indicadores.addClassName("cc-cartera-indicadores");
@@ -236,7 +236,7 @@ public class CuentasCobrarView extends VerticalLayout implements BeforeEnterObse
             corte.setRequiredIndicatorVisible(true);
             dialogo.add(new Paragraph("El reporte usa los filtros de la cartera y agrupa los saldos por cliente y moneda."),corte);
             var filtros=filtro();
-            dialogo.getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Generar reporte",e->{
+            dialogo.getFooter().add(AppActionButton.verPdf(e->{
                 try{PdfEnPestana.abrir(pdf.antiguedad(filtros,corte.getValue()));dialogo.close();}
                 catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el reporte de antigüedad.");}
             }),new AppActionButton(ActionType.CANCEL,ButtonSize.MAIN,"Cancelar",e->dialogo.close()));

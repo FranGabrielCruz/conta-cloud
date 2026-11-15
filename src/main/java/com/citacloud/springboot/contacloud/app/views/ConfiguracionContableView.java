@@ -174,7 +174,7 @@ public class ConfiguracionContableView extends VerticalLayout implements BeforeE
             Div asientos = seccion("CONFIGURACIÓN DE ASIENTOS",
                 "Estos parámetros serán consumidos por las futuras integraciones contables.", automatica);
             Div cuentas = seccion("CUENTAS POR DEFECTO",
-                "El catálogo de cuentas debe estar implementado y configurado antes de asignar cuentas contables predeterminadas.");
+                "Las integraciones contables utilizarán las cuentas configuradas en el catálogo.");
             add(parametros, cuentas, asientos);
             if (hasAny("configuracion_contable.editar", "CONFIGURACION_CONTABLE_EDITAR")) {
                 add(new HorizontalLayout(new AppActionButton(ActionType.SAVE, ButtonSize.MAIN, "Guardar", event -> guardar())));

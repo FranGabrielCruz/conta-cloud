@@ -137,7 +137,7 @@ public class BajasActivosView extends VerticalLayout implements BeforeEnterObser
                     ejecutar("No fue posible editar la baja.", () -> { editar(d); modal.close(); })));
                 if (puede("confirmar")) modal.getFooter().add(accion(ActionType.ACCEPT, "Confirmar baja", () -> confirmar(d, modal)));
             } else if (puede("imprimir")) {
-                modal.getFooter().add(accion(ActionType.PRINT, "Imprimir", () ->
+                modal.getFooter().add(AppActionButton.verPdf(evento ->
                     ejecutar("No fue posible abrir el PDF.", () -> PdfEnPestana.abrir(pdf.generar(id)))));
             }
             modal.getFooter().add(accion(ActionType.CLOSE, "Cerrar", modal::close));

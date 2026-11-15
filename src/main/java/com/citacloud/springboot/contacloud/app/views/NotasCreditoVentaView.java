@@ -135,7 +135,7 @@ public class NotasCreditoVentaView extends VerticalLayout implements BeforeEnter
     }
     List<AppActionButton> accionesDetalle(Dialog dialog,NotaCreditoVentaDocumento nota,NotaCreditoVentaCicloDto ciclo){
         List<AppActionButton> acciones=new ArrayList<>();
-        if(puede("notas_credito.pdf"))acciones.add(botonImprimir(nota.id()));
+        if(puede("notas_credito.pdf"))acciones.add(botonVerPdf(nota.id()));
         if(puede("notas_credito.anular")&&"CONFIRMED".equals(ciclo.estado())&&ciclo.anulable())acciones.add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular nota de crédito",e->confirmarAnulacion(dialog,nota,ciclo)));
         acciones.add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->dialog.close()));
         return acciones;
@@ -151,7 +151,7 @@ public class NotasCreditoVentaView extends VerticalLayout implements BeforeEnter
     }
     private Component resumen(NotaCreditoVentaDocumento n){var section=new AppDetailSection("TOTALES").field("Subtotal",money(n.moneda(),n.subtotal())).field("Descuento",money(n.moneda(),n.descuento()));if(n.recargo().signum()>0)section.field("Recargo",money(n.moneda(),n.recargo()));
         var taxes=new LinkedHashMap<String,BigDecimal>();for(var l:n.lineas())if(l.impuesto().signum()!=0)taxes.merge(valor(l.impuestoNombre())+" "+l.tasa().stripTrailingZeros().toPlainString()+"%",l.impuesto(),BigDecimal::add);taxes.forEach((label,amount)->section.field(label,money(n.moneda(),amount)));section.field("TOTAL "+n.moneda(),money(n.moneda(),n.total()));return section;}
-    AppActionButton botonImprimir(UUID id){return new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir nota de crédito",e->abrirPdf(id));}
+    AppActionButton botonVerPdf(UUID id){return AppActionButton.verPdf(e->abrirPdf(id));}
     private void abrirPdf(UUID id){try{var f=pdf.generar(id);var resource=new StreamResource(f.nombreArchivo(),()->new ByteArrayInputStream(f.contenido()));resource.setContentType("application/pdf");resource.setCacheTime(0);var registration=VaadinSession.getCurrent().getResourceRegistry().registerResource(resource);UI.getCurrent().getPage().open(registration.getResourceUri().toString(),"_blank");}catch(RuntimeException ex){UiErrorHandler.show(ex,"No fue posible generar el PDF. La nota permanece emitida.");}}
     private static DatePicker fecha(String label){var f=new DatePicker(label);f.setLocale(Locale.forLanguageTag("es-DO"));f.setI18n(new DatePicker.DatePickerI18n().setDateFormat("dd/MM/yyyy"));f.setClearButtonVisible(true);return f;}
     private static boolean puede(String permiso){return TenantContext.principalActual().permisos().contains(permiso);}

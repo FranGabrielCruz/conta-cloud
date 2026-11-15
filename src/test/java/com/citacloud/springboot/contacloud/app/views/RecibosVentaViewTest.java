@@ -58,14 +58,14 @@ class RecibosVentaViewTest {
         var vista=new RecibosVentaView(null,null,null,null);
         autenticar("recibos.ver","recibos.imprimir","recibos.anular");
         assertThat(pie(vista.crearDetalle(detalle(recibo(EstadoReciboCliente.APPLIED),true))))
-            .extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Anular recibo","Cerrar");
+            .extracting(RecibosVentaViewTest::nombre).containsExactly("Ver PDF","Anular recibo","Cerrar");
         assertThat(pie(vista.crearDetalle(detalle(recibo(EstadoReciboCliente.VOIDED),true))))
-            .extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Cerrar");
+            .extracting(RecibosVentaViewTest::nombre).containsExactly("Ver PDF","Cerrar");
         assertThat(pie(vista.crearDetalle(detalle(recibo(EstadoReciboCliente.APPLIED),false))))
-            .extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Cerrar");
+            .extracting(RecibosVentaViewTest::nombre).containsExactly("Ver PDF","Cerrar");
         autenticar("recibos.ver","recibos.imprimir");
         assertThat(pie(vista.crearDetalle(detalle(recibo(EstadoReciboCliente.APPLIED),true))))
-            .extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Cerrar");
+            .extracting(RecibosVentaViewTest::nombre).containsExactly("Ver PDF","Cerrar");
     }
 
     @Test void confirmarActualizaElMismoDetalleAbierto() {
@@ -101,7 +101,7 @@ class RecibosVentaViewTest {
 
         assertThat(detalle.isOpened()).isTrue();
         assertThat(confirmacion.isOpened()).isFalse();
-        assertThat(pie(detalle)).extracting(RecibosVentaViewTest::nombre).containsExactly("Imprimir recibo","Cerrar");
+        assertThat(pie(detalle)).extracting(RecibosVentaViewTest::nombre).containsExactly("Ver PDF","Cerrar");
         assertThat(descendientes(detalle).map(c->c.getElement().getText()))
             .contains("Anulado","ANULACIÓN","Cobro incorrecto","DOP 10.00");
         assertThat(descendientes(detalle).filter(com.citacloud.springboot.contacloud.app.views.components.AppStatusBadge.class::isInstance))
@@ -145,7 +145,7 @@ class RecibosVentaViewTest {
         var vista=new RecibosVentaView(null,cobros,pdf,null);
         var fila=recibo(EstadoReciboCliente.APPLIED);
         when(pdf.generar(fila.id())).thenThrow(new com.citacloud.springboot.contacloud.app.services.ReglaNegocioException("No fue posible generar el PDF del recibo."));
-        vista.imprimir(fila.id());
+        vista.abrirPdf(fila.id());
         verifyNoInteractions(recursos,cobros);
     }
 

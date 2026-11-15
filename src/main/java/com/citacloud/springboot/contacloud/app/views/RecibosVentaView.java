@@ -142,7 +142,7 @@ public class RecibosVentaView extends VerticalLayout implements BeforeEnterObser
         dialog.removeAll();
         dialog.add(cuerpo);
         dialog.getFooter().removeAll();
-        if(permiso("recibos.imprimir"))dialog.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir recibo",e->imprimir(r.id())));
+        if(permiso("recibos.imprimir"))dialog.getFooter().add(AppActionButton.verPdf(e->abrirPdf(r.id())));
         if(r.estado()!=EstadoReciboCliente.VOIDED && detalle.anulable() && permiso("recibos.anular"))
             dialog.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular recibo",
                 e->anular(r.id(),r.numero(),()->refrescarTrasAnulacion(dialog,r.id()))));
@@ -204,7 +204,7 @@ public class RecibosVentaView extends VerticalLayout implements BeforeEnterObser
         return dialogo;
     }
 
-    void imprimir(UUID id) {
+    void abrirPdf(UUID id) {
         try {
             PdfEnPestana.abrir(pdf.generar(id));
         } catch(RuntimeException ex) {

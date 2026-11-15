@@ -63,7 +63,7 @@ public class ExpedienteCierreCajaDialog extends Dialog {
         AppActionButton print=new BillingPrintActionButton(cierre.id(),ButtonSize.MAIN,"Imprimir cierre",imprimir);
         print.setDisableOnClick(true);
         print.setVisible(puedeImprimir);
-        AppActionButton pdf=new AppActionButton(ActionType.VIEW,ButtonSize.MAIN,"Ver PDF",e->{if(puedeImprimir&&verPdf!=null)verPdf.accept(cierre.id());});
+        AppActionButton pdf=AppActionButton.verPdf(e->{if(puedeImprimir&&verPdf!=null)verPdf.accept(cierre.id());});
         pdf.setVisible(puedeImprimir&&verPdf!=null);
         restringir(panelVentas,puedeVentas,"No tienes permiso para consultar las facturas del turno.");
         restringir(panelCobros,puedeCobros,"No tienes permiso para consultar los cobros del turno.");

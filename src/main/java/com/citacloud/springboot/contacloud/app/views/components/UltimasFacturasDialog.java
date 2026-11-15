@@ -87,8 +87,6 @@ public class UltimasFacturasDialog extends Dialog {
     private Component importe(String moneda,BigDecimal total){Span valor=new Span(valor(moneda)+" "+PosNumberFormatter.money(total));valor.addClassName("cc-latest-invoice-amount");return valor;}
     private Component acciones(FacturaVentaResumenDto factura){HorizontalLayout acciones=new HorizontalLayout();acciones.addClassNames("cc-grid-actions","cc-latest-invoice-actions");acciones.setPadding(false);acciones.setSpacing(false);
         acciones.add(new AppActionButton(ActionType.VIEW,ButtonSize.GRID_ACTION,"Ver factura",e->abrirDetalle(factura)));
-        if(puede("facturas.pdf"))acciones.add(new AppActionButton(ActionType.PDF,ButtonSize.GRID_ACTION,"Ver PDF",e->reimprimir.accept(factura.id())));
-        if(imprimir!=null&&puede("facturas.pdf"))acciones.add(botonImprimir(factura.id(),ButtonSize.GRID_ACTION));
         return acciones;}
 
     AppActionButton botonImprimir(UUID facturaId,ButtonSize size){
@@ -133,7 +131,7 @@ public class UltimasFacturasDialog extends Dialog {
             lineas.setItems(factura.lineas());lineas.setAllRowsVisible(true);lineas.addClassName("cc-latest-invoice-lines");
             Div totales=totales(factura);Div pagos=pagos(factura);Div contenido=new Div(cabecera,new H3("PRODUCTOS"),lineas,totales,pagos);
             contenido.addClassName("cc-latest-invoice-detail-body");detalle.add(contenido);
-            if(puede("facturas.pdf"))detalle.getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->reimprimir.accept(factura.id())));
+            if(puede("facturas.pdf"))detalle.getFooter().add(AppActionButton.verPdf(e->reimprimir.accept(factura.id())));
             if(imprimir!=null&&puede("facturas.pdf"))detalle.getFooter().add(botonImprimir(factura.id(),ButtonSize.MAIN));
             detalle.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->detalle.close()));
             detalle.addClosedListener(e->buscar.focus());detalle.open();

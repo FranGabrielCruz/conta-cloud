@@ -44,8 +44,8 @@ class NotasCreditoVentaViewTest {
         assertThat(tree(section).map(c->c.getElement().getText())).contains("Consumidor Final","Contado","DOP 400.00");
     }
     @Test void imprimirReutilizaAccionPrincipalGlobalConIconoPrinter(){
-        var button=view(Set.of("notas_credito.ver","notas_credito.pdf")).botonImprimir(UUID.randomUUID());
-        assertThat(button.getClassNames()).contains("cc-action-main","cc-action-view");assertThat(button.getIcon().getElement().getAttribute("icon")).isEqualTo("vaadin:print");assertThat(button.getText()).isEmpty();assertThat(button.getAriaLabel()).contains("Imprimir nota de crédito");
+        var button=view(Set.of("notas_credito.ver","notas_credito.pdf")).botonVerPdf(UUID.randomUUID());
+        assertThat(button.getClassNames()).contains("cc-action-main","cc-action-view");assertThat(button.getIcon().getElement().getAttribute("icon")).isEqualTo("vaadin:file-text-o");assertThat(button.getText()).isEmpty();assertThat(button.getAriaLabel()).contains("Ver PDF");
     }
     @Test void cancelarSinCambiosCierraYDescartarRequiereConfirmacion(){
         var form=mock(com.vaadin.flow.component.dialog.Dialog.class);NotasCreditoVentaView.cancelar(form,false);verify(form).close();clearInvocations(form);
@@ -71,12 +71,12 @@ class NotasCreditoVentaViewTest {
         var dialog=mock(com.vaadin.flow.component.dialog.Dialog.class);
         var issued=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(UUID.randomUUID(),null,null,0,"CONFIRMED",true,null,null,null);
         var buttons=v.accionesDetalle(dialog,note,issued);
-        assertThat(buttons).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Imprimir nota de crédito","Anular nota de crédito","Cerrar");
+        assertThat(buttons).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Ver PDF","Anular nota de crédito","Cerrar");
         assertThat(buttons).allMatch(b->b.getText().isEmpty()&&b.hasClassName("cc-action-main"));
-        assertThat(buttons.get(0).getIcon().getElement().getAttribute("icon")).isEqualTo("vaadin:print");
+        assertThat(buttons.get(0).getIcon().getElement().getAttribute("icon")).isEqualTo("vaadin:file-text-o");
         assertThat(buttons.get(1).getClassNames()).contains("cc-action-danger");assertThat(buttons.getLast().getClassNames()).contains("cc-action-neutral");
         var voided=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(issued.facturaId(),null,null,1,"VOIDED",true,"Error","Operador",java.time.LocalDateTime.now());
-        var history=v.accionesDetalle(dialog,note,voided);assertThat(history).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Imprimir nota de crédito","Cerrar");
+        var history=v.accionesDetalle(dialog,note,voided);assertThat(history).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Ver PDF","Cerrar");
         history.getLast().click();verify(dialog).close();
     }
     @Test void detalleRespetaPermisosYElegibilidadSinAccionPdfRedundante(){
@@ -84,7 +84,7 @@ class NotasCreditoVentaViewTest {
         var issued=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(UUID.randomUUID(),null,null,0,"CONFIRMED",true,null,null,null);
         assertThat(view(Set.of("notas_credito.ver")).accionesDetalle(dialog,note,issued)).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Cerrar");
         var used=new com.citacloud.springboot.contacloud.app.dto.NotaCreditoVentaCicloDto(issued.facturaId(),null,null,0,"CONFIRMED",false,null,null,null);
-        assertThat(view(Set.of("notas_credito.pdf","notas_credito.anular")).accionesDetalle(dialog,note,used)).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Imprimir nota de crédito","Cerrar");
+        assertThat(view(Set.of("notas_credito.pdf","notas_credito.anular")).accionesDetalle(dialog,note,used)).extracting(b->b.getAriaLabel().orElse("")).containsExactly("Ver PDF","Cerrar");
         verifyNoInteractions(dialog);
     }
 }

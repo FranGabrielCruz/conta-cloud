@@ -107,7 +107,7 @@ public class NotasDebitoVentaView extends VerticalLayout implements BeforeEnterO
   if(!n.pagos().isEmpty()){var paid=new AppDetailSection("FORMA DE PAGO");for(var pay:n.pagos())paid.field(pay.metodo(),money(n.moneda(),pay.monto()));paid.field("Recibido",money(n.moneda(),n.recibido())).field("Cambio",money(n.moneda(),n.cambio()));d.add(paid);}
   d.getFooter().add(accionesDetalle(d,n,c).toArray(Component[]::new));d.open();
  }
- List<AppActionButton> accionesDetalle(Dialog d,NotaDebitoVentaDocumento n,NotaDebitoVentaCicloDto c){List<AppActionButton> actions=new ArrayList<>();if(puede("notas_debito.pdf"))actions.add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir nota de débito",e->abrirPdfEmitida(n)));if(puede("notas_debito.anular")&&c.anulable()&&"CONFIRMED".equals(c.estado()))actions.add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular nota de débito",e->anular(d,n,c)));actions.add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));return actions;}
+ List<AppActionButton> accionesDetalle(Dialog d,NotaDebitoVentaDocumento n,NotaDebitoVentaCicloDto c){List<AppActionButton> actions=new ArrayList<>();if(puede("notas_debito.pdf"))actions.add(AppActionButton.verPdf(e->abrirPdfEmitida(n)));if(puede("notas_debito.anular")&&c.anulable()&&"CONFIRMED".equals(c.estado()))actions.add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular nota de débito",e->anular(d,n,c)));actions.add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));return actions;}
  private void anular(Dialog parent,NotaDebitoVentaDocumento n,NotaDebitoVentaCicloDto state){
   var d=new Dialog();d.setHeaderTitle("ANULAR NOTA DE DÉBITO");d.add(new Paragraph("Está a punto de anular la nota "+n.numero()+". Se revertirá únicamente el efecto financiero de este documento."));
   var reason=new TextArea("Motivo de anulación");reason.setRequiredIndicatorVisible(true);reason.setMinLength(3);reason.setMaxLength(n.condicionNota()==com.citacloud.springboot.contacloud.app.models.TipoCondicionPago.CASH?500:1000);reason.setWidthFull();d.add(reason);UUID key=UUID.randomUUID();
@@ -132,7 +132,7 @@ public class NotasDebitoVentaView extends VerticalLayout implements BeforeEnterO
   org.slf4j.LoggerFactory.getLogger(NotasDebitoVentaView.class).atWarn().addKeyValue("DebitNoteId",issued.id()).addKeyValue("TraceId",trace).addKeyValue("ExceptionType",ex.getClass().getName()).log("sales_debit_note_pdf_failed");
   Notification.show(mensajeFalloPdf(issued),8000,Notification.Position.BOTTOM_START).addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
  }
- static String mensajeFalloPdf(NotaDebitoVentaDocumento issued){return "La nota de débito "+issued.numero()+" fue emitida correctamente, pero no fue posible abrir el PDF. Puede reintentarlo desde Imprimir.";}
+ static String mensajeFalloPdf(NotaDebitoVentaDocumento issued){return "La nota de débito "+issued.numero()+" fue emitida correctamente, pero no fue posible abrir el PDF. Puede reintentarlo desde Ver PDF.";}
  void abrirPdf(UUID id){
   var file=pdf.generar(id);var resource=new StreamResource(file.nombreArchivo(),()->new ByteArrayInputStream(file.contenido()));resource.setContentType("application/pdf");resource.setCacheTime(0);
   var registered=VaadinSession.getCurrent().getResourceRegistry().registerResource(resource);

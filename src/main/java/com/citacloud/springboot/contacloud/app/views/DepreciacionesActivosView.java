@@ -188,7 +188,7 @@ public class DepreciacionesActivosView extends VerticalLayout implements BeforeE
             informacion.addClassName("cc-detail-three");
             d.add(informacion,resumen(detalle.totales()),new H3("DETALLE"),lineas(detalle.lineas(),false));
             if (TenantContext.principalActual().permisos().contains(DepreciacionService.PDF))
-                d.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir",e->{
+                d.getFooter().add(AppActionButton.verPdf(e->{
                     try {
                         PdfEnPestana.abrir(pdf.generar(id));
                     } catch (RuntimeException ex) {

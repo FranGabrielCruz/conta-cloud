@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 public class ConfiguracionContableMapper {
     public ConfiguracionContableDto toDto(ConfiguracionContable entity) {
         return new ConfiguracionContableDto(entity.getId(), entity.getMetodoContable().name(),
-            entity.isContabilizacionAutomatica(), entity.isPermitirPeriodosCerrados(), false);
+            entity.isContabilizacionAutomatica(), entity.isPermitirPeriodosCerrados(), true);
     }
 
     public void updateEntity(ConfiguracionContableInput input, ConfiguracionContable entity) {

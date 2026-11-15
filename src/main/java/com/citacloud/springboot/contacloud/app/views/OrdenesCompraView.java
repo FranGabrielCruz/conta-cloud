@@ -91,7 +91,7 @@ public class OrdenesCompraView extends VerticalLayout implements BeforeEnterObse
         if(o.estado()==EstadoOrdenCompra.DRAFT&&can("ordenes_compra.editar"))d.getFooter().add(new AppActionButton(ActionType.EDIT,ButtonSize.MAIN,"Editar orden",e->{d.close();form(o.id());}));
         if(o.estado()==EstadoOrdenCompra.DRAFT&&can("ordenes_compra.emitir"))d.getFooter().add(new AppActionButton(ActionType.ISSUE,ButtonSize.MAIN,"Emitir orden",e->confirmIssue(o,d)));
         if(o.estado()!=EstadoOrdenCompra.DRAFT&&o.pdfDisponible()){
-            d.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir",e->openPdf(o)));
+            d.getFooter().add(AppActionButton.verPdf(e->openPdf(o)));
         }
         if((o.estado()==EstadoOrdenCompra.DRAFT||o.estado()==EstadoOrdenCompra.ISSUED)&&can("ordenes_compra.anular"))d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular orden",e->voidForm(o,d)));
         d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();}catch(RuntimeException ex){error(ex,"No fue posible consultar la orden de compra.");}}

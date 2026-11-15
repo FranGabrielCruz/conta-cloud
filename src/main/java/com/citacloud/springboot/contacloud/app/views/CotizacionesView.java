@@ -123,7 +123,7 @@ public class CotizacionesView extends VerticalLayout implements BeforeEnterObser
         if(c.estado()==EstadoCotizacion.ENVIADA&&can("cotizaciones.rechazar"))d.getFooter().add(new AppActionButton(ActionType.REJECT,ButtonSize.MAIN,"Rechazar cotización",e->reasonForm(c,d,false)));
         if(c.estado()==EstadoCotizacion.ACEPTADA&&can("cotizaciones.convertir"))d.getFooter().add(new AppActionButton(ActionType.CREATE_INVOICE,ButtonSize.MAIN,"Crear factura",e->createInvoice(c,d)));
         if(can("cotizaciones.duplicar"))d.getFooter().add(new AppActionButton(ActionType.DUPLICATE,ButtonSize.MAIN,"Duplicar cotización",e->duplicate(c,d)));
-        if(can("cotizaciones.imprimir"))d.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Imprimir",e->openPdf(c)));
+        if(can("cotizaciones.imprimir"))d.getFooter().add(AppActionButton.verPdf(e->openPdf(c)));
         if(c.estado()!=EstadoCotizacion.ANULADA&&c.estado()!=EstadoCotizacion.CONVERTIDA&&can("cotizaciones.anular"))d.getFooter().add(new AppActionButton(ActionType.VOID,ButtonSize.MAIN,"Anular cotización",e->reasonForm(c,d,true)));
         d.getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->d.close()));d.open();
     }catch(RuntimeException ex){error(ex,"No fue posible consultar la cotización.");}}

@@ -67,7 +67,7 @@ public class ActivosFijosView extends VerticalLayout implements BeforeEnterObser
         setSpacing(false);
         addClassName("cc-page");
         nuevo=new AppActionButton(ActionType.NEW,ButtonSize.MAIN,"Nuevo activo",e->formulario(null,null));
-        reporte=new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Reporte de activos",e->{
+        reporte=AppActionButton.verPdf(e->{
             try {
                 PdfEnPestana.abrir(pdf.generar(filtro()));
             } catch (RuntimeException ex) {

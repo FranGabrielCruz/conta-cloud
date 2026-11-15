@@ -96,6 +96,32 @@ final class LargeDocumentPdfTemplate {
         return tablaReporte(base,anchos,etiquetas,i->(antiguedad?i>=2:i==5||i==6)?"Right":"Left",i->i==(antiguedad?0:3));
     }
 
+    static String catalogoCuentas(boolean logo, boolean conFiltros) throws IOException {
+        String titulo = "CATÁLOGO DE CUENTAS";
+        String base = receipt(logo, 90, 36, false)
+            .replace("RECIBO DE COBRO", titulo)
+            .replace("customer_receipt_large", "accounting_chart");
+        int primerCampo = base.indexOf("<field ");
+        base = base.substring(0, primerCampo) + "<parameter name=\"chartFilters\" class=\"java.lang.String\"/>"
+            + base.substring(primerCampo);
+        String original = section(base, "title");
+        String empresa = original.substring(original.indexOf('>', original.indexOf("<band ")) + 1,
+            original.indexOf("<rectangle"));
+        empresa = empresa.substring(0, empresa.lastIndexOf("<textField>"));
+        String filtros = conFiltros ? field("$P{chartFilters}", 0, 90, 782, 15, "Base", "Left", true) : "";
+        base = replaceSection(base, "title", "<title><band height=\"" + (conFiltros ? 108 : 90)
+            + "\" splitType=\"Stretch\">" + empresa + filtros + "</band></title>");
+        base = replaceSection(base, "pageHeader", "<pageHeader><band height=\"26\" splitType=\"Prevent\">"
+            + "<printWhenExpression><![CDATA[$V{PAGE_NUMBER} > 1]]></printWhenExpression>"
+            + field("$P{companyTradeName}", 0, 2, 410, 20, "Section", "Left", false)
+            + staticText(titulo, 449, 0, 333, 12, "Section", "Right")
+            + field("\"Fecha: \" + $P{orderDate}", 449, 12, 333, 12, "Base", "Right", false)
+            + "</band></pageHeader>");
+        return tablaReporte(base, new int[]{145, 280, 94, 94, 92, 77},
+            new String[]{"CÓDIGO", "CUENTA", "TIPO", "CLASIFICACIÓN", "NATURALEZA", "ESTADO"},
+            i -> "Left", i -> i <= 1);
+    }
+
     static String activosFijos(boolean logo,boolean conFiltros)throws IOException{
         String base=receipt(logo,90,36,false)
             .replace("RECIBO DE COBRO","REPORTE DE ACTIVOS FIJOS")

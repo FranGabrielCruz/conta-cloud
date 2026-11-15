@@ -42,7 +42,7 @@ public final class DetalleRecuentoCajaDialog extends Dialog {
             Paragraph texto=new Paragraph(recuento.observacion());texto.addClassName("cc-cash-count-observation");cuerpo.add(titulo,texto);
         }
         add(cuerpo);
-        if(puedeImprimir&&verPdf!=null)getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->verPdf.accept(recuento.id())));
+        if(puedeImprimir&&verPdf!=null)getFooter().add(AppActionButton.verPdf(e->verPdf.accept(recuento.id())));
         if(puedeImprimir)getFooter().add(new BillingPrintActionButton(recuento.id(),ButtonSize.MAIN,"Imprimir recuento",imprimir));
         getFooter().add(new AppActionButton(ActionType.CLOSE,ButtonSize.MAIN,"Cerrar",e->close()));
     }

@@ -86,7 +86,7 @@ public final class PhaseTwoNavigation {
                 "Corrige existencias mediante movimientos trazables y auditados."),
             item("Conteo físico", "inventario/conteo-fisico", "CHECK_SQUARE_O", INVENTARIO, "conteo_fisico.ver", placeholder()))),
         new Section("CONTABILIDAD", List.of(
-            item("Catálogo de cuentas", "catalogo-cuentas", "BOOK_DOLLAR", CONTABILIDAD, "catalogo_cuentas.ver", placeholder("Catálogo de cuentas")),
+            item("Catálogo de cuentas", "catalogo-cuentas", "BOOK_DOLLAR", CONTABILIDAD, "catalogo_cuentas.ver", "Administra la estructura de cuentas contables."),
             item("Asientos", "asientos", "EDIT", CONTABILIDAD, "asientos.ver", placeholder("Asientos")),
             item("Libro diario", "libro-diario", "BOOK", CONTABILIDAD, "libro_diario.ver", placeholder("Libro diario")),
             item("Libro mayor", "libro-mayor", "BOOK", CONTABILIDAD, "libro_mayor.ver", placeholder("Libro mayor")),

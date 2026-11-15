@@ -38,7 +38,7 @@ import com.citacloud.springboot.contacloud.app.dto.*;import com.citacloud.spring
         "ANULAR AJUSTE","Motivo de anulación",r->{service.anular(a.id(),r);d.close();refresh();})));
    if((a.estado()==EstadoAjusteInventario.CONFIRMED||a.estado()==EstadoAjusteInventario.REVERSED)
        &&can("inventario_ajustes.pdf"))
-    d.getFooter().add(new AppActionButton(ActionType.PRINT,ButtonSize.MAIN,"Generar PDF",e->{
+    d.getFooter().add(AppActionButton.verPdf(e->{
      try{openPdf(a.id());}catch(RuntimeException x){error(x,"No fue posible generar el PDF del ajuste.");}}));
    if(a.estado()==EstadoAjusteInventario.CONFIRMED&&can("inventario_ajustes.revertir"))
     d.getFooter().add(new AppActionButton(ActionType.REJECT,ButtonSize.MAIN,"Revertir ajuste",e->reason(

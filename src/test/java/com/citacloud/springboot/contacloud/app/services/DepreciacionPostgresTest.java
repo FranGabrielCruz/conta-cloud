@@ -146,6 +146,7 @@ class DepreciacionPostgresTest {
                     "activo_depreciacion_proceso","activo_fijo","periodos_fiscales","usuarios","monedas","sucursales",
                     "condiciones_pago","unit_of_measure","inventory_adjustment_reason","sales_payment_method","sales_return_reason"))
                     jdbc.update("DELETE FROM "+tabla+" WHERE empresa_id=?",empresa);
+                jdbc.update("DELETE FROM cuenta_contable WHERE empresa_id=?",empresa);
                 jdbc.update("DELETE FROM empresas WHERE id=? AND tenant_id=?",empresa,tenant);
             });
         }

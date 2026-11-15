@@ -150,7 +150,8 @@ public class MantenimientoActivosView extends VerticalLayout implements BeforeEn
             if(d.estado().pendiente() && puede("cancelar"))
                 dialogo.getFooter().add(accion(ActionType.VOID,"Cancelar mantenimiento",()->cancelar(d,dialogo)));
             if(d.estado()==Estado.COMPLETADO && puede("imprimir"))
-                dialogo.getFooter().add(accion(ActionType.PRINT,"Imprimir",()->ejecutar("No fue posible abrir el PDF.",()->PdfEnPestana.abrir(pdf.generar(id)))));
+                dialogo.getFooter().add(AppActionButton.verPdf(evento ->
+                    ejecutar("No fue posible abrir el PDF.",()->PdfEnPestana.abrir(pdf.generar(id)))));
             dialogo.getFooter().add(accion(ActionType.CLOSE,"Cerrar",dialogo::close));
             dialogo.open();
         });

@@ -251,7 +251,7 @@ public final class RecibosCobrosDialog extends Dialog {
                     && x.disponible().signum() > 0);
             Button voidButton = new AppActionButton(ActionType.VOID, ButtonSize.MAIN, "Anular recibo", e -> askVoid(dialog, x.id()));
             voidButton.setVisible(hasPermission("recibos.anular") && x.estado() != EstadoReciboCliente.VOIDED);
-            if(verPdf!=null&&hasPermission("recibos.imprimir"))dialog.getFooter().add(new AppActionButton(ActionType.PDF,ButtonSize.MAIN,"Ver PDF",e->verPdf.accept(x.id())));
+            if(verPdf!=null&&hasPermission("recibos.imprimir"))dialog.getFooter().add(AppActionButton.verPdf(e->verPdf.accept(x.id())));
             dialog.getFooter().add(apply, pdf, voidButton,
                     new AppActionButton(ActionType.CLOSE, ButtonSize.MAIN, "Cerrar", e -> dialog.close()));
             dialog.open();

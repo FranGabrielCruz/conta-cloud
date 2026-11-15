@@ -15,6 +15,9 @@ class UltimasFacturasDialogLayoutTest {
   var dialog=new UltimasFacturasDialog(mock(UltimasFacturasService.class),id->{},(id,attempt)->true,()->{});
   var field=UltimasFacturasDialog.class.getDeclaredField("grid");field.setAccessible(true);Grid<?> grid=(Grid<?>)field.get(dialog);
   var columns=grid.getColumns();assertThat(columns).hasSize(6);var actions=columns.getLast();assertThat(actions.getHeaderText()).isEqualTo("Acciones");assertThat(actions.isAutoWidth()).isTrue();assertThat(actions.isFrozenToEnd()).isTrue();assertThat(actions.getFlexGrow()).isZero();assertThat(columns.get(2).getFlexGrow()).isPositive();assertThat(grid.isAllRowsVisible()).isTrue();
+  var factura=mock(com.citacloud.springboot.contacloud.app.dto.FacturaVentaResumenDto.class);
+  var fila=(com.vaadin.flow.component.Component)org.springframework.test.util.ReflectionTestUtils.invokeMethod(dialog,"acciones",factura);
+  assertThat(fila.getChildren().map(c->c.getElement().getAttribute("aria-label")).toList()).containsExactly("Ver factura");
  }
  @Test void imprimirProtegeElBotonYConservaCallbackSeparadoDeVerPdf(){
   java.util.function.Consumer<UUID> pdf=mock(java.util.function.Consumer.class);

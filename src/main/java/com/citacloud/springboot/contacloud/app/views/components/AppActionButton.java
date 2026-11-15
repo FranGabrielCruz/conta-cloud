@@ -9,6 +9,10 @@ import java.util.Objects;
 
 /** Acción visual compartida; la autorización sigue siendo responsabilidad de cada View y del backend. */
 public class AppActionButton extends Button {
+    public static AppActionButton verPdf(ComponentEventListener<ClickEvent<Button>> listener) {
+        return new AppActionButton(ActionType.PDF, ButtonSize.MAIN, listener);
+    }
+
     public AppActionButton(ActionType action, ButtonSize size, String label,
                            ComponentEventListener<ClickEvent<Button>> listener) {
         Objects.requireNonNull(action);
