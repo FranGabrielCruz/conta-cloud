@@ -21,16 +21,18 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.function.SerializableFunction;
 import com.vaadin.flow.router.*;
-import com.vaadin.flow.server.VaadinService;
 import jakarta.annotation.security.PermitAll;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
+import java.util.UUID;
 
 @Route(value="libro-mayor",layout=MainLayout.class)
 @PageTitle("Libro Mayor | ContaCloud")
@@ -62,14 +64,7 @@ public class LibroMayorView extends VerticalLayout implements BeforeEnterObserve
         setSpacing(false);
         setWidthFull();
 
-        verPdf=AppActionButton.verPdf(null);
-        verPdf.getElement().executeJs("""
-            this.addEventListener('click', () => {
-                const url = this.getAttribute('data-pdf-url');
-                if (url && !this.disabled) window.open(url, '_blank', 'noopener');
-            });
-            """);
-        verPdf.setEnabled(false);
+        verPdf=AppActionButton.verPdfEnlace();
         cuenta.setRequiredIndicatorVisible(true);
         cuenta.setItemLabelGenerator(c->c.etiqueta()+(c.activo()?"":" (Inactiva)"));
         cuenta.setPlaceholder("Busca por código o nombre");
@@ -122,7 +117,35 @@ public class LibroMayorView extends VerticalLayout implements BeforeEnterObserve
             var mes=servicio.mesInicial();
             desde.setValue(mes.atDay(1));
             hasta.setValue(mes.atEndOfMonth());
-            cuenta.setItems(servicio.cuentas());
+            var cuentas=new ArrayList<>(servicio.cuentas());
+            var parametros=event.getLocation().getQueryParameters();
+            var cuentaId=parametros.getSingleParameter("accountId");
+            if(cuentaId.isEmpty()) {
+                cuenta.setItems(cuentas);
+                return;
+            }
+            UUID id;
+            LocalDate inicial;
+            LocalDate fin;
+            try {
+                id=UUID.fromString(cuentaId.get());
+                inicial=parametros.getSingleParameter("fromDate").map(LocalDate::parse).orElse(desde.getValue());
+                fin=parametros.getSingleParameter("toDate").map(LocalDate::parse).orElse(hasta.getValue());
+            } catch(IllegalArgumentException|DateTimeParseException ex) {
+                cuenta.setItems(cuentas);
+                mostrarEstado("La cuenta o el período del enlace no es válido.");
+                return;
+            }
+            var seleccion=cuentas.stream().filter(c->c.id().equals(id)).findFirst().orElseGet(()->{
+                var c=servicio.cuenta(id);
+                cuentas.add(c);
+                return c;
+            });
+            cuenta.setItems(cuentas);
+            cuenta.setValue(seleccion);
+            desde.setValue(inicial);
+            hasta.setValue(fin);
+            cargar();
         });
     }
 
@@ -130,8 +153,7 @@ public class LibroMayorView extends VerticalLayout implements BeforeEnterObserve
         boolean fechas=!desde.isEmpty()&&!hasta.isEmpty()&&!hasta.getValue().isBefore(desde.getValue());
         desde.setInvalid(desde.isEmpty());
         hasta.setInvalid(!fechas);
-        verPdf.setEnabled(false);
-        verPdf.getElement().removeAttribute("data-pdf-url");
+        verPdf.actualizarEnlacePdf(null,Map.of());
         if(cuenta.isEmpty()||!fechas) {
             mostrarEstado(cuenta.isEmpty()?"Seleccione una cuenta para consultar su Libro Mayor.":"Indica un rango de fechas válido.");
             return;
@@ -146,8 +168,7 @@ public class LibroMayorView extends VerticalLayout implements BeforeEnterObserve
             var resultado=servicio.consultar(filtro(),p.page(),p.size());
             presentar(resultado);
             pagina.setTotal(resultado.total());
-            verPdf.getElement().setAttribute("data-pdf-url",urlPdf(filtro()));
-            verPdf.setEnabled(true);
+            verPdf.actualizarEnlacePdf("/api/accounting/general-ledger/pdf",parametrosPdf(filtro()));
         });
     }
 
@@ -199,14 +220,15 @@ public class LibroMayorView extends VerticalLayout implements BeforeEnterObserve
         return new Filtro(cuenta.getValue().id(),desde.getValue(),hasta.getValue(),tipo.getValue(),origen.getValue(),buscar.getValue());
     }
 
-    private static String urlPdf(Filtro f) {
-        String contexto=VaadinService.getCurrentRequest().getContextPath();
-        var query=new StringJoiner("&",contexto+"/api/accounting/general-ledger/pdf?","");
-        query.add("accountId="+f.accountId()).add("fromDate="+f.fromDate()).add("toDate="+f.toDate());
-        if(f.type()!=null) query.add("type="+f.type().name());
-        if(f.origin()!=null) query.add("origin="+f.origin().name());
-        if(!f.search().isBlank()) query.add("search="+URLEncoder.encode(f.search(),StandardCharsets.UTF_8));
-        return query.toString();
+    private static Map<String,Object> parametrosPdf(Filtro f) {
+        var p=new LinkedHashMap<String,Object>();
+        p.put("accountId",f.accountId());
+        p.put("fromDate",f.fromDate());
+        p.put("toDate",f.toDate());
+        if(f.type()!=null) p.put("type",f.type().name());
+        if(f.origin()!=null) p.put("origin",f.origin().name());
+        if(!f.search().isBlank()) p.put("search",f.search());
+        return p;
     }
 
     private static Div concepto(Movimiento m) {

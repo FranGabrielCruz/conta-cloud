@@ -1512,6 +1512,27 @@ vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
 @media (max-width: 1000px) { .cc-cartera-filtros { grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); } }
 
 .cc-general-ledger { gap: 12px; }
+.cc-trial-balance { gap: 12px; }
+.cc-trial-balance-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.4fr);
+  gap: 8px 16px;
+  width: 100%;
+}
+.cc-trial-balance-filters > * { width: 100%; min-width: 0; }
+.cc-trial-balance-filters > :last-child { grid-column: 1 / -1; }
+.cc-trial-balance-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.cc-trial-balance-amount { display: grid; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cc-trial-balance-grid::part(trial-balance-action) {
+  --vaadin-grid-cell-text-overflow: clip;
+  --vaadin-grid-cell-padding: 4px 6px;
+}
+@media (max-width: 900px) {
+  .cc-trial-balance-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .cc-trial-balance-filters { grid-template-columns: minmax(0, 1fr); }
+}
 .cc-general-ledger-filters {
   display: grid;
   grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));

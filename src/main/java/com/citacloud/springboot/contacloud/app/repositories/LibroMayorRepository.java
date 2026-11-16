@@ -32,8 +32,8 @@ public class LibroMayorRepository {
         """;
     private static final String CUENTAS = """
         SELECT c.id,c.codigo,c.nombre,c.tipo,c.naturaleza,c.activo
-        FROM cuenta_contable c WHERE c.tenant_id=:tenant AND c.empresa_id=:empresa AND
-        """ + CONSULTABLE;
+        FROM cuenta_contable c WHERE c.tenant_id=:tenant AND c.empresa_id=:empresa
+        """;
     private static final String ORDEN = "fecha,length(numero),numero,asiento_id,orden";
     private static final String BASE = """
         WITH RECURSIVE descendientes(id,tipo) AS (
@@ -68,7 +68,7 @@ public class LibroMayorRepository {
     }
 
     public List<Cuenta> cuentas(TenantPrincipal principal) {
-        return jdbc.query(CUENTAS + " ORDER BY c.codigo,c.id", contexto(principal), LibroMayorRepository::cuenta);
+        return jdbc.query(CUENTAS + " AND "+CONSULTABLE+" ORDER BY c.codigo,c.id", contexto(principal), LibroMayorRepository::cuenta);
     }
 
     public Optional<Cuenta> cuenta(TenantPrincipal principal, UUID id) {

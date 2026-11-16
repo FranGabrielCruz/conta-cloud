@@ -148,6 +148,52 @@ final class LargeDocumentPdfTemplate {
             i->i>concepto?"Right":"Left",i->(i>0 && i<=concepto)||i==concepto+3);
     }
 
+    static String balanza(boolean logo) throws IOException {
+        var base=encabezadoContable(logo,42,"BALANZA DE COMPROBACIÓN","trial_balance")
+            .replace("\"Fecha: \" + $P{orderDate}","\"Período: \" + $P{orderDate}");
+        var tabla=tablaReporte(base,new int[]{86,228,78,78,78,78,78,78},
+            new String[]{"CÓDIGO","CUENTA","DÉBITO","CRÉDITO","DÉBITO","CRÉDITO","DÉBITO","CRÉDITO"},
+            i->i<2?"Left":"Right",i->i>=1);
+        String encabezado=section(tabla,"columnHeader").replace("height=\"24\"><staticText","height=\"42\"><staticText")
+            .replace(" y=\"0\""," y=\"18\"").replace("</band>",staticText("SALDO INICIAL",314,0,156,18,"TableHeader","Center")
+                +staticText("MOVIMIENTOS",470,0,156,18,"TableHeader","Center")
+                +staticText("SALDO FINAL",626,0,156,18,"TableHeader","Center")+"</band>");
+        String banda=between(encabezado,"<band ","</columnHeader>")
+            .replace("<band height=\"42\">","<band height=\"42\" splitType=\"Prevent\">"
+                +"<printWhenExpression><![CDATA[$F{dato0} != null && !$F{dato0}.isEmpty()]]></printWhenExpression>");
+        // El encabezado pertenece al grupo de cuentas. El resumen es un bloque propio.
+        String grupos="""
+            <group name="TrialAccounts" isReprintHeaderOnEachPage="true" minHeightToStartNewPage="62">
+              <groupExpression><![CDATA[$F{dato0} != null && !$F{dato0}.isEmpty()]]></groupExpression>
+              <groupHeader>
+            """+banda+"""
+              </groupHeader>
+            </group>
+            <group name="TrialBlock" keepTogether="true">
+              <groupExpression><![CDATA[$F{dato0} == null ? "" : $F{dato0}]]></groupExpression>
+            </group>
+            """;
+        tabla=replaceSection(tabla,"columnHeader","").replace("<title>",grupos+"<title>")
+            .replace("<band height=\"22\" splitType=\"Prevent\">"+when("SECTION")
+                    +field("$F{rowLabel}",0,7,782,14,"Section","Left",false),
+                "<band height=\"17\" splitType=\"Prevent\">"+when("SECTION")
+                    +field("$F{rowLabel}",0,2,782,14,"Section","Left",false));
+        int campo=tabla.indexOf("<field ");
+        tabla=tabla.substring(0,campo)+"<field name=\"rowBold\" class=\"java.lang.Boolean\"/>"+tabla.substring(campo);
+        int parametro=tabla.indexOf("<parameter ");
+        var estilo="""
+            <style name="TrialAccount" style="Base">
+              <conditionalStyle>
+                <conditionExpression><![CDATA[Boolean.TRUE.equals($F{rowBold})]]></conditionExpression>
+                <style isBold="true"/>
+              </conditionalStyle>
+            </style>
+            """;
+        return (tabla.substring(0,parametro)+estilo+tabla.substring(parametro))
+            .replace(field("$F{dato1}",89,3,222,16,"Base","Left",true),
+                field("$F{dato1}",89,3,222,16,"TrialAccount","Left",true));
+    }
+
     private static String tablaContable(boolean logo,boolean conFiltros,String titulo,String nombre,
                                         int[] anchos,String[] etiquetas,boolean monetaria) throws IOException {
         return tablaReporte(encabezadoContable(logo,conFiltros?18:0,titulo,nombre),anchos,etiquetas,

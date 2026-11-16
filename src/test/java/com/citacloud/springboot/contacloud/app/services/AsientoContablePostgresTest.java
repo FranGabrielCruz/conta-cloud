@@ -340,7 +340,100 @@ class AsientoContablePostgresTest {
             assertThat(finalPeriodo.movimientos().getFirst().saldo().importe()).isEqualByComparingTo("991");
             assertThat(finalPeriodo.movimientos().getLast().saldo().importe()).isEqualByComparingTo("1000");
             assertThat(finalPeriodo.resumen()).isEqualTo(inicio.resumen());
+            var balanza=new BalanzaService(new BalanzaRepository(new NamedParameterJdbcTemplate(jdbc)),null,null);
+            var totales=balanza.consultar(filtroBalanza(null,null,""),0,10).totales().generales().getFirst();
+            assertThat(totales.debito()).isEqualByComparingTo("1000");
+            assertThat(totales.credito()).isEqualByComparingTo("1000");
         });
+    }
+
+    @Test void balanzaConsolidaSaldosYExportaTodasLasCuentas() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var bancos=cuenta(jdbc,"BANK_DEFAULT");
+            var activos=cuenta(jdbc,"ASSETS_ROOT");
+            var venta=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            var asientos=servicio(jdbc);
+            registrarBalanza(asientos,fecha.minusDays(1),caja,venta,100);
+            registrarBalanza(asientos,fecha.minusDays(1),bancos,venta,20);
+            var original=registrarBalanza(asientos,fecha,caja,venta,10);
+            asientos.reversar(original,asientos.detalle(original).version(),fecha,"Reversión de prueba",UUID.randomUUID());
+            registrarBalanza(asientos,fecha,venta,caja,150);
+            asientos.crear(entrada(caja,venta,BigDecimal.TEN),UUID.randomUUID());
+            jdbc.update("UPDATE periodos_fiscales SET estado='CERRADO' WHERE tenant_id=? AND empresa_id=?",tenant,empresa);
+            jdbc.update("UPDATE cuenta_contable SET activo=false WHERE id=?",caja);
+            jdbc.update("""
+                INSERT INTO cuenta_contable(id,tenant_id,empresa_id,padre_id,codigo,nombre,tipo,clasificacion,naturaleza,solicitud_id,creado_por)
+                SELECT gen_random_uuid(),?,?,?,'1.999.'||lpad(n::text,3,'0'),'Cuenta volumen '||lpad(n::text,3,'0'),
+                       'MOVIMIENTO','ACTIVO','DEUDORA',gen_random_uuid(),?
+                FROM generate_series(1,135) n
+                """,tenant,empresa,activos,usuario);
+            var empresaRepo=mock(EmpresaRepository.class);
+            var emisor=mock(Empresa.class);
+            when(emisor.getNombre()).thenReturn("Empresa prueba Balanza");
+            when(emisor.getZonaHoraria()).thenReturn("America/Caracas");
+            when(empresaRepo.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(emisor));
+            var balanza=new BalanzaService(new BalanzaRepository(new NamedParameterJdbcTemplate(jdbc)),empresaRepo,mock(DatosEmpresaRepository.class));
+            var completas=balanza.consultar(filtroBalanza(null,null,""),0,25);
+            var total=completas.totales().generales().getFirst();
+            assertThat(total.columnas()).usingElementComparator(BigDecimal::compareTo)
+                .containsExactlyElementsOf(importesBalanza(120,120,170,170,50,50));
+            assertThat(completas.totales().filtrados()).isEqualTo(completas.totales().generales());
+            assertThat(completas.cuentas()).filteredOn(c->c.id().equals(caja)).singleElement().satisfies(c->{
+                assertThat(c.activa()).isFalse();
+                assertThat(c.importes().getFirst().columnas()).usingElementComparator(BigDecimal::compareTo)
+                    .containsExactlyElementsOf(importesBalanza(100,0,10,160,0,50));
+            });
+            assertThat(completas.cuentas()).filteredOn(c->c.id().equals(activos)).singleElement().satisfies(c->
+                assertThat(c.importes().getFirst().columnas()).usingElementComparator(BigDecimal::compareTo)
+                    .containsExactlyElementsOf(importesBalanza(120,0,10,160,0,30)));
+            var bancosSaldo=balanza.consultar(filtroBalanza(null,com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Mostrar.SALDO,"Bancos"),0,10);
+            assertThat(bancosSaldo.cuentas()).singleElement().satisfies(c->assertThat(c.id()).isEqualTo(bancos));
+            assertThat(bancosSaldo.totales().filtrados().getFirst().finalDebito()).isEqualByComparingTo("20");
+            assertThat(balanza.consultar(filtroBalanza(null,com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Mostrar.MOVIMIENTOS,"Bancos"),0,10).total()).isZero();
+            assertThat(balanza.consultar(filtroBalanza(1,null,"1"),0,10).cuentas()).allSatisfy(c->assertThat(c.nivel()).isEqualTo(1));
+            assertThatThrownBy(()->balanza.consultar(filtroBalanza(999,null,""),0,10)).isInstanceOf(ReglaNegocioException.class);
+            assertThat(balanza.consultar(filtroBalanza(null,null,"' OR 1=1 --"),0,10).total()).isZero();
+            var filtro=filtroBalanza(2,com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Mostrar.TODAS,"Cuenta volumen");
+            var pagina=balanza.consultar(filtro,0,10);
+            assertThat(pagina.total()).isEqualTo(135);
+            assertThat(pagina.cuentas()).hasSize(10);
+            assertThat(balanza.consultar(filtro,13,10).cuentas()).hasSize(5);
+            assertThat(balanza.consultar(filtro,13,10).totales()).isEqualTo(pagina.totales());
+            var pdfService=new BalanzaPdfService(balanza,mock(LocalFileStorageService.class));
+            try(var pdf=Loader.loadPDF(pdfService.generar(filtro).contenido())) {
+                assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+                String texto=new PDFTextStripper().getText(pdf);
+                assertThat(texto).contains("BALANZA DE COMPROBACIÓN","Empresa prueba Balanza","Cuenta volumen 001",
+                    "Cuenta volumen 135","MOVIMIENTOS","Página 1 de","TOTALES DE LA CONSULTA","COMPROBACIÓN GENERAL")
+                    .doesNotContain("ContaCloud","Caja General");
+            } catch(java.io.IOException ex) {throw new AssertionError(ex);}
+            autenticar(tenant,UUID.randomUUID());
+            assertThat(balanza.consultar(filtroBalanza(null,null,""),0,10).total()).isZero();
+            autenticar(UUID.randomUUID(),empresa);
+            assertThat(balanza.consultar(filtroBalanza(null,null,""),0,10).total()).isZero();
+        });
+    }
+
+    private UUID registrarBalanza(AsientoContableService asientos,LocalDate dia,UUID debe,UUID haber,int valor) {
+        var importe=BigDecimal.valueOf(valor);
+        var e=new Entrada(dia,Tipo.DIARIO,moneda,"Movimiento para balanza",null,null,List.of(
+            new Movimiento(debe,null,importe,BigDecimal.ZERO),new Movimiento(haber,null,BigDecimal.ZERO,importe)));
+        return asientos.guardarYContabilizar(null,0,e,UUID.randomUUID());
+    }
+
+    private com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Filtro filtroBalanza(Integer nivel,
+            com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Mostrar mostrar,String buscar) {
+        return new com.citacloud.springboot.contacloud.app.dto.BalanzaDto.Filtro(fecha,fecha,nivel,mostrar,buscar);
+    }
+
+    private static List<BigDecimal> importesBalanza(int... valores) {
+        return Arrays.stream(valores).mapToObj(v->BigDecimal.valueOf(v).setScale(2)).toList();
     }
 
     private long ledger(JdbcTemplate j,UUID id) {

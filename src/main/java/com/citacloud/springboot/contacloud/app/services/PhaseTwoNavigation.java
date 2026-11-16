@@ -90,7 +90,8 @@ public final class PhaseTwoNavigation {
             item("Asientos contables", "asientos", "EDIT", CONTABILIDAD, "asientos.ver", "Consulta y registra asientos contables."),
             item("Libro diario", "libro-diario", "BOOK", CONTABILIDAD, "libro_diario.ver", "Consulta los asientos contabilizados en orden cronológico."),
             item("Libro mayor", "libro-mayor", "BOOK", CONTABILIDAD, "libro_mayor.ver", "Consulta el historial y los saldos por cuenta contable."),
-            item("Balanza", "balanza", "SCALE", CONTABILIDAD, "balanza.ver", placeholder("Balanza")),
+            item("Balanza de Comprobación", "balanza", "SCALE", CONTABILIDAD, "balanza.ver",
+                "Consulta y comprueba los saldos contables del período."),
             item("Centros de costos", "centros-costos", "GROUP", CONTABILIDAD, "centros_costos.ver", placeholder("Centros de costos")),
             item("Cierres", "cierres-contables", "LOCK", CONTABILIDAD, "cierres_contables.ver", placeholder("Cierres")))),
         new Section("FISCAL", List.of(

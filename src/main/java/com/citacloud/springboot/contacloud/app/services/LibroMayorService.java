@@ -48,6 +48,12 @@ public class LibroMayorService {
     }
 
     @PreAuthorize(VER)
+    public Cuenta cuenta(java.util.UUID id) {
+        return repo.cuenta(TenantContext.principalActual(),id)
+            .orElseThrow(()->new RecursoNoEncontradoException("Cuenta no encontrada."));
+    }
+
+    @PreAuthorize(VER)
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Resultado consultar(Filtro filtro,int pagina,int tamano) {
         if(pagina<0||!Set.of(10,25,50,100).contains(tamano))
