@@ -161,15 +161,17 @@ public class CuentaContableRepository {
     public void crear(TenantPrincipal p, UUID id, UUID solicitud, Entrada e, String codigo, Clasificacion clasificacion) {
         jdbc.update("""
             INSERT INTO cuenta_contable(id,tenant_id,empresa_id,padre_id,codigo,nombre,tipo,clasificacion,naturaleza,
-                descripcion,solicitud_id,creado_por)
-            VALUES(:id,:tenant,:empresa,:padre,:codigo,:nombre,:tipo,:clasificacion,:naturaleza,:descripcion,:solicitud,:usuario)
+                descripcion,solicitud_id,creado_por,uso_centro_costo)
+            VALUES(:id,:tenant,:empresa,:padre,:codigo,:nombre,:tipo,:clasificacion,:naturaleza,:descripcion,:solicitud,:usuario,
+                coalesce(:uso,'OPCIONAL'))
             """, datos(p,id,e,codigo,clasificacion).addValue("solicitud",solicitud).addValue("usuario",p.usuarioId()));
     }
 
     public void editar(TenantPrincipal p, UUID id, Entrada e, String codigo, Clasificacion clasificacion) {
         jdbc.update("""
             UPDATE cuenta_contable c SET padre_id=:padre,codigo=:codigo,nombre=:nombre,tipo=:tipo,
-                clasificacion=:clasificacion,naturaleza=:naturaleza,descripcion=:descripcion,version=version+1
+                clasificacion=:clasificacion,naturaleza=:naturaleza,descripcion=:descripcion,version=version+1,
+                uso_centro_costo=coalesce(:uso,CASE WHEN c.tipo<>:tipo THEN 'OPCIONAL' ELSE c.uso_centro_costo END)
             WHERE c.id=:id AND
             """ + AMBITO, datos(p,id,e,codigo,clasificacion));
     }
@@ -210,7 +212,9 @@ public class CuentaContableRepository {
         return new Cuenta(r.getObject("id", UUID.class), r.getObject("padre_id", UUID.class), r.getString("codigo"),
             r.getString("nombre"), Tipo.valueOf(r.getString("tipo")), Clasificacion.valueOf(r.getString("clasificacion")),
             Naturaleza.valueOf(r.getString("naturaleza")), r.getBoolean("activo"), r.getString("descripcion"),
-            r.getLong("version"), r.getBoolean("hijos"), r.getBoolean("estructural"));
+            r.getLong("version"), r.getBoolean("hijos"), r.getBoolean("estructural"),
+            "MOVIMIENTO".equals(r.getString("tipo"))?com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.valueOf(r.getString("uso_centro_costo"))
+                :com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.NO_PERMITIDO);
     }
 
     private static String cte(Filtro f) { return f.restringido() ? FILTRADAS : ""; }
@@ -232,6 +236,7 @@ public class CuentaContableRepository {
     private static MapSqlParameterSource datos(TenantPrincipal p, UUID id, Entrada e, String codigo, Clasificacion clasificacion) {
         return ambito(p).addValue("id", id).addValue("padre", e.padre()).addValue("codigo", codigo)
             .addValue("nombre", e.nombre()).addValue("tipo", e.tipo().name()).addValue("clasificacion", clasificacion.name())
-            .addValue("naturaleza", e.naturaleza().name()).addValue("descripcion", e.descripcion());
+            .addValue("naturaleza", e.naturaleza().name()).addValue("descripcion", e.descripcion())
+            .addValue("uso",e.tipo()==Tipo.AGRUPADORA?"NO_PERMITIDO":e.usoCentroCosto()==null?null:e.usoCentroCosto().name());
     }
 }

@@ -105,6 +105,7 @@ class PhaseTwoNavigationTest {
                 com.citacloud.springboot.contacloud.app.views.LibroDiarioView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.LibroMayorView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BalanzaView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.CentrosCostosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CatalogoCuentasView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BajasActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),

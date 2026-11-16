@@ -40,11 +40,21 @@ public final class CuentaContableDto {
         }
     }
     public record Cuenta(UUID id, UUID padre, String codigo, String nombre, Tipo tipo, Clasificacion clasificacion,
-                         Naturaleza naturaleza, boolean activo, String descripcion, long version, boolean hijos, boolean estructural) {
+                         Naturaleza naturaleza, boolean activo, String descripcion, long version, boolean hijos, boolean estructural,
+                         CentroCostoDto.Uso usoCentroCosto) {
+        public Cuenta(UUID id,UUID padre,String codigo,String nombre,Tipo tipo,Clasificacion clasificacion,
+                      Naturaleza naturaleza,boolean activo,String descripcion,long version,boolean hijos,boolean estructural) {
+            this(id,padre,codigo,nombre,tipo,clasificacion,naturaleza,activo,descripcion,version,hijos,estructural,
+                tipo==Tipo.MOVIMIENTO?CentroCostoDto.Uso.OPCIONAL:CentroCostoDto.Uso.NO_PERMITIDO);
+        }
         public String etiqueta() { return codigo + " — " + nombre; }
         public boolean permiteMovimientos() { return tipo == Tipo.MOVIMIENTO; }
     }
-    public record Entrada(UUID padre, String nombre, Tipo tipo, Naturaleza naturaleza, String descripcion) {}
+    public record Entrada(UUID padre, String nombre, Tipo tipo, Naturaleza naturaleza, String descripcion,CentroCostoDto.Uso usoCentroCosto) {
+        public Entrada(UUID padre,String nombre,Tipo tipo,Naturaleza naturaleza,String descripcion) {
+            this(padre,nombre,tipo,naturaleza,descripcion,null);
+        }
+    }
     public record Uso(String modulo, String concepto, boolean historico, boolean activo) {}
     public record Detalle(Cuenta cuenta, Cuenta padre, int nivel, List<Cuenta> hijos, List<Uso> usos) {
         public boolean movimientos() { return usos.stream().anyMatch(Uso::historico); }

@@ -211,7 +211,7 @@ public class CatalogoCuentasService {
         if (e == null || e.tipo() == null || e.naturaleza() == null)
             throw new ReglaNegocioException("Completa el tipo y la naturaleza de la cuenta.");
         return new Entrada(e.padre(), requerido(e.nombre(), 160, "Indica el nombre de la cuenta."),
-            e.tipo(), e.naturaleza(), texto(e.descripcion(), 2000));
+            e.tipo(), e.naturaleza(), texto(e.descripcion(), 2000),e.usoCentroCosto());
     }
 
     private static Filtro filtro(Filtro f) {

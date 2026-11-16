@@ -141,6 +141,11 @@ public class LibroDiarioView extends VerticalLayout implements BeforeEnterObserv
         bloque.getElement().setAttribute("aria-label",a.numero());
         for(var l:a.movimientos()) {
             var cuenta=new Div(new Span(l.codigo()+" — "+l.cuenta()));
+            if(l.centroCosto()!=null) {
+                var centro=new Span("Centro: "+l.centroCosto());
+                centro.addClassName("cc-detail-label");
+                cuenta.add(centro);
+            }
             if(l.descripcion()!=null) {
                 var desc=new Span(l.descripcion());
                 desc.addClassName("cc-detail-label");

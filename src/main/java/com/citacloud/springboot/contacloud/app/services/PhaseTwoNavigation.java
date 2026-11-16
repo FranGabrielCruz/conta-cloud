@@ -92,7 +92,7 @@ public final class PhaseTwoNavigation {
             item("Libro mayor", "libro-mayor", "BOOK", CONTABILIDAD, "libro_mayor.ver", "Consulta el historial y los saldos por cuenta contable."),
             item("Balanza de Comprobación", "balanza", "SCALE", CONTABILIDAD, "balanza.ver",
                 "Consulta y comprueba los saldos contables del período."),
-            item("Centros de costos", "centros-costos", "GROUP", CONTABILIDAD, "centros_costos.ver", placeholder("Centros de costos")),
+            item("Centros de costos", "centros-costos", "GROUP", CONTABILIDAD, "centros_costos.ver", "Administra los centros de costos de la empresa."),
             item("Cierres", "cierres-contables", "LOCK", CONTABILIDAD, "cierres_contables.ver", placeholder("Cierres")))),
         new Section("FISCAL", List.of(
             item("NCF", "fiscal/ncf", "FILE_TEXT_O", FISCAL, "fiscal_ncf.ver", placeholder("NCF")),

@@ -1,5 +1,7 @@
 package com.citacloud.springboot.contacloud.app.views;
 
+import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto;
+
 import com.citacloud.springboot.contacloud.app.dto.CuentaContableDto.*;
 import com.citacloud.springboot.contacloud.app.errors.UiErrorHandler;
 import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
@@ -162,6 +164,7 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
                 seccion("CLASIFICACIÓN CONTABLE").field("Tipo", c.tipo().etiqueta())
                     .field("Clasificación", c.clasificacion().etiqueta()).field("Naturaleza", c.naturaleza().etiqueta())
                     .field("Permite movimientos", c.permiteMovimientos() ? "Sí" : "No")
+                    .field("Uso de Centro de Costos",c.usoCentroCosto().etiqueta())
                     .field("Tiene movimientos", d.movimientos() ? "Sí" : "No")
                     .field("Saldo actual", "Disponible al integrar Asientos"));
             if (c.descripcion() != null) {
@@ -209,6 +212,9 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
         clase.setReadOnly(true);
         var naturaleza = combo("Naturaleza", Naturaleza::etiqueta, List.of(Naturaleza.values()));
         var tipoCuenta = combo("Tipo", Tipo::etiqueta, List.of(Tipo.values()));
+        var usoCentro = combo("Uso de Centro de Costos", CentroCostoDto.Uso::etiqueta, List.of(CentroCostoDto.Uso.values()));
+        usoCentro.setValue(c!=null&&c.permiteMovimientos()?c.usoCentroCosto():CentroCostoDto.Uso.OPCIONAL);
+        tipoCuenta.addValueChangeListener(e->usoCentro.setVisible(e.getValue()==Tipo.MOVIMIENTO));
         var descripcion = new TextArea("Descripción");
         descripcion.setWidthFull();
         descripcion.setMaxLength(2000);
@@ -227,6 +233,7 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
             naturaleza.setReadOnly(protegida);
             for (var campo : List.<HasValue<?, ?>>of(padre, tipoCuenta)) campo.setReadOnly(protegida || c.hijos());
         }
+        usoCentro.setVisible(tipoCuenta.getValue()==Tipo.MOVIMIENTO);
         var estadoInicial = texto("Estado", 10);
         estadoInicial.setValue(etiquetaEstado(c == null || c.activo()));
         estadoInicial.setReadOnly(true);
@@ -242,12 +249,12 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
         general.addClassName("cc-chart-form-general");
         modal.add(general,
             formulario("CLASIFICACIÓN CONTABLE", clase, naturaleza, tipoCuenta),
-            formulario("CONFIGURACIÓN", estadoInicial), descripcion);
+            formulario("CONFIGURACIÓN", estadoInicial,usoCentro), descripcion);
         var solicitud = UUID.randomUUID();
         modal.getFooter().add(accion(ActionType.SAVE, "Guardar", () -> ejecutar("No fue posible guardar la cuenta.", () -> {
             if (nombre.isInvalid()) return;
             var entrada = new Entrada(padre.isEmpty() ? null : padre.getValue().id(), nombre.getValue(),
-                tipoCuenta.getValue(), naturaleza.getValue(), descripcion.getValue());
+                tipoCuenta.getValue(), naturaleza.getValue(), descripcion.getValue(),usoCentro.getValue());
             UUID id = c == null ? servicio.crear(entrada, solicitud) : c.id();
             if (c != null) servicio.editar(id, c.version(), entrada);
             modal.close();

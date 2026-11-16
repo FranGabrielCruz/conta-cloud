@@ -436,6 +436,64 @@ class AsientoContablePostgresTest {
         return Arrays.stream(valores).mapToObj(v->BigDecimal.valueOf(v).setScale(2)).toList();
     }
 
+    @Test void imputaCentrosPorLineaYConservaHistoriaAlReversar() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var named=new NamedParameterJdbcTemplate(jdbc);
+            var centros=new CentroCostoService(new CentroCostoRepository(named),new CuentaContableRepository(named),new AuditoriaService(jdbc));
+            var clave=UUID.randomUUID();
+            var raiz=new com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Entrada(" Tecnología ",null,null);
+            var tecnologia=centros.crear(raiz,clave);
+            assertThat(centros.crear(raiz,clave)).isEqualTo(tecnologia);
+            var proyecto=centros.crear(new com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Entrada("ERP",tecnologia,null),UUID.randomUUID());
+            assertThat(centros.detalle(tecnologia).referencia().codigo()).isEqualTo("CC-001");
+            assertThat(centros.detalle(proyecto).referencia().codigo()).isEqualTo("CC-002");
+            assertThatThrownBy(()->centros.editar(tecnologia,0,new com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Entrada(
+                "Tecnología",proyecto,null))).hasMessageContaining("descendiente");
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var ventas=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            jdbc.update("UPDATE cuenta_contable SET uso_centro_costo='OBLIGATORIO' WHERE id=?",caja);
+            var asientos=servicio(jdbc);
+            var sinCentro=asientos.crear(entrada(caja,ventas,BigDecimal.TEN),UUID.randomUUID());
+            assertThatThrownBy(()->asientos.contabilizar(sinCentro,0,UUID.randomUUID())).hasMessageContaining("centro de costos");
+            var e=new Entrada(fecha,Tipo.DIARIO,moneda,"Imputación",null,null,List.of(
+                new Movimiento(caja,null,BigDecimal.TEN,BigDecimal.ZERO,tecnologia),
+                new Movimiento(ventas,null,BigDecimal.ZERO,BigDecimal.TEN,proyecto)));
+            var id=asientos.guardarYContabilizar(null,0,e,UUID.randomUUID());
+            assertThat(asientos.detalle(id).lineas()).extracting(l->l.centroCosto().id()).containsExactly(tecnologia,proyecto);
+            var fuente=new Fuente(Origen.VENTAS,"Factura",UUID.randomUUID(),"FAC-CENTRO","CONTABILIZAR");
+            var configuradas=List.of(new LineaConfigurada("CASH_DEFAULT",null,BigDecimal.TEN,BigDecimal.ZERO,tecnologia),
+                new LineaConfigurada("SALES_REVENUE_DEFAULT",null,BigDecimal.ZERO,BigDecimal.TEN,proyecto));
+            var automatico=asientos.registrarAutomatico(fuente,fecha,moneda,"Prueba automática",configuradas);
+            assertThat(asientos.registrarAutomatico(fuente,fecha,moneda,"Prueba automática",configuradas)).isEqualTo(automatico);
+            assertThat(asientos.detalle(automatico).lineas()).extracting(l->l.centroCosto().id()).containsExactly(tecnologia,proyecto);
+            centros.desactivar(tecnologia,0);
+            assertThat(asientos.centros("",0,10)).extracting(c->c.id()).containsExactly(proyecto);
+            assertThatThrownBy(()->asientos.crear(e,UUID.randomUUID())).hasMessageContaining("activa");
+            jdbc.update("UPDATE cuenta_contable SET uso_centro_costo='NO_PERMITIDO' WHERE id=?",ventas);
+            var noPermitido=new Entrada(fecha,Tipo.DIARIO,moneda,"Imputación inválida",null,null,List.of(
+                new Movimiento(caja,null,BigDecimal.TEN,BigDecimal.ZERO,proyecto),
+                new Movimiento(ventas,null,BigDecimal.ZERO,BigDecimal.TEN,proyecto)));
+            assertThatThrownBy(()->asientos.crear(noPermitido,UUID.randomUUID())).hasMessageContaining("si la admite");
+            var reversa=asientos.reversar(id,1,fecha,"Corrige imputación",UUID.randomUUID());
+            assertThat(asientos.detalle(reversa).lineas()).extracting(l->l.centroCosto().id()).containsExactly(tecnologia,proyecto);
+            assertThat(asientos.detalle(id).lineas().getFirst().centroCosto().activo()).isFalse();
+            assertThat(asientos.detalle(reversa).lineas().getFirst().credito()).isEqualByComparingTo("10");
+            var diario=new LibroDiarioRepository(named);
+            var principal=com.citacloud.springboot.contacloud.app.security.TenantContext.principalActual();
+            assertThat(diario.asientos(principal,new com.citacloud.springboot.contacloud.app.dto.LibroDiarioDto.Filtro(
+                fecha,fecha,null,null,""),0,10)).flatExtracting(a->a.movimientos()).extracting(m->m.centroCosto())
+                .contains("CC-001 — Tecnología","CC-002 — ERP");
+            autenticar(tenant,UUID.randomUUID());
+            assertThatThrownBy(()->centros.detalle(tecnologia)).isInstanceOf(RecursoNoEncontradoException.class);
+            assertThat(centros.listar(new com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Filtro(null,""),0,10).total()).isZero();
+        });
+    }
+
     private long ledger(JdbcTemplate j,UUID id) {
         return j.queryForObject("SELECT count(*) FROM asiento_movimiento_contable WHERE asiento_id=?",Long.class,id);
     }

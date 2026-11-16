@@ -12,8 +12,7 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import jakarta.annotation.security.PermitAll;
 
-@Route(value = "centros-costos", layout = MainLayout.class)
-@RouteAlias(value = "cierres-contables", layout = MainLayout.class)
+@Route(value = "cierres-contables", layout = MainLayout.class)
 @RouteAlias(value = "fiscal/ncf", layout = MainLayout.class)
 @RouteAlias(value = "fiscal/ecf", layout = MainLayout.class)
 @RouteAlias(value = "fiscal/impuestos", layout = MainLayout.class)

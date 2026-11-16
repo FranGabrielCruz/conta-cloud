@@ -46,8 +46,11 @@ public class LibroDiarioRepository {
             args.addValue("limite",tamano).addValue("offset",(long)pagina*tamano);
         }
         var bloques=new LinkedHashMap<UUID,Asiento>();
-        jdbc.query("WITH seleccion AS ("+FILTRADOS+limite+") SELECT a.*,l.codigo,l.cuenta,l.descripcion,l.debito,l.credito"
-                +" FROM seleccion a "+MOVIMIENTOS+" ORDER BY "+ORDEN+", l.orden",
+        jdbc.query("WITH seleccion AS ("+FILTRADOS+limite+") SELECT a.*,l.codigo,l.cuenta,l.descripcion,l.debito,l.credito,"
+                +" c.codigo || ' — ' || c.nombre AS centro FROM seleccion a "+MOVIMIENTOS+"""
+                 LEFT JOIN centro_costo c ON (c.tenant_id,c.empresa_id,c.id)=(l.tenant_id,l.empresa_id,l.centro_costo_id)
+                 ORDER BY
+                """+ORDEN+", l.orden",
             args,r->{
                 var id=r.getObject("id",UUID.class);
                 var a=bloques.get(id);
@@ -56,7 +59,7 @@ public class LibroDiarioRepository {
                     bloques.put(id,a);
                 }
                 a.movimientos().add(new Movimiento(r.getString("codigo"),r.getString("cuenta"),
-                    r.getString("descripcion"),r.getBigDecimal("debito"),r.getBigDecimal("credito")));
+                    r.getString("descripcion"),r.getBigDecimal("debito"),r.getBigDecimal("credito"),r.getString("centro")));
             });
         return bloques.values().stream().map(a->{
             var debe=java.math.BigDecimal.ZERO;

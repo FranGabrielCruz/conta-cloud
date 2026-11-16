@@ -52,10 +52,11 @@ class AsientoContableViewTest {
             assertThat(post.isEnabled()).isFalse();
             seleccionarCuenta(filas.get(1));
             seleccionarCuenta(filas.get(2));
-            campoImporte(filas.get(1),2).setValue(new BigDecimal("120"));
-            campoImporte(filas.get(2),3).setValue(new BigDecimal("95"));
+            assertThat(filas.get(1).getChildren().filter(ComboBox.class::isInstance)).hasSize(2);
+            campoImporte(filas.get(1),0).setValue(new BigDecimal("120"));
+            campoImporte(filas.get(2),1).setValue(new BigDecimal("95"));
             assertThat(totales.getElement().getTextRecursively()).contains("25.00 · Descuadrado");
-            campoImporte(filas.get(2),3).setValue(new BigDecimal("120"));
+            campoImporte(filas.get(2),1).setValue(new BigDecimal("120"));
             assertThat(post.isEnabled()).isFalse();
             concepto.setValue("Prueba");
             assertThat(post.isEnabled()).isTrue();
@@ -79,7 +80,8 @@ class AsientoContableViewTest {
     }
 
     private static BigDecimalField campoImporte(Component fila,int indice) {
-        return (BigDecimalField)fila.getChildren().toList().get(indice);
+        return fila.getChildren().filter(BigDecimalField.class::isInstance).map(BigDecimalField.class::cast)
+            .skip(indice).findFirst().orElseThrow();
     }
 
     @Test void muestraFiltrosYUnaAccionDirecta() {

@@ -1,5 +1,8 @@
 package com.citacloud.springboot.contacloud.app.views;
 
+import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Referencia;
+import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso;
+
 import com.citacloud.springboot.contacloud.app.dto.AsientoContableDto.*;
 import com.citacloud.springboot.contacloud.app.errors.UiErrorHandler;
 import com.citacloud.springboot.contacloud.app.security.ModuleAuthorization;
@@ -125,6 +128,7 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
             if(d.numeroReversion()!=null) general.field("Asiento de reversión",d.numeroReversion());
             var lineas=new AppGrid<Linea>(Linea.class);
             lineas.addColumn(l->l.cuenta().etiqueta()).setHeader("Cuenta").setFlexGrow(3);
+            lineas.addColumn(l->l.centroCosto()==null?"":l.centroCosto().etiqueta()).setHeader("Centro de costos").setFlexGrow(2);
             lineas.addColumn(Linea::descripcion).setHeader("Descripción").setFlexGrow(2);
             lineas.addColumn(l->dinero(l.debito())).setHeader("Débito").setTextAlign(ColumnTextAlign.END);
             lineas.addColumn(l->dinero(l.credito())).setHeader("Crédito").setTextAlign(ColumnTextAlign.END);
@@ -194,7 +198,7 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
         movimientos.getElement().setAttribute("role","region");
         movimientos.getElement().setAttribute("aria-label","Movimientos contables");
         movimientos.getElement().setAttribute("tabindex","0");
-        var columnas=new Div(new Span("Cuenta"),new Span("Descripción"),new Span("Débito"),new Span("Crédito"),new Span("Acc."));
+        var columnas=new Div(new Span("Cuenta"),new Span("Centro de costos"),new Span("Descripción"),new Span("Débito"),new Span("Crédito"),new Span("Acc."));
         columnas.addClassNames("cc-journal-line","cc-journal-columns");
         movimientos.add(columnas);
         var filas=new ArrayList<EditorLinea>();
@@ -212,7 +216,7 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
             diferencia.getElement().getThemeList().add("badge");
             diferencia.getElement().getThemeList().add(cuadrado?"success":"error");
             botonPost.setEnabled(cabeceraCompleta.getAsBoolean() && cuadrado && lineas.size()>=2
-                && lineas.stream().allMatch(l->l.cuenta.getValue()!=null && l.errorImporte()==null
+                && lineas.stream().allMatch(l->l.cuenta.getValue()!=null && l.errorImporte()==null && l.centroValido()
                     && (positivo(l.debito.getValue()) || positivo(l.credito.getValue()))));
         };
         if(previo!=null) {
@@ -318,6 +322,7 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
 
     private final class EditorLinea extends Div {
         private final ComboBox<Cuenta> cuenta=combo("",Cuenta::etiqueta,List.of());
+        private final ComboBox<Referencia> centro=combo("",c->c.etiqueta()+(c.activo()?"":" (Inactivo)"),List.of());
         private final TextField descripcion=texto("",500);
         private final BigDecimalField debito=importe("Débito");
         private final BigDecimalField credito=importe("Crédito");
@@ -325,23 +330,42 @@ public class AsientosContablesView extends VerticalLayout implements BeforeEnter
         EditorLinea(Linea previa,Runnable resumen) {
             addClassName("cc-journal-line");
             cuenta.setAriaLabel("Cuenta");
+            centro.setAriaLabel("Centro de costos");
+            centro.setPlaceholder("Selecciona un centro");
+            centro.setClearButtonVisible(true);
+            centro.setItems(q->servicio.centros(q.getFilter().orElse(""),q.getOffset(),q.getLimit()).stream());
             descripcion.setAriaLabel("Descripción");
             cuenta.setItems(q->servicio.cuentas(q.getFilter().orElse(""),q.getOffset(),q.getLimit()).stream());
             if(previa!=null) {
                 cuenta.setValue(previa.cuenta());
+                if(previa.centroCosto()!=null) centro.setValue(previa.centroCosto());
                 descripcion.setValue(Objects.toString(previa.descripcion(),""));
                 debito.setValue(previa.debito());
                 credito.setValue(previa.credito());
             }
             debito.addValueChangeListener(e->{validarImportes();resumen.run();});
             credito.addValueChangeListener(e->{validarImportes();resumen.run();});
-            cuenta.addValueChangeListener(e->{cuenta.setInvalid(false);resumen.run();});
+            actualizarCentro();
+            cuenta.addValueChangeListener(e->{cuenta.setInvalid(false);actualizarCentro();resumen.run();});
+            centro.addValueChangeListener(e->resumen.run());
             descripcion.addValueChangeListener(e->resumen.run());
-            add(cuenta,descripcion,debito,credito);
+            add(cuenta,centro,descripcion,debito,credito);
+        }
+
+        private void actualizarCentro() {
+            var uso=cuenta.isEmpty()?Uso.NO_PERMITIDO:cuenta.getValue().usoCentroCosto();
+            if(uso==Uso.NO_PERMITIDO) centro.clear();
+            centro.setEnabled(uso!=Uso.NO_PERMITIDO);
+            centro.setRequiredIndicatorVisible(uso==Uso.OBLIGATORIO);
+        }
+
+        private boolean centroValido() {
+            return centro.isEmpty()?cuenta.getValue().usoCentroCosto()!=Uso.OBLIGATORIO:centro.getValue().activo();
         }
 
         Movimiento entrada() {
-            return new Movimiento(cuenta.isEmpty()?null:cuenta.getValue().id(),descripcion.getValue(),debito.getValue(),credito.getValue());
+            return new Movimiento(cuenta.isEmpty()?null:cuenta.getValue().id(),descripcion.getValue(),debito.getValue(),credito.getValue(),
+                centro.isEmpty()?null:centro.getValue().id());
         }
 
         boolean vacia() {

@@ -11,7 +11,11 @@ public final class LibroDiarioDto {
     private LibroDiarioDto() {}
 
     public record Filtro(LocalDate desde, LocalDate hasta, Tipo tipo, Origen origen, String buscar) {}
-    public record Movimiento(String codigo, String cuenta, String descripcion, BigDecimal debito, BigDecimal credito) {}
+    public record Movimiento(String codigo,String cuenta,String descripcion,BigDecimal debito,BigDecimal credito,String centroCosto) {
+        public Movimiento(String codigo,String cuenta,String descripcion,BigDecimal debito,BigDecimal credito) {
+            this(codigo,cuenta,descripcion,debito,credito,null);
+        }
+    }
     public record Asiento(UUID id, String numero, LocalDate fecha, Tipo tipo, Origen origen, Estado estado,
                           String concepto, String referencia, String documento, String moneda,
                           List<Movimiento> movimientos, Total total) {}

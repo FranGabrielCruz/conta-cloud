@@ -1,5 +1,7 @@
 package com.citacloud.springboot.contacloud.app.services;
 
+import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto;
+
 import com.citacloud.springboot.contacloud.app.dto.AsientoContableDto.*;
 import com.citacloud.springboot.contacloud.app.dto.DepreciacionDto.Empresa;
 import com.citacloud.springboot.contacloud.app.errors.TraceContext;
@@ -54,6 +56,11 @@ public class AsientoContableService {
 
     @PreAuthorize(VER)
     public Moneda monedaBase() { return monedaBase(principal()); }
+
+    @PreAuthorize(VER)
+    public List<CentroCostoDto.Referencia> centros(String buscar,int offset,int limite) {
+        return repo.buscarCentros(principal(),Objects.toString(texto(buscar,150),""),Math.max(0,offset),Math.clamp(limite,1,100));
+    }
 
     @PreAuthorize(VER)
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -134,7 +141,7 @@ public class AsientoContableService {
         periodo(p,fecha);
         var e=new Entrada(fecha,Tipo.REVERSION,original.moneda().id(),"Reversión de "+original.fila().numero(),
             original.fila().numero(),null,movimientos(original,true));
-        var lineas=validarLineas(p,e.lineas());
+        var lineas=validarLineas(p,e.lineas(),ValidacionLinea.REVERSION);
         partidaDoble(e.lineas());
         var reversa=insertar(p,e,original.moneda(),lineas,null,id,razon,clave);
         repo.contabilizar(p,reversa,clave,emisor(p));
@@ -155,10 +162,10 @@ public class AsientoContableService {
             throw new ReglaNegocioException("Indica las claves contables de los movimientos.");
         var cuentas=repo.claves(p,lineas.stream().map(LineaConfigurada::clave).collect(Collectors.toSet()));
         var e=normalizar(new Entrada(fecha,Tipo.AUTOMATICO,moneda,concepto,fuente.numero(),null,
-            lineas.stream().map(l->new Movimiento(cuentas.get(l.clave()),l.descripcion(),l.debito(),l.credito())).toList()));
+            lineas.stream().map(l->new Movimiento(cuentas.get(l.clave()),l.descripcion(),l.debito(),l.credito(),l.centroCostoId())).toList()));
         periodo(p,e.fecha());
         var base=validarMoneda(p,e.moneda());
-        var renglones=validarLineas(p,e.lineas());
+        var renglones=validarLineas(p,e.lineas(),ValidacionLinea.CONTABILIZACION);
         partidaDoble(e.lineas());
         var clave=UUID.randomUUID();
         var id=insertar(p,e,base,renglones,fuente,null,null,clave);
@@ -185,7 +192,7 @@ public class AsientoContableService {
         if(!MANUALES.contains(e.tipo())) throw new ReglaNegocioException("Selecciona un tipo de asiento manual.");
         if(repo.periodoCerrado(p,e.fecha())) throw new ReglaNegocioException("El período fiscal está cerrado.");
         var moneda=validarMoneda(p,e.moneda());
-        var lineas=validarLineas(p,e.lineas());
+        var lineas=validarLineas(p,e.lineas(),ValidacionLinea.BORRADOR);
         UUID guardado=id;
         if(id==null) guardado=insertar(p,e,moneda,lineas,null,null,null,clave);
         else {
@@ -208,21 +215,33 @@ public class AsientoContableService {
         periodo(p,d.fila().fecha());
         validarMoneda(p,d.moneda().id());
         var movimientos=movimientos(d,false);
-        var lineas=validarLineas(p,movimientos);
+        var lineas=validarLineas(p,movimientos,ValidacionLinea.CONTABILIZACION);
         partidaDoble(movimientos);
         repo.reemplazarLineas(p,d.fila().id(),lineas);
         repo.contabilizar(p,d.fila().id(),clave,emisor(p));
         auditar(p,"CONTABILIZAR",detalle(p,d.fila().id()),null);
     }
 
-    private List<Linea> validarLineas(TenantPrincipal p,List<Movimiento> movimientos) {
+    private enum ValidacionLinea { BORRADOR, CONTABILIZACION, REVERSION }
+
+    private List<Linea> validarLineas(TenantPrincipal p,List<Movimiento> movimientos,ValidacionLinea validacion) {
         if(movimientos.stream().anyMatch(l->l.cuenta()==null)) throw new ReglaNegocioException("Selecciona una cuenta de movimiento válida en cada línea.");
         var cuentas=repo.cuentas(p,movimientos.stream().map(Movimiento::cuenta).collect(Collectors.toSet()));
+        var ids=movimientos.stream().map(Movimiento::centroCostoId).filter(Objects::nonNull).collect(Collectors.toSet());
+        var centros=ids.isEmpty()?Map.<UUID,CentroCostoDto.Referencia>of():repo.centros(p,ids);
         return movimientos.stream().map(l->{
             var c=cuentas.get(l.cuenta());
             if(c==null||!c.activa()||!c.movimiento())
                 throw new ReglaNegocioException("Cada línea debe utilizar una cuenta de movimiento activa de la empresa.");
-            return new Linea(c,l.descripcion(),l.debito(),l.credito());
+            var centro=l.centroCostoId()==null?null:centros.get(l.centroCostoId());
+            if(l.centroCostoId()!=null&&centro==null)
+                throw new ReglaNegocioException("Selecciona un centro de costos de la empresa.");
+            if(validacion!=ValidacionLinea.REVERSION&&centro!=null
+                    &&(!centro.activo()||c.usoCentroCosto()==CentroCostoDto.Uso.NO_PERMITIDO))
+                throw new ReglaNegocioException("La cuenta "+c.codigo()+" requiere una imputación de centro válida y activa, si la admite.");
+            if(validacion==ValidacionLinea.CONTABILIZACION&&centro==null&&c.usoCentroCosto()==CentroCostoDto.Uso.OBLIGATORIO)
+                throw new ReglaNegocioException("Selecciona un centro de costos para la cuenta "+c.codigo()+".");
+            return new Linea(c,l.descripcion(),l.debito(),l.credito(),centro);
         }).toList();
     }
 
@@ -236,7 +255,7 @@ public class AsientoContableService {
             var debe=importe(l.debito());
             var haber=importe(l.credito());
             if(debe.signum()>0&&haber.signum()>0) throw new ReglaNegocioException("Una línea solo puede tener débito o crédito.");
-            return new Movimiento(l.cuenta(),texto(l.descripcion(),500),debe,haber);
+            return new Movimiento(l.cuenta(),texto(l.descripcion(),500),debe,haber,l.centroCostoId());
         }).toList();
         return new Entrada(e.fecha(),e.tipo(),e.moneda(),requerido(e.concepto(),500,"Indica el concepto."),
             texto(e.referencia(),150),texto(e.observacion(),2000),lineas);
@@ -270,7 +289,7 @@ public class AsientoContableService {
 
     private static List<Movimiento> movimientos(Detalle d,boolean invertir) {
         return d.lineas().stream().map(l->new Movimiento(l.cuenta().id(),l.descripcion(),
-            invertir?l.credito():l.debito(),invertir?l.debito():l.credito())).toList();
+            invertir?l.credito():l.debito(),invertir?l.debito():l.credito(),l.centroCosto()==null?null:l.centroCosto().id())).toList();
     }
 
     private static Fuente validarFuente(Fuente f) {

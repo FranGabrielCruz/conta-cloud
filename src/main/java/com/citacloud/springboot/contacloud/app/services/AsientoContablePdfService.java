@@ -70,7 +70,8 @@ public class AsientoContablePdfService {
         texto(filas,"Asiento de reversión",d.numeroReversion());
         texto(filas,"Motivo",d.motivo());
         texto(filas,"Observación",d.observacion());
-        d.lineas().forEach(l->filas.add(fila(l.cuenta().etiqueta(),Objects.toString(l.descripcion(),""),
+        d.lineas().forEach(l->filas.add(fila(l.cuenta().etiqueta(),Objects.toString(l.descripcion(),"")
+            +(l.centroCosto()==null?"":"\nCentro: "+l.centroCosto().etiqueta()),
             dinero(l.debito()),dinero(l.credito()))));
         var t=d.fila().total();
         filas.add(fila("TOTAL","",dinero(t.debito()),dinero(t.credito())));

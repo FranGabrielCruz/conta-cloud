@@ -89,7 +89,7 @@ public class LibroDiarioPdfService {
                 FECHA.format(a.fecha())+"   "+a.numero()+"   "+a.moneda(),
                 "journalConcept",a.concepto(),"journalMetadata",datos.toString());
             var movimientos=a.movimientos().stream().map(l->fila(l.codigo()+" — "+l.cuenta(),
-                Objects.toString(l.descripcion(),""),l.debito(),l.credito()));
+                Objects.toString(l.descripcion(),"")+(l.centroCosto()==null?"":"\nCentro: "+l.centroCosto()),l.debito(),l.credito()));
             return Stream.concat(movimientos,Stream.of(fila("Total "+a.numero(),"",a.total().debito(),a.total().credito())))
                 .<Map<String,String>>map(fila->{
                     var renglon=new HashMap<>(fila);

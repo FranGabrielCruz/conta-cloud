@@ -29,14 +29,29 @@ public final class AsientoContableDto {
         public String etiqueta() { return etiqueta; }
     }
     public record Moneda(UUID id,String codigo) {}
-    public record Cuenta(UUID id,String codigo,String nombre,boolean activa,boolean movimiento) {
+    public record Cuenta(UUID id,String codigo,String nombre,boolean activa,boolean movimiento,CentroCostoDto.Uso usoCentroCosto) {
+        public Cuenta(UUID id,String codigo,String nombre,boolean activa,boolean movimiento) {
+            this(id,codigo,nombre,activa,movimiento,CentroCostoDto.Uso.OPCIONAL);
+        }
         public String etiqueta() { return codigo+" — "+nombre; }
     }
-    public record Movimiento(UUID cuenta,String descripcion,BigDecimal debito,BigDecimal credito) {}
-    public record Linea(Cuenta cuenta,String descripcion,BigDecimal debito,BigDecimal credito) {}
+    public record Movimiento(UUID cuenta,String descripcion,BigDecimal debito,BigDecimal credito,UUID centroCostoId) {
+        public Movimiento(UUID cuenta,String descripcion,BigDecimal debito,BigDecimal credito) {
+            this(cuenta,descripcion,debito,credito,null);
+        }
+    }
+    public record Linea(Cuenta cuenta,String descripcion,BigDecimal debito,BigDecimal credito,CentroCostoDto.Referencia centroCosto) {
+        public Linea(Cuenta cuenta,String descripcion,BigDecimal debito,BigDecimal credito) {
+            this(cuenta,descripcion,debito,credito,null);
+        }
+    }
     public record Entrada(LocalDate fecha,Tipo tipo,UUID moneda,String concepto,String referencia,String observacion,List<Movimiento> lineas) {}
     public record Fuente(Origen origen,String tipo,UUID id,String numero,String evento) {}
-    public record LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito) {}
+    public record LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito,UUID centroCostoId) {
+        public LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito) {
+            this(clave,descripcion,debito,credito,null);
+        }
+    }
     public record Filtro(LocalDate desde,LocalDate hasta,Tipo tipo,Estado estado,Origen origen,String buscar) {}
     public record Total(BigDecimal debito,BigDecimal credito) {
         public BigDecimal diferencia() { return debito.subtract(credito); }

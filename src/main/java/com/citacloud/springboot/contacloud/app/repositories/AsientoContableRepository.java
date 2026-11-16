@@ -1,5 +1,7 @@
 package com.citacloud.springboot.contacloud.app.repositories;
 
+import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto;
+
 import com.citacloud.springboot.contacloud.app.dto.AsientoContableDto.*;
 import com.citacloud.springboot.contacloud.app.dto.DepreciacionDto.Empresa;
 import com.citacloud.springboot.contacloud.app.security.TenantPrincipal;
@@ -72,9 +74,38 @@ public class AsientoContableRepository {
     }
 
     private List<Linea> lineas(TenantPrincipal p,UUID id) {
-        return jdbc.query("SELECT * FROM asiento_contable_linea WHERE "+AMBITO+" AND asiento_id=:id ORDER BY orden",
+        return jdbc.query("""
+            SELECT l.*,a.uso_centro_costo,c.codigo AS centro_codigo,c.nombre AS centro_nombre,c.activo AS centro_activo
+            FROM asiento_contable_linea l
+            JOIN cuenta_contable a ON (a.tenant_id,a.empresa_id,a.id)=(l.tenant_id,l.empresa_id,l.cuenta_id)
+            LEFT JOIN centro_costo c ON (c.tenant_id,c.empresa_id,c.id)=(l.tenant_id,l.empresa_id,l.centro_costo_id)
+            WHERE l.tenant_id=:tenant AND l.empresa_id=:empresa AND l.asiento_id=:id ORDER BY l.orden
+            """,
             ambito(p).addValue("id",id),(r,n)->new Linea(new Cuenta(uuid(r,"cuenta_id"),r.getString("codigo"),
-                r.getString("cuenta"),true,true),r.getString("descripcion"),r.getBigDecimal("debito"),r.getBigDecimal("credito")));
+                r.getString("cuenta"),true,true,CentroCostoDto.Uso.valueOf(r.getString("uso_centro_costo"))),
+                r.getString("descripcion"),r.getBigDecimal("debito"),r.getBigDecimal("credito"),
+                centro(r,"centro_costo_id","centro_")));
+    }
+
+    public Map<UUID,CentroCostoDto.Referencia> centros(TenantPrincipal p,Set<UUID> ids) {
+        if(ids.isEmpty()) return Map.of();
+        var centros=new java.util.HashMap<UUID,CentroCostoDto.Referencia>();
+        jdbc.query("SELECT id,codigo,nombre,activo FROM centro_costo WHERE "+AMBITO+" AND id IN (:ids)",
+            ambito(p).addValue("ids",ids),r->{var c=centro(r,"id",""); centros.put(c.id(),c);});
+        return centros;
+    }
+
+    public List<CentroCostoDto.Referencia> buscarCentros(TenantPrincipal p,String buscar,int offset,int limite) {
+        return jdbc.query("SELECT id,codigo,nombre,activo FROM centro_costo WHERE "+AMBITO+"""
+             AND activo AND (:buscar='' OR strpos(lower(codigo || ' ' || nombre),lower(:buscar))>0)
+             ORDER BY numero LIMIT :limite OFFSET :offset
+            """,ambito(p).addValue("buscar",buscar).addValue("offset",offset).addValue("limite",limite),(r,n)->centro(r,"id",""));
+    }
+
+    private static CentroCostoDto.Referencia centro(ResultSet r,String id,String prefijo) throws SQLException {
+        UUID uuid=uuid(r,id);
+        return uuid==null?null:new CentroCostoDto.Referencia(uuid,r.getString(prefijo+"codigo"),r.getString(prefijo+"nombre"),
+            r.getBoolean(prefijo+"activo"));
     }
 
     public Optional<UUID> porSolicitud(TenantPrincipal p,UUID solicitud) {
@@ -172,11 +203,12 @@ public class AsientoContableRepository {
             var l=lineas.get(i);
             batch[i]=ambito(p).addValue("id",id).addValue("orden",i+1).addValue("cuentaId",l.cuenta().id())
                 .addValue("codigo",l.cuenta().codigo()).addValue("cuenta",l.cuenta().nombre()).addValue("descripcion",l.descripcion())
-                .addValue("debito",l.debito()).addValue("credito",l.credito());
+                .addValue("debito",l.debito()).addValue("credito",l.credito())
+                .addValue("centro",l.centroCosto()==null?null:l.centroCosto().id());
         }
         if(batch.length>0) jdbc.batchUpdate("""
-            INSERT INTO asiento_contable_linea(tenant_id,empresa_id,asiento_id,orden,cuenta_id,codigo,cuenta,descripcion,debito,credito)
-            VALUES(:tenant,:empresa,:id,:orden,:cuentaId,:codigo,:cuenta,:descripcion,:debito,:credito)
+            INSERT INTO asiento_contable_linea(tenant_id,empresa_id,asiento_id,orden,cuenta_id,codigo,cuenta,descripcion,debito,credito,centro_costo_id)
+            VALUES(:tenant,:empresa,:id,:orden,:cuentaId,:codigo,:cuenta,:descripcion,:debito,:credito,:centro)
             """,batch);
     }
 
@@ -202,7 +234,7 @@ public class AsientoContableRepository {
 
     private static Cuenta cuenta(ResultSet r)throws SQLException {
         return new Cuenta(uuid(r,"id"),r.getString("codigo"),r.getString("nombre"),r.getBoolean("activo"),
-            "MOVIMIENTO".equals(r.getString("tipo")));
+            "MOVIMIENTO".equals(r.getString("tipo")),CentroCostoDto.Uso.valueOf(r.getString("uso_centro_costo")));
     }
 
     private static Fila fila(ResultSet r)throws SQLException {

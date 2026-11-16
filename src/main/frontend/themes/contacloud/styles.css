@@ -303,10 +303,10 @@ vaadin-button.cc-action-button[disabled] { opacity: .5; cursor: not-allowed; }
 .cc-journal-movements { overflow-x: auto; padding-inline: 2px; }
 .cc-journal-line {
   display: grid;
-  grid-template-columns: minmax(0, 32fr) minmax(0, 30fr) repeat(2, minmax(0, 16fr)) 36px;
+  grid-template-columns: minmax(0, 29fr) minmax(0, 25fr) minmax(0, 22fr) repeat(2, minmax(0, 13fr)) 36px;
   gap: 8px;
   align-items: start;
-  min-width: 590px;
+  min-width: 760px;
   padding-block: 2px;
 }
 .cc-journal-line > * { min-width: 0; }
@@ -1523,9 +1523,21 @@ vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
 .cc-trial-balance-filters > :last-child { grid-column: 1 / -1; }
 .cc-trial-balance-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .cc-trial-balance-amount { display: grid; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.cc-trial-balance-grid::part(trial-balance-action) {
+.cc-trial-balance-grid::part(trial-balance-action),
+.cc-cost-center-grid::part(cost-center-action) {
   --vaadin-grid-cell-text-overflow: clip;
   --vaadin-grid-cell-padding: 4px 6px;
+}
+.cc-cost-center-page { gap: 12px; }
+.cc-cost-center-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  width: 100%;
+}
+.cc-cost-center-fields > * { width: 100%; min-width: 0; }
+@media (max-width: 520px) {
+  .cc-cost-center-fields { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 900px) {
   .cc-trial-balance-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
