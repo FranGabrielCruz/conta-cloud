@@ -35,7 +35,7 @@ class SupplierPaymentServiceTest {
     private final IdempotentOperationService idempotency=mock(IdempotentOperationService.class);
     private final SupplierPaymentService service=new SupplierPaymentService(payments,applications,drafts,movements,
         new CuentaDineroResolver(cash,banks),sessions,audit,suppliers,currencies,invoices,payables,creditNotes,numbers,reconciliation,
-        idempotency);
+        idempotency,mock(ContabilizacionTesoreriaService.class));
     private final UUID tenant=UUID.randomUUID(),company=UUID.randomUUID(),user=UUID.randomUUID();
     private final UUID supplier=UUID.randomUUID(),branch=UUID.randomUUID(),currency=UUID.randomUUID();
 

@@ -148,6 +148,11 @@ final class LargeDocumentPdfTemplate {
             i->i>concepto?"Right":"Left",i->(i>0 && i<=concepto)||i==concepto+3);
     }
 
+    static String cierreContable(boolean logo) throws IOException {
+        return encabezadoContable(logo,42,"CIERRE CONTABLE","accounting_close")
+            .replace("\"Fecha: \" + $P{orderDate}","\"Período: \" + $P{orderDate}");
+    }
+
     static String balanza(boolean logo) throws IOException {
         var base=encabezadoContable(logo,42,"BALANZA DE COMPROBACIÓN","trial_balance")
             .replace("\"Fecha: \" + $P{orderDate}","\"Período: \" + $P{orderDate}");

@@ -40,7 +40,7 @@ class AsientoContableServiceTest {
             when(modulos.habilitado("CONTABILIDAD")).thenReturn(true);
             ctx.register(Seguridad.class);
             ctx.registerBean("empresaModuloService",EmpresaModuloService.class,()->modulos);
-            ctx.registerBean(AsientoContableService.class,()->new AsientoContableService(repo,null,null,null,null));
+            ctx.registerBean(AsientoContableService.class,()->new AsientoContableService(repo,null,null,null,null,null));
             ctx.refresh();
             var s=ctx.getBean(AsientoContableService.class);
             var id=UUID.randomUUID();

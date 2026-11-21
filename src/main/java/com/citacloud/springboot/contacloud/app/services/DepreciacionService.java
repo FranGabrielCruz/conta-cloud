@@ -46,13 +46,15 @@ public class DepreciacionService {
     private final EmpresaRepository empresas;
     private final DatosEmpresaRepository datosEmpresa;
     private final AuditoriaService auditoria;
+    private final ContabilizacionOperativaService contabilidad;
 
     public DepreciacionService(DepreciacionRepository repo,EmpresaRepository empresas,DatosEmpresaRepository datosEmpresa,
-                               AuditoriaService auditoria) {
+                               AuditoriaService auditoria,ContabilizacionOperativaService contabilidad) {
         this.repo=repo;
         this.empresas=empresas;
         this.datosEmpresa=datosEmpresa;
         this.auditoria=auditoria;
+        this.contabilidad=contabilidad;
     }
 
     @PreAuthorize(ACCESO)
@@ -124,6 +126,7 @@ public class DepreciacionService {
 
     private UUID guardar(TenantPrincipal p,VistaPrevia previa,Proceso proceso) {
         repo.guardar(p,proceso,previa.lineas());
+        contabilidad.depreciacion(proceso.id(),proceso.codigo(),proceso.fecha(),previa.totales());
         auditoria.registrar("PROCESAR","DepreciacionActivoFijo",proceso.id(),JSON.writeValueAsString(java.util.Map.of(
             "numero",proceso.codigo(),"periodo",proceso.periodo().toString(),"tenantId",p.tenantId(),"empresaId",p.empresaId(),
             "usuarioId",p.usuarioId(),"activos",previa.lineas().size(),"totales",previa.totales(),

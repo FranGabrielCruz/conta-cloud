@@ -149,14 +149,13 @@ class MenuServiceTest {
     }
 
     @Test
-    void periodosSeIntegraEnConfiguracionContableSinOpcionDuplicada() {
+    void periodosMantieneUnaRutaPropiaFueraDeConfiguracionContable() {
         autenticar(Set.of("periodos_fiscales.ver", "configuracion_contable.ver"));
 
         assertThat(service.obtener().stream()
             .flatMap(grupo -> grupo.opciones().stream())
             .map(MenuService.OpcionMenu::titulo))
-            .contains("Configuración contable")
-            .doesNotContain("Períodos fiscales");
+            .containsOnlyOnce("Configuración contable", "Períodos fiscales");
     }
 
     @Test

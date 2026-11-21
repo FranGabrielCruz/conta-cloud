@@ -93,7 +93,8 @@ public final class PhaseTwoNavigation {
             item("Balanza de Comprobación", "balanza", "SCALE", CONTABILIDAD, "balanza.ver",
                 "Consulta y comprueba los saldos contables del período."),
             item("Centros de costos", "centros-costos", "GROUP", CONTABILIDAD, "centros_costos.ver", "Administra los centros de costos de la empresa."),
-            item("Cierres", "cierres-contables", "LOCK", CONTABILIDAD, "cierres_contables.ver", placeholder("Cierres")))),
+            item("Cierre contable", "cierres-contables", "LOCK", CONTABILIDAD, "cierres_contables.ver",
+                "Valida, cierra y reabre períodos contables."))),
         new Section("FISCAL", List.of(
             item("NCF", "fiscal/ncf", "FILE_TEXT_O", FISCAL, "fiscal_ncf.ver", placeholder("NCF")),
             item("e-CF", "fiscal/ecf", "FILE", FISCAL, "fiscal_ecf.ver", placeholder("e-CF")),

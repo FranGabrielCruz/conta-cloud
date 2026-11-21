@@ -75,7 +75,7 @@ class PhaseTwoNavigationTest {
                 "Ajustes", "Conteo físico");
         assertThat(section("CONTABILIDAD").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("Catálogo de cuentas", "Asientos contables", "Libro diario", "Libro mayor", "Balanza de Comprobación",
-                "Centros de costos", "Cierres");
+                "Centros de costos", "Cierre contable");
         assertThat(section("FISCAL").items()).extracting(PhaseTwoNavigation.Item::title)
             .containsExactly("NCF", "e-CF", "Impuestos", "Retenciones", "606", "607", "608", "609", "IT-1", "IR-17");
         assertThat(section("ACTIVOS FIJOS").items()).extracting(PhaseTwoNavigation.Item::title)
@@ -106,6 +106,7 @@ class PhaseTwoNavigationTest {
                 com.citacloud.springboot.contacloud.app.views.LibroMayorView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BalanzaView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CentrosCostosView.class.getAnnotation(Route.class).value(),
+                com.citacloud.springboot.contacloud.app.views.CierreContableView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.CatalogoCuentasView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.BajasActivosView.class.getAnnotation(Route.class).value(),
                 com.citacloud.springboot.contacloud.app.views.DepreciacionesActivosView.class.getAnnotation(Route.class).value(),

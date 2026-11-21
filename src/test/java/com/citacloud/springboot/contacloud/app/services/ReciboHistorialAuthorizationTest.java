@@ -20,7 +20,7 @@ class ReciboHistorialAuthorizationTest {
             when(mod.habilitado("VENTAS")).thenReturn(true);
             context.register(Security.class);
             context.registerBean("empresaModuloService",EmpresaModuloService.class,()->mod);
-            context.registerBean(CobroClienteService.class,()->new CobroClienteService(repo,null,null,null,null,null,null,null,null,null));
+            context.registerBean(CobroClienteService.class,()->new CobroClienteService(repo,null,null,null,null,null,null,null,null,null,null));
             context.registerBean(ReciboHistorialService.class,()->new ReciboHistorialService(context.getBean(CobroClienteService.class),repo,null,null,null));
             context.registerBean(CobroClientePdfService.class,()->new CobroClientePdfService(context.getBean(ReciboHistorialService.class),null));
             context.refresh();

@@ -24,14 +24,15 @@ public class PurchaseInvoiceService {
     private final FacturaProveedorMapper mapper; private final AuditoriaService audit;
     private final SupplierPaymentService supplierPayments; private final CuentaDineroResolver accountResolver;
     private final PurchaseInvoiceNumberService invoiceNumbers;
+    private final CompraEventoContableService contabilidad;
     public PurchaseInvoiceService(PurchaseInvoiceRepository invoices,AccountsPayableRepository payables,SupplierRepository suppliers,
             SucursalRepository branches,MonedaRepository currencies,CondicionPagoRepository terms,ImpuestoRepository taxes,
             ProductRepository products,PurchaseOrderRepository orders,PurchaseOrderCalculationService calculations,
             FacturaProveedorMapper mapper,AuditoriaService audit,SupplierPaymentService supplierPayments,
-            CuentaDineroResolver accountResolver,PurchaseInvoiceNumberService invoiceNumbers){this.invoices=invoices;this.payables=payables;this.suppliers=suppliers;
+            CuentaDineroResolver accountResolver,PurchaseInvoiceNumberService invoiceNumbers,CompraEventoContableService contabilidad){this.invoices=invoices;this.payables=payables;this.suppliers=suppliers;
         this.branches=branches;this.currencies=currencies;this.terms=terms;this.taxes=taxes;this.products=products;
         this.orders=orders;this.calculations=calculations;this.mapper=mapper;this.audit=audit;
-        this.supplierPayments=supplierPayments;this.accountResolver=accountResolver;this.invoiceNumbers=invoiceNumbers;}
+        this.supplierPayments=supplierPayments;this.accountResolver=accountResolver;this.invoiceNumbers=invoiceNumbers;this.contabilidad=contabilidad;}
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.ver')")
@@ -42,6 +43,9 @@ public class PurchaseInvoiceService {
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.ver')")
     public FacturaProveedorDto get(UUID id){FacturaProveedor f=safe(id);return mapper.toDto(f,payable(f));}
+    @Transactional(readOnly=true)
+    @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and @empresaModuloService.habilitado('CONTABILIDAD') and hasAuthority('facturas_proveedores.ver') and hasAuthority('asientos.ver')")
+    public Optional<UUID> asientoContable(UUID id){return contabilidad.asiento(safe(id));}
 
     @Transactional(readOnly=true)
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAnyAuthority('facturas_proveedores.crear','facturas_proveedores.editar')")
@@ -133,9 +137,10 @@ public class PurchaseInvoiceService {
         return registerNew(f,TenantContext.principalActual(),term,payment);}
     @Transactional
     @PreAuthorize("@empresaModuloService.habilitado('COMPRAS') and hasAuthority('facturas_proveedores.anular')")
-    public FacturaProveedorDto voidInvoice(UUID id,long version,String reason){FacturaProveedor f=locked(id);expected(f,version);
-        if(f.getEstado()==EstadoFacturaProveedor.VOIDED)return mapper.toDto(f,payable(f));String r=required(reason,500,"El motivo de anulación es obligatorio.");var p=TenantContext.principalActual();
+    public FacturaProveedorDto voidInvoice(UUID id,long version,String reason){FacturaProveedor f=locked(id);
+        if(f.getEstado()==EstadoFacturaProveedor.VOIDED)return mapper.toDto(f,payable(f));expected(f,version);String r=required(reason,500,"El motivo de anulación es obligatorio.");var p=TenantContext.principalActual();
         CuentaPagar c=payable(f);if(c!=null&&c.getMontoAplicado().signum()>0)throw new ReglaNegocioException("No se puede anular una factura con pagos aplicados.");
+        contabilidad.anulada(f,r);
         if(c!=null){c.anular();payables.save(c);}if(f.getCondicionPagoTipoSnapshot()==TipoCondicionPago.CASH)supplierPayments.anularPorFactura(f,r);
         f.anular(r,p.usuarioId());f=invoices.saveAndFlush(f);audit.registrar("PURCHASE_INVOICE_VOIDED","FacturaProveedor",f.getId(),detail(f));return mapper.toDto(f,c);}
 
@@ -169,6 +174,7 @@ public class PurchaseInvoiceService {
             f.registrar(term,EstadoFinancieroFactura.PAID,key,p.usuarioId());f=invoices.saveAndFlush(f);
             supplierPayments.registrar(f,new PagoFacturaProveedorInput(payment.tipoFuente(),payment.fuenteId(),payment.medioPago(),
                 payment.referencia(),key));}
+        contabilidad.registrada(f,payment);
         audit.registrar("PURCHASE_INVOICE_REGISTERED","FacturaProveedor",f.getId(),detail(f));return mapper.toDto(f,payable);}
     private static LocalDate dueDate(LocalDate date,CondicionPago term){if(date==null)return null;return term.getTipo()==TipoCondicionPago.CASH
         ?date:date.plusDays(Math.max(0,term.getDias()));}

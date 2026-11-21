@@ -76,7 +76,7 @@ class DepreciacionServiceTest {
             when(modulos.habilitado("ACTIVOS_FIJOS")).thenReturn(true);
             ctx.register(Seguridad.class);
             ctx.registerBean("empresaModuloService",EmpresaModuloService.class,()->modulos);
-            ctx.registerBean(DepreciacionService.class,()->new DepreciacionService(repo,null,null,null));
+            ctx.registerBean(DepreciacionService.class,()->new DepreciacionService(repo,null,null,null,null));
             ctx.refresh();
             var svc=ctx.getBean(DepreciacionService.class);
             autenticar(Set.of("depreciaciones.procesar"),true);

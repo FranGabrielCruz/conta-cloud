@@ -41,7 +41,12 @@ public final class CuentaContableDto {
     }
     public record Cuenta(UUID id, UUID padre, String codigo, String nombre, Tipo tipo, Clasificacion clasificacion,
                          Naturaleza naturaleza, boolean activo, String descripcion, long version, boolean hijos, boolean estructural,
-                         CentroCostoDto.Uso usoCentroCosto) {
+                         CentroCostoDto.Uso usoCentroCosto,boolean permiteResultadoEjercicio) {
+        public Cuenta(UUID id,UUID padre,String codigo,String nombre,Tipo tipo,Clasificacion clasificacion,
+                      Naturaleza naturaleza,boolean activo,String descripcion,long version,boolean hijos,boolean estructural,
+                      CentroCostoDto.Uso usoCentroCosto) {
+            this(id,padre,codigo,nombre,tipo,clasificacion,naturaleza,activo,descripcion,version,hijos,estructural,usoCentroCosto,false);
+        }
         public Cuenta(UUID id,UUID padre,String codigo,String nombre,Tipo tipo,Clasificacion clasificacion,
                       Naturaleza naturaleza,boolean activo,String descripcion,long version,boolean hijos,boolean estructural) {
             this(id,padre,codigo,nombre,tipo,clasificacion,naturaleza,activo,descripcion,version,hijos,estructural,
@@ -50,7 +55,11 @@ public final class CuentaContableDto {
         public String etiqueta() { return codigo + " — " + nombre; }
         public boolean permiteMovimientos() { return tipo == Tipo.MOVIMIENTO; }
     }
-    public record Entrada(UUID padre, String nombre, Tipo tipo, Naturaleza naturaleza, String descripcion,CentroCostoDto.Uso usoCentroCosto) {
+    public record Entrada(UUID padre, String nombre, Tipo tipo, Naturaleza naturaleza, String descripcion,CentroCostoDto.Uso usoCentroCosto,
+                          Boolean permiteResultadoEjercicio) {
+        public Entrada(UUID padre,String nombre,Tipo tipo,Naturaleza naturaleza,String descripcion,CentroCostoDto.Uso usoCentroCosto) {
+            this(padre,nombre,tipo,naturaleza,descripcion,usoCentroCosto,null);
+        }
         public Entrada(UUID padre,String nombre,Tipo tipo,Naturaleza naturaleza,String descripcion) {
             this(padre,nombre,tipo,naturaleza,descripcion,null);
         }

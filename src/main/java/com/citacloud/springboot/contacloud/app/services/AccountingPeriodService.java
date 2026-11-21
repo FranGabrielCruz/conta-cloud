@@ -85,7 +85,7 @@ public class AccountingPeriodService {
     }
 
     @Transactional
-    @PreAuthorize("@empresaModuloService.habilitado('CONFIGURACION_CONTABLE') and hasAnyAuthority('periodos_fiscales.cerrar','PERIODO_CERRAR')")
+    @PreAuthorize("@empresaModuloService.habilitado('CONFIGURACION_CONTABLE') and !@empresaModuloService.habilitado('CONTABILIDAD') and hasAnyAuthority('periodos_fiscales.cerrar','PERIODO_CERRAR')")
     public PeriodoFiscalDto cerrar(UUID id) {
         bloquearEmpresa();
         var entity = seguro(id);
@@ -99,7 +99,7 @@ public class AccountingPeriodService {
     }
 
     @Transactional
-    @PreAuthorize("@empresaModuloService.habilitado('CONFIGURACION_CONTABLE') and hasAuthority('periodos_fiscales.reabrir')")
+    @PreAuthorize("@empresaModuloService.habilitado('CONFIGURACION_CONTABLE') and !@empresaModuloService.habilitado('CONTABILIDAD') and hasAuthority('periodos_fiscales.reabrir')")
     public PeriodoFiscalDto reabrir(UUID id) {
         bloquearEmpresa();
         var entity = seguro(id);

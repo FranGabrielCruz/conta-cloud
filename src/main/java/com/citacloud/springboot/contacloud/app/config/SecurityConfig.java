@@ -34,7 +34,9 @@ public class SecurityConfig {
             .requestMatchers("/api/company/logo", "/api/accounting/general-journal", "/api/accounting/general-journal/pdf",
                 "/api/accounting/general-ledger", "/api/accounting/general-ledger/pdf",
                 "/api/accounting/trial-balance", "/api/accounting/trial-balance/pdf",
-                "/api/accounting/cost-centers", "/api/accounting/cost-centers/**").authenticated());
+                "/api/accounting/cost-centers", "/api/accounting/cost-centers/**",
+                "/api/accounting/closures", "/api/accounting/closures/**",
+                "/api/accounting/configuration", "/api/accounting/configuration/**").authenticated());
         http.with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer.loginView(LoginView.class));
         return http.build();
     }

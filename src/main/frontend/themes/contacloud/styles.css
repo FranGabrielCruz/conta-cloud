@@ -187,6 +187,7 @@ vaadin-button.cc-action-edit { --cc-action-color: var(--cc-action-edit); }
 vaadin-button.cc-action-view { --cc-action-color: var(--cc-action-view); }
 vaadin-button.cc-action-neutral { --cc-action-color: var(--cc-action-neutral); }
 vaadin-button.cc-action-danger { --cc-action-color: var(--cc-action-danger); }
+vaadin-button.cc-action-warning { --cc-action-color: #b45309; }
 vaadin-button.cc-action-main { background: var(--cc-action-color); }
 vaadin-button.cc-action-grid { color: var(--cc-action-color); }
 vaadin-button.cc-action-main .cc-action-icon { width: var(--cc-button-main-icon-size); height: var(--cc-button-main-icon-size); }
@@ -1524,11 +1525,56 @@ vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
 .cc-trial-balance-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .cc-trial-balance-amount { display: grid; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .cc-trial-balance-grid::part(trial-balance-action),
-.cc-cost-center-grid::part(cost-center-action) {
+.cc-cost-center-grid::part(cost-center-action),
+.cc-accounting-close-grid::part(accounting-close-action) {
   --vaadin-grid-cell-text-overflow: clip;
   --vaadin-grid-cell-padding: 4px 6px;
 }
 .cc-cost-center-page { gap: 12px; }
+.cc-accounting-close { gap: 12px; }
+.cc-accounting-close-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  width: 100%;
+}
+.cc-accounting-close-filters > * { width: 100%; min-width: 0; }
+.cc-accounting-close-history-actions { display: flex; justify-content: end; gap: 8px; }
+.cc-accounting-close-dialog::part(title) { white-space: normal; overflow-wrap: anywhere; }
+.cc-accounting-close-dialog::part(footer) { justify-content: flex-end; }
+.cc-accounting-close-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) minmax(0, 4fr);
+  gap: 12px;
+}
+.cc-accounting-close-detail > *,
+.cc-accounting-close-checks li > * { min-width: 0; }
+.cc-accounting-close-detail .cc-detail-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.cc-accounting-close-detail :is(h2, span, p),
+.cc-accounting-close-period-result .cc-detail-value {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cc-accounting-close-checks { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.cc-accounting-close-checks li { display: grid; grid-template-columns: 1rem minmax(0, 1fr); gap: 8px; }
+.cc-accounting-close-checks li > div { display: grid; gap: 2px; }
+.cc-accounting-close-checks li > div > span:first-child { font-weight: 600; }
+.cc-accounting-close-checks p { color: var(--cc-muted); font-size: var(--lumo-font-size-s); margin: 2px 0 0; }
+.cc-close-check-ok { color: var(--lumo-success-text-color); }
+.cc-close-check-error { color: var(--lumo-error-text-color); }
+.cc-accounting-close-period-result { margin-top: 12px; }
+.cc-accounting-close-period-result .cc-detail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .cc-accounting-close-detail,
+  .cc-accounting-close-period-result .cc-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-accounting-close-validation { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .cc-accounting-close-filters,
+  .cc-accounting-close-detail,
+  .cc-accounting-close-period-result .cc-detail-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .cc-cost-center-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
@@ -1565,3 +1611,32 @@ vaadin-button.cc-action-analytics { --cc-action-color: #5145b5; }
 @media (max-width: 520px) {
   .cc-general-ledger-filters { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Configuración central del motor contable */
+.cc-motor-config { min-width: 0; }
+.cc-motor-content { min-width: 0; width: 100%; box-sizing: border-box; }
+.cc-motor-periods { min-width: 0; padding: 24px 20px; box-sizing: border-box; }
+.cc-motor-panel { width: 100%; box-sizing: border-box; padding: 24px 20px; overflow-wrap: anywhere; }
+.cc-motor-panel h3 { font-size: 14px; margin: 12px 0; }
+.cc-motor-panel p { font-size: 14px; margin: 8px 0; white-space: normal; }
+.cc-motor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.cc-motor-fields > * { min-width: 0; }
+.cc-motor-automation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.cc-motor-tab-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 16px; row-gap: 4px; margin-bottom: 24px; }
+.cc-motor-tab-header h3 { grid-column: 1; grid-row: 1; margin: 0; min-width: 0; }
+.cc-motor-tab-header p { grid-column: 1 / -1; grid-row: 2; margin: 0; color: var(--cc-muted); }
+.cc-motor-tab-header .cc-action-button { grid-column: 2; grid-row: 1; }
+.cc-motor-config .cc-motor-periods .cc-page-title { font-size: 14px; }
+.cc-motor-periods .cc-subtitle { margin-bottom: 0; }
+.cc-motor-periods .cc-filter-bar { margin: 0; }
+@media (max-width: 600px) { .cc-motor-fields, .cc-motor-automation { grid-template-columns: minmax(0, 1fr); } .cc-motor-panel, .cc-motor-periods { padding: 24px 12px; } }
+.cc-motor-config .cc-page-title { font-size: clamp(1.4rem, 3vw, 2.1rem); overflow-wrap: anywhere; }
+.cc-motor-config vaadin-tabs { max-width: 100%; min-width: 0; }
+.cc-motor-module-head, .cc-motor-module-row { display: grid; grid-template-columns: 140px minmax(0,1fr) 130px; gap: 16px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--cc-border); }
+.cc-motor-module-head { font-weight: 700; }
+.cc-motor-module-row > * { min-width: 0; overflow-wrap: anywhere; }
+.cc-motor-module-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.cc-motor-status-ready { color: var(--lumo-success-text-color); font-weight: 650; }
+.cc-motor-status-warning { color: var(--lumo-warning-text-color, #b98513); font-weight: 650; }
+@media (max-width:600px) { .cc-motor-module-head { display: none; } .cc-motor-module-row { grid-template-columns: minmax(0,1fr) auto; gap: 8px; } .cc-motor-module-row > :first-child { grid-column:1; font-weight:700; } .cc-motor-module-row > :nth-child(2) { grid-column:1 / -1; grid-row:2; } .cc-motor-module-actions { grid-column:2; grid-row:1; } }
+.cc-motor-notice-warning { border-inline-start: 3px solid var(--lumo-warning-text-color, #b98513); padding-inline-start: 12px; }

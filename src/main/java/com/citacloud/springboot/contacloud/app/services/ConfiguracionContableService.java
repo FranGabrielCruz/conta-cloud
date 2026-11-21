@@ -42,6 +42,9 @@ public class ConfiguracionContableService {
     public ConfiguracionContableDto actualizar(ConfiguracionContableInput input) {
         ConfiguracionContable.MetodoContable metodo = validar(input);
         var configuracion = configuracionActual();
+        if (input.contabilizacionAutomatica() != configuracion.isContabilizacionAutomatica()) {
+            throw new ReglaNegocioException("Actualiza la automatización desde la configuración central por módulos.");
+        }
         String anterior = configuracion.getMetodoContable().name();
         mapper.updateEntity(new ConfiguracionContableInput(metodo.name(), input.contabilizacionAutomatica(),
             input.permitirPeriodosCerrados()), configuracion);

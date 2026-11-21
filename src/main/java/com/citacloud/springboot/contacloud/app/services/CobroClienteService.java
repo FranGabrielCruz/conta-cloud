@@ -28,12 +28,14 @@ public class CobroClienteService {
     private final FinancialMovementRepository movements;
     private final BankReconciliationMatchRepository reconciliation;
     private final AuditoriaService audit;
+    private final ContabilizacionTesoreriaService contabilidad;
 
     public CobroClienteService(CobroClienteRepository receipts,ClienteRepository customers,MonedaRepository currencies,SucursalRepository branches,
             MetodoPagoVentaRepository methods,CuentaDineroResolver accountResolver,CashRegisterSessionService cashSessions,
-            FinancialMovementRepository movements,BankReconciliationMatchRepository reconciliation,AuditoriaService audit){
+            FinancialMovementRepository movements,BankReconciliationMatchRepository reconciliation,AuditoriaService audit,ContabilizacionTesoreriaService contabilidad){
         this.receipts=receipts;this.customers=customers;this.currencies=currencies;this.branches=branches;this.methods=methods;
         this.accountResolver=accountResolver;this.cashSessions=cashSessions;this.movements=movements;this.reconciliation=reconciliation;this.audit=audit;
+        this.contabilidad=contabilidad;
     }
 
     @Transactional(readOnly=true)
@@ -108,6 +110,8 @@ public class CobroClienteService {
             movement.asignarRelacionesCuenta(method.account.caja(),method.account.cuentaBancaria(),method.account.moneda());movement=movements.saveAndFlush(movement);receipts.vincularMovimiento(paymentId,movement.getId());}
         receipts.conservarImpresion(receiptId,p.tenantId(),empresa,input.cajaId(),balanceAnterior,
             receipts.saldoPendiente(p.tenantId(),empresa,customer.getId(),currency.getId()));
+        contabilidad.cobro(receiptId,number,input.fecha(),currency.getId(),received,applied,paymentMethods.stream()
+            .map(m->new EventoContable.RecursoImporte(m.type,m.account.id(),m.amount)).toList());
         audit.registrar("CUSTOMER_RECEIPT_CONFIRMED","CobroCliente",receiptId,"{\"numero\":\""+number+"\",\"recibido\":"+received+",\"aplicado\":"+applied+"}");
         return new CobroClienteResultadoDto(receiptId,number,received,applied,received.subtract(applied));
     }
@@ -122,7 +126,8 @@ public class CobroClienteService {
         if(total.signum()<=0||total.compareTo(receipt.disponible())>0)throw new ReglaNegocioException("El importe supera el saldo disponible del recibo.");
         for(var item:items){var account=receipts.bloquearCuenta(item.cuentaCobrarId(),p.tenantId(),empresa);BigDecimal amount=money(item.monto());
             if(account==null||!account.facturaId().equals(item.facturaId())||!account.clienteId().equals(receipt.clienteId())||!account.monedaId().equals(receipt.monedaId())||amount.signum()<=0||amount.compareTo(account.saldo())>0)throw new ReglaNegocioException("El saldo de una o más facturas cambió. Actualice la información antes de continuar.");
-            receipts.aplicarCuenta(account,amount);receipts.insertarAplicacion(UUID.randomUUID(),p.tenantId(),empresa,id,account,amount,p.usuarioId());}
+            receipts.aplicarCuenta(account,amount);var aplicacionId=UUID.randomUUID();receipts.insertarAplicacion(aplicacionId,p.tenantId(),empresa,id,account,amount,p.usuarioId());
+            contabilidad.aplicarRecibo(aplicacionId,receipt.numero(),receipt.fecha(),receipt.monedaId(),amount);}
         receipts.consumirDisponible(id,total);audit.registrar("CUSTOMER_RECEIPT_AVAILABLE_APPLIED","CobroCliente",id,"{\"monto\":"+total+"}");
         return detalle(id);
     }
@@ -155,6 +160,7 @@ public class CobroClienteService {
         // Serialize with cash closing before changing balances or locking ledger rows.
         receipts.sesionesDelRecibo(id,p.tenantId(),empresa).forEach(cashSessions::bloquearParaAnularRecibo);
         var medios=detalle(id).medios();
+        contabilidad.anularRecibo(id,receipt.numero(),receipt.fecha(),receipts.aplicacionesActivas(id,p.tenantId(),empresa).stream().map(a->a.id()).toList(),clean);
         var movimientos=receipts.movimientos(id,p.tenantId(),empresa);
         if(movimientos.isEmpty()||movimientos.size()!=medios.size())
             throw new ReglaNegocioException("El recibo no conserva todos sus movimientos financieros y no puede anularse.");

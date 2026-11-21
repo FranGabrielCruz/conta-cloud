@@ -88,6 +88,7 @@ public class CatalogoCuentasService {
         if (existente.isPresent()) return existente.get().id();
         var padre = validarPadre(p, null, e.padre());
         var id = UUID.randomUUID();
+        validarFuncionResultado(e,padre.clasificacion());
         repo.crear(p, id, solicitud, e, siguienteCodigo(p, padre), padre.clasificacion());
         auditar(p, "CREAR", null, cuenta(p, id));
         return id;
@@ -118,6 +119,7 @@ public class CatalogoCuentasService {
             clasificacion = padre.clasificacion();
             repo.reservarCodigo(p, c.codigo());
         }
+        validarFuncionResultado(e,clasificacion);
         repo.editar(p, id, e, codigo, clasificacion);
         auditar(p, "EDITAR", c, cuenta(p, id));
     }
@@ -211,7 +213,13 @@ public class CatalogoCuentasService {
         if (e == null || e.tipo() == null || e.naturaleza() == null)
             throw new ReglaNegocioException("Completa el tipo y la naturaleza de la cuenta.");
         return new Entrada(e.padre(), requerido(e.nombre(), 160, "Indica el nombre de la cuenta."),
-            e.tipo(), e.naturaleza(), texto(e.descripcion(), 2000),e.usoCentroCosto());
+            e.tipo(), e.naturaleza(), texto(e.descripcion(), 2000),e.usoCentroCosto(),e.permiteResultadoEjercicio());
+    }
+
+    private static void validarFuncionResultado(Entrada e,Clasificacion clasificacion) {
+        if(Boolean.TRUE.equals(e.permiteResultadoEjercicio())&&(e.tipo()!=Tipo.MOVIMIENTO||clasificacion!=Clasificacion.PATRIMONIO
+                ||e.usoCentroCosto()==com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.OBLIGATORIO))
+            throw new ReglaNegocioException("La función de resultado requiere una cuenta de movimiento de Patrimonio sin centro de costos obligatorio.");
     }
 
     private static Filtro filtro(Filtro f) {

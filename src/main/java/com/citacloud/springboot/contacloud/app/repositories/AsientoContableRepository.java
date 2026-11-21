@@ -20,6 +20,26 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Repository
 public class AsientoContableRepository {
+    public boolean monedaActiva(TenantPrincipal p,UUID moneda) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM monedas WHERE "+AMBITO+" AND id=:id AND activo)",ambito(p).addValue("id",moneda),Boolean.class));
+    }
+    public Optional<java.math.BigDecimal> tasaExacta(TenantPrincipal p,UUID origen,UUID destino,LocalDate fecha) {
+        var args=ambito(p).addValue("origen",origen).addValue("destino",destino).addValue("fecha",fecha);
+        var directa=jdbc.query("SELECT tasa FROM tasas_cambio WHERE "+AMBITO+" AND moneda_origen_id=:origen AND moneda_destino_id=:destino AND fecha=:fecha AND activo",args,(r,n)->r.getBigDecimal(1));
+        if(!directa.isEmpty())return Optional.of(directa.getFirst());
+        var inversa=jdbc.query("SELECT tasa FROM tasas_cambio WHERE "+AMBITO+" AND moneda_origen_id=:destino AND moneda_destino_id=:origen AND fecha=:fecha AND activo",args,(r,n)->r.getBigDecimal(1));
+        return inversa.stream().filter(t->t.signum()>0).findFirst().map(t->java.math.BigDecimal.ONE.divide(t,8,java.math.RoundingMode.HALF_UP));
+    }
+    public void registrarConversion(TenantPrincipal p,UUID id,UUID moneda,java.math.BigDecimal tasa) {
+        jdbc.update("UPDATE asiento_contable SET fuente_moneda_id=:moneda,fuente_tasa_cambio=:tasa WHERE "+AMBITO+" AND id=:id AND estado='BORRADOR'",
+            ambito(p).addValue("id",id).addValue("moneda",moneda).addValue("tasa",tasa));
+    }
+    public void registrarEvento(TenantPrincipal p,UUID id,long version,String traceId,String datos) {
+        if(version<0||traceId==null||traceId.isBlank()||traceId.length()>120)
+            throw new IllegalArgumentException("Metadatos de evento contable inválidos.");
+        jdbc.update("UPDATE asiento_contable SET fuente_version=:version,fuente_trace_id=:trace,fuente_datos=CAST(:datos AS jsonb) WHERE "+AMBITO+" AND id=:id AND estado='BORRADOR'",
+            ambito(p).addValue("id",id).addValue("version",version).addValue("trace",traceId).addValue("datos",datos));
+    }
     private static final String AMBITO="tenant_id=:tenant AND empresa_id=:empresa";
     private static final String ASIENTO="a.tenant_id=:tenant AND a.empresa_id=:empresa";
     private static final String TOTALES="""
@@ -210,6 +230,11 @@ public class AsientoContableRepository {
             INSERT INTO asiento_contable_linea(tenant_id,empresa_id,asiento_id,orden,cuenta_id,codigo,cuenta,descripcion,debito,credito,centro_costo_id)
             VALUES(:tenant,:empresa,:id,:orden,:cuentaId,:codigo,:cuenta,:descripcion,:debito,:credito,:centro)
             """,batch);
+    }
+
+    public void origenSistema(TenantPrincipal p,UUID id) {
+        jdbc.update("UPDATE asiento_contable SET origen='SISTEMA' WHERE estado='BORRADOR' AND id=:id AND "+AMBITO,
+            ambito(p).addValue("id",id));
     }
 
     public void contabilizar(TenantPrincipal p,UUID id,UUID solicitud,Empresa emisor) {

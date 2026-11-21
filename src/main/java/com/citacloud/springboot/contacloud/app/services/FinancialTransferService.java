@@ -24,12 +24,14 @@ public class FinancialTransferService {
     private final FinancialMovementService movimientos;
     private final TransferenciaFinancieraMapper mapper;
     private final AuditoriaService auditoria;
+    private final ContabilizacionOperativaService contabilidad;
 
     public FinancialTransferService(FinancialTransferRepository repository,TasaCambioRepository tasas,
             CuentaDineroResolver cuentas,FinancialMovementService movimientos,
-            TransferenciaFinancieraMapper mapper,AuditoriaService auditoria){
+            TransferenciaFinancieraMapper mapper,AuditoriaService auditoria,ContabilizacionOperativaService contabilidad){
         this.repository=repository;this.tasas=tasas;this.cuentas=cuentas;this.movimientos=movimientos;
         this.mapper=mapper;this.auditoria=auditoria;
+        this.contabilidad=contabilidad;
     }
 
     @Transactional(readOnly=true)
@@ -82,6 +84,7 @@ public class FinancialTransferService {
         movimientos.registrarTransferencia(entity.getId(),TipoMovimientoFinanciero.INCOME,v.fecha,destino,
             conversion.montoDestino,v.referencia,v.descripcion);
         auditoria.registrar("FINANCIAL_TRANSFER_CREATED","TransferenciaFinanciera",entity.getId(),detalle(entity));
+        contabilidad.transferencia(entity);
         return mapper.toDto(entity);
     }
 
@@ -98,6 +101,7 @@ public class FinancialTransferService {
         if(limpio==null)throw new ReglaNegocioException("El motivo de anulación es obligatorio.");
         if(limpio.length()>500)throw new ReglaNegocioException("El motivo de anulación excede 500 caracteres.");
         movimientos.anularTransferencia(entity.getId(),limpio);
+        contabilidad.anularTransferencia(entity,limpio);
         entity.anular(limpio,TenantContext.principalActual().usuarioId());repository.saveAndFlush(entity);
         auditoria.registrar("FINANCIAL_TRANSFER_VOIDED","TransferenciaFinanciera",entity.getId(),detalle(entity));
         return mapper.toDto(entity);

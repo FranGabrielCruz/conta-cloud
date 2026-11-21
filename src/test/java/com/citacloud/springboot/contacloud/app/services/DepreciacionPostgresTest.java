@@ -181,7 +181,7 @@ class DepreciacionPostgresTest {
         when(e.getZonaHoraria()).thenReturn("America/Santo_Domingo");
         when(empresas.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(e));
         return new DepreciacionService(new DepreciacionRepository(new NamedParameterJdbcTemplate(jdbc)),
-            empresas,mock(DatosEmpresaRepository.class),auditoria);
+            empresas,mock(DatosEmpresaRepository.class),auditoria,mock(ContabilizacionOperativaService.class));
     }
 
     private void preparar(JdbcTemplate jdbc) {

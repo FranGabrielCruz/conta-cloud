@@ -23,7 +23,7 @@ class FinancialTransferServiceTest {
     private final FinancialMovementService movimientos=mock(FinancialMovementService.class);
     private final AuditoriaService auditoria=mock(AuditoriaService.class);
     private final FinancialTransferService service=new FinancialTransferService(repository,tasas,cuentas,movimientos,
-        new TransferenciaFinancieraMapper(),auditoria);
+        new TransferenciaFinancieraMapper(),auditoria,mock(ContabilizacionOperativaService.class));
     private final UUID tenantId=UUID.randomUUID(),empresaId=UUID.randomUUID(),usuarioId=UUID.randomUUID();
     private final UUID origenId=UUID.randomUUID(),destinoId=UUID.randomUUID(),dopId=UUID.randomUUID(),usdId=UUID.randomUUID();
     private Moneda dop,usd;private CuentaDineroResolver.CuentaResuelta origenDop,destinoDop,destinoUsd;

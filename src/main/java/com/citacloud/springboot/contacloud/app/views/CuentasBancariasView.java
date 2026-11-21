@@ -34,6 +34,7 @@ public class CuentasBancariasView extends VerticalLayout
 
     private final BankAccountService service;
     private final EmpresaModuloService modulos;
+    private final com.citacloud.springboot.contacloud.app.services.CuentaFinancieraContableService cuentasContables;
     private final TextField buscar = new TextField();
     private final ComboBox<CuentaBancariaCatalogosDto.MonedaOpcion> moneda = new ComboBox<>("Moneda");
     private final Select<String> estado = new Select<>();
@@ -44,9 +45,11 @@ public class CuentasBancariasView extends VerticalLayout
     private Dialog formularioAbierto;
     private EstadoFormulario cambiosFormulario;
 
-    public CuentasBancariasView(BankAccountService service, EmpresaModuloService modulos) {
+    public CuentasBancariasView(BankAccountService service, EmpresaModuloService modulos,
+                               com.citacloud.springboot.contacloud.app.services.CuentaFinancieraContableService cuentasContables) {
         this.service = service;
         this.modulos = modulos;
+        this.cuentasContables=cuentasContables;
         addClassName("cc-page");
         setPadding(false);
         setSpacing(false);
@@ -282,6 +285,9 @@ public class CuentasBancariasView extends VerticalLayout
         try {
             CuentaBancariaDto item = service.obtener(id);
             Dialog dialog = dialog("CUENTA BANCARIA");
+            if(item.activa()&&puede("cuentas_bancarias.editar")&&(puede("configuracion_contable.editar")||puede("CONFIGURACION_CONTABLE_EDITAR")))dialog.getFooter().add(
+                CuentaFinancieraContableEditor.boton(cuentasContables,
+                    com.citacloud.springboot.contacloud.app.models.TipoCuentaDinero.BANK_ACCOUNT,id));
             dialog.add(new AppDetailSection("Información")
                 .field("Banco", item.banco())
                 .field("Nombre de cuenta", item.nombre())

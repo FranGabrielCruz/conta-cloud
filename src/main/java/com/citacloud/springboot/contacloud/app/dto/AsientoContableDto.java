@@ -47,9 +47,12 @@ public final class AsientoContableDto {
     }
     public record Entrada(LocalDate fecha,Tipo tipo,UUID moneda,String concepto,String referencia,String observacion,List<Movimiento> lineas) {}
     public record Fuente(Origen origen,String tipo,UUID id,String numero,String evento) {}
-    public record LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito,UUID centroCostoId) {
+    public record LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito,UUID centroCostoId,UUID cuentaId) {
+        public LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito,UUID centroCostoId) {
+            this(clave,descripcion,debito,credito,centroCostoId,null);
+        }
         public LineaConfigurada(String clave,String descripcion,BigDecimal debito,BigDecimal credito) {
-            this(clave,descripcion,debito,credito,null);
+            this(clave,descripcion,debito,credito,null,null);
         }
     }
     public record Filtro(LocalDate desde,LocalDate hasta,Tipo tipo,Estado estado,Origen origen,String buscar) {}

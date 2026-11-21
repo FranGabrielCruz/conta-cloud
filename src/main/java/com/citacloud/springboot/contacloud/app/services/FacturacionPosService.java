@@ -34,6 +34,9 @@ public class FacturacionPosService {
     private final AuditoriaService auditoria; private final VentaGuardadaService ventasGuardadas;private final DescuentoVentaService descuentos;private final RecargoVentaService recargos; private final JdbcTemplate jdbc;private final IdempotentOperationService idempotency;private final CobroClienteRepository cuentasCobrar;
     @Autowired private CotizacionRepository cotizaciones;
     @Autowired private FacturaPosDocumentoService documentosPos;
+    @Autowired private ContabilizacionOperativaService contabilidad;
+    private final ContabilizacionTesoreriaService contabilidadCobros;
+    private final InventarioEventoContableService contabilidadInventario;
 
     public FacturacionPosService(TerminalPosRepository terminales,CashRegisterRepository cajas,
             CashRegisterSessionRepository sesiones,SucursalRepository sucursales,PosWarehouseResolver almacenesPos,
@@ -41,11 +44,13 @@ public class FacturacionPosService {
             FacturaVentaRepository facturas,LineaFacturaVentaRepository lineas,PagoVentaRepository pagos,
             MetodoPagoVentaRepository metodosPago,AplicacionPagoVentaRepository aplicacionesPago,BankAccountRepository cuentasBancarias,
             FinancialMovementRepository movimientos,InventoryMovementService inventario,AuditoriaService auditoria,
-            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc,IdempotentOperationService idempotency,CobroClienteRepository cuentasCobrar){
+            VentaGuardadaService ventasGuardadas,DescuentoVentaService descuentos,RecargoVentaService recargos,JdbcTemplate jdbc,IdempotentOperationService idempotency,CobroClienteRepository cuentasCobrar,
+            ContabilizacionTesoreriaService contabilidadCobros,InventarioEventoContableService contabilidadInventario){
         this.terminales=terminales;this.cajas=cajas;this.sesiones=sesiones;this.sucursales=sucursales;this.almacenesPos=almacenesPos;
         this.productos=productos;this.clientes=clientes;this.existencias=existencias;this.facturas=facturas;this.lineas=lineas;
         this.pagos=pagos;this.metodosPago=metodosPago;this.aplicacionesPago=aplicacionesPago;this.cuentasBancarias=cuentasBancarias;
         this.movimientos=movimientos;this.inventario=inventario;this.auditoria=auditoria;this.ventasGuardadas=ventasGuardadas;this.descuentos=descuentos;this.recargos=recargos;this.jdbc=jdbc;this.idempotency=idempotency;this.cuentasCobrar=cuentasCobrar;
+        this.contabilidadCobros=contabilidadCobros;this.contabilidadInventario=contabilidadInventario;
     }
 
     @Transactional(readOnly=true)
@@ -316,6 +321,9 @@ public class FacturacionPosService {
                 String recibo="REC-"+String.format(Locale.ROOT,"%06d",cuentasCobrar.siguienteNumero(p.tenantId(),empresa));
                 UUID reciboId=cuentasCobrar.insertarReciboVentaPos(factura,ctx.caja.getSucursal().getNombre(),recibo);
                 cuentasCobrar.conservarImpresionVentaPos(reciboId,p.tenantId(),empresa,ctx.caja.getId());
+                contabilidadCobros.cobro(reciboId,recibo,factura.getFecha(),factura.getMonedaId(),aplicado,aplicado,cobros.stream()
+                    .map(c->new EventoContable.RecursoImporte(c.metodo.isCash()?TipoCuentaDinero.CASH_REGISTER:TipoCuentaDinero.BANK_ACCOUNT,
+                        c.metodo.isCash()?ctx.caja.getId():c.cuenta==null?null:c.cuenta.getId(),c.monto)).toList());
                 auditoria.registrar("CUSTOMER_RECEIPT_CONFIRMED","CobroCliente",reciboId,
                     "{\"numero\":\""+recibo+"\",\"facturaId\":\""+factura.getId()+"\"}");
             }
@@ -329,6 +337,8 @@ public class FacturacionPosService {
         if(cotizacionOrigen!=null&&calculos.stream().anyMatch(c->c.cotizacionLineaOrigenId!=null))
             registrarConversionCotizacion(cotizacionOrigen,factura,calculos,p.usuarioId());
         ventasGuardadas.completarDesdeFactura(input.ventaGuardadaId(),factura.getId(),p.usuarioId(),ctx.terminal.getId(),p.tenantId(),empresa);
+        contabilidad.factura(factura);
+        contabilidadInventario.costoVenta(factura,lineas.findAllByFacturaIdAndTenantIdAndEmpresaIdOrderByOrden(factura.getId(),p.tenantId(),empresa));
         idempotency.complete(p.tenantId(),empresa,operation,input.idempotencia(),"FacturaVenta",factura.getId());
         return resultado(factura);
     }

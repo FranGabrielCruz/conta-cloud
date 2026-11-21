@@ -161,9 +161,9 @@ public class CuentaContableRepository {
     public void crear(TenantPrincipal p, UUID id, UUID solicitud, Entrada e, String codigo, Clasificacion clasificacion) {
         jdbc.update("""
             INSERT INTO cuenta_contable(id,tenant_id,empresa_id,padre_id,codigo,nombre,tipo,clasificacion,naturaleza,
-                descripcion,solicitud_id,creado_por,uso_centro_costo)
+                descripcion,solicitud_id,creado_por,uso_centro_costo,permite_resultado_ejercicio)
             VALUES(:id,:tenant,:empresa,:padre,:codigo,:nombre,:tipo,:clasificacion,:naturaleza,:descripcion,:solicitud,:usuario,
-                coalesce(:uso,'OPCIONAL'))
+                coalesce(:uso,'OPCIONAL'),coalesce(:resultado,false))
             """, datos(p,id,e,codigo,clasificacion).addValue("solicitud",solicitud).addValue("usuario",p.usuarioId()));
     }
 
@@ -171,7 +171,9 @@ public class CuentaContableRepository {
         jdbc.update("""
             UPDATE cuenta_contable c SET padre_id=:padre,codigo=:codigo,nombre=:nombre,tipo=:tipo,
                 clasificacion=:clasificacion,naturaleza=:naturaleza,descripcion=:descripcion,version=version+1,
-                uso_centro_costo=coalesce(:uso,CASE WHEN c.tipo<>:tipo THEN 'OPCIONAL' ELSE c.uso_centro_costo END)
+                uso_centro_costo=coalesce(:uso,CASE WHEN c.tipo<>:tipo THEN 'OPCIONAL' ELSE c.uso_centro_costo END),
+                permite_resultado_ejercicio=CASE WHEN :tipo='MOVIMIENTO' AND :clasificacion='PATRIMONIO'
+                    THEN coalesce(:resultado,c.permite_resultado_ejercicio) ELSE false END
             WHERE c.id=:id AND
             """ + AMBITO, datos(p,id,e,codigo,clasificacion));
     }
@@ -214,7 +216,7 @@ public class CuentaContableRepository {
             Naturaleza.valueOf(r.getString("naturaleza")), r.getBoolean("activo"), r.getString("descripcion"),
             r.getLong("version"), r.getBoolean("hijos"), r.getBoolean("estructural"),
             "MOVIMIENTO".equals(r.getString("tipo"))?com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.valueOf(r.getString("uso_centro_costo"))
-                :com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.NO_PERMITIDO);
+                :com.citacloud.springboot.contacloud.app.dto.CentroCostoDto.Uso.NO_PERMITIDO,r.getBoolean("permite_resultado_ejercicio"));
     }
 
     private static String cte(Filtro f) { return f.restringido() ? FILTRADAS : ""; }
@@ -237,6 +239,7 @@ public class CuentaContableRepository {
         return ambito(p).addValue("id", id).addValue("padre", e.padre()).addValue("codigo", codigo)
             .addValue("nombre", e.nombre()).addValue("tipo", e.tipo().name()).addValue("clasificacion", clasificacion.name())
             .addValue("naturaleza", e.naturaleza().name()).addValue("descripcion", e.descripcion())
-            .addValue("uso",e.tipo()==Tipo.AGRUPADORA?"NO_PERMITIDO":e.usoCentroCosto()==null?null:e.usoCentroCosto().name());
+            .addValue("uso",e.tipo()==Tipo.AGRUPADORA?"NO_PERMITIDO":e.usoCentroCosto()==null?null:e.usoCentroCosto().name())
+            .addValue("resultado",e.permiteResultadoEjercicio(),java.sql.Types.BOOLEAN);
     }
 }

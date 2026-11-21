@@ -33,6 +33,7 @@ import java.util.UUID;
 public class CajasView extends VerticalLayout implements BeforeEnterObserver, BeforeLeaveObserver {
     private final CashRegisterService service;
     private final EmpresaModuloService modulos;
+    private final com.citacloud.springboot.contacloud.app.services.CuentaFinancieraContableService cuentasContables;
     private final TextField buscar = new TextField("Buscar caja");
     private final ComboBox<CajaCatalogosDto.SucursalOpcion> sucursal = new ComboBox<>("Sucursal");
     private final Select<String> estado = new Select<>();
@@ -43,9 +44,11 @@ public class CajasView extends VerticalLayout implements BeforeEnterObserver, Be
     private Dialog formularioAbierto;
     private EstadoFormulario cambiosFormulario;
 
-    public CajasView(CashRegisterService service, EmpresaModuloService modulos) {
+    public CajasView(CashRegisterService service, EmpresaModuloService modulos,
+                     com.citacloud.springboot.contacloud.app.services.CuentaFinancieraContableService cuentasContables) {
         this.service = service;
         this.modulos = modulos;
+        this.cuentasContables=cuentasContables;
         addClassName("cc-page");
         setPadding(false);
         setSpacing(false);
@@ -259,6 +262,9 @@ public class CajasView extends VerticalLayout implements BeforeEnterObserver, Be
         try {
             CajaDto item = service.obtener(id);
             Dialog dialog = dialog("CAJA");
+            if(item.activa()&&puede("cajas.editar")&&(puede("configuracion_contable.editar")||puede("CONFIGURACION_CONTABLE_EDITAR")))dialog.getFooter().add(
+                CuentaFinancieraContableEditor.boton(cuentasContables,
+                    com.citacloud.springboot.contacloud.app.models.TipoCuentaDinero.CASH_REGISTER,id));
             dialog.add(new AppDetailSection("Información")
                 .field("Nombre", item.nombre())
                 .field("Sucursal", item.sucursalNombre())

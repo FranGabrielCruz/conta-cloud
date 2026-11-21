@@ -6,6 +6,7 @@ public enum ActionType {
     NEW("Nuevo registro", VaadinIcon.PLUS, "new"),
     SAVE("Guardar", VaadinIcon.DISC, "save"),
     EDIT("Editar", VaadinIcon.PENCIL, "edit"),
+    CONFIGURE("Configurar cuentas", VaadinIcon.COG, "neutral"),
     VIEW("Ver", VaadinIcon.EYE, "view"),
     CANCEL("Cancelar", VaadinIcon.CLOSE, "neutral"),
     CLOSE("Cerrar", VaadinIcon.CLOSE, "neutral"),
@@ -39,7 +40,7 @@ public enum ActionType {
     COUNT("Realizar conteo", VaadinIcon.CHECK_SQUARE_O, "success"),
     APPLY_CREDIT("Aplicar crédito", VaadinIcon.CHECK_CIRCLE, "success"),
     CLOSE_PERIOD("Cerrar período", VaadinIcon.LOCK, "danger"),
-    REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "success");
+    REOPEN_PERIOD("Reabrir período", VaadinIcon.UNLOCK, "warning");
 
     private final String defaultLabel;
     private final VaadinIcon icon;

@@ -41,14 +41,16 @@ public class AsientoContableService {
     private final EmpresaRepository empresas;
     private final DatosEmpresaRepository datos;
     private final AuditoriaService auditoria;
+    private final ConfiguracionMotorService configuracion;
 
     public AsientoContableService(AsientoContableRepository repo,CuentaContableRepository catalogo,EmpresaRepository empresas,
-                                 DatosEmpresaRepository datos,AuditoriaService auditoria) {
+                                 DatosEmpresaRepository datos,AuditoriaService auditoria,ConfiguracionMotorService configuracion) {
         this.repo=repo;
         this.catalogo=catalogo;
         this.empresas=empresas;
         this.datos=datos;
         this.auditoria=auditoria;
+        this.configuracion=configuracion;
     }
 
     @PreAuthorize(VER)
@@ -151,27 +153,81 @@ public class AsientoContableService {
     }
 
     // Punto de entrada para módulos con su propia autorización y transacción de negocio.
+    @PreAuthorize(VER)
+    public Optional<UUID> consultarAutomatico(Fuente fuente) {
+        return repo.porFuente(principal(),validarFuente(fuente));
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public Optional<UUID> automaticoExistente(Fuente fuente) {
+        var p=principal();catalogo.bloquearEmpresa(p);
+        return repo.porFuente(p,validarFuente(fuente));
+    }
+
     @Transactional(propagation=Propagation.MANDATORY)
     public UUID registrarAutomatico(Fuente origen,LocalDate fecha,UUID moneda,String concepto,List<LineaConfigurada> lineas) {
+        return registrarAutomatico(origen,fecha,moneda,concepto,lineas,0,com.citacloud.springboot.contacloud.app.errors.TraceContext.currentOrCreate());
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public UUID registrarAutomatico(Fuente origen,LocalDate fecha,UUID moneda,String concepto,List<LineaConfigurada> lineas,long version,String traceId) {
+        return registrarAutomatico(origen,fecha,moneda,concepto,lineas,version,traceId,null);
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public UUID registrarAutomatico(Fuente origen,LocalDate fecha,UUID moneda,String concepto,List<LineaConfigurada> lineas,long version,String traceId,String datos) {
         var p=principal();
         var fuente=validarFuente(origen);
         catalogo.bloquearEmpresa(p);
         var existente=repo.porFuente(p,fuente);
         if(existente.isPresent()) return existente.get();
-        if(lineas==null || lineas.stream().anyMatch(l->l==null || l.clave()==null || l.clave().isBlank()))
+        if(!configuracion.efectivo(com.citacloud.springboot.contacloud.app.dto.ConfiguracionMotorDto.Modulo.valueOf(fuente.origen().name())))
+            return null;
+        if(lineas==null || lineas.stream().anyMatch(l->l==null || (l.cuentaId()==null)==(l.clave()==null || l.clave().isBlank())))
             throw new ReglaNegocioException("Indica las claves contables de los movimientos.");
-        var cuentas=repo.claves(p,lineas.stream().map(LineaConfigurada::clave).collect(Collectors.toSet()));
+        var cuentas=repo.claves(p,lineas.stream().map(LineaConfigurada::clave).filter(Objects::nonNull).collect(Collectors.toSet()));
+        configuracion.validarFunciones(lineas.stream().map(LineaConfigurada::clave).filter(Objects::nonNull).collect(Collectors.toSet()));
+        for(var l:lineas) if(l.clave()!=null && !cuentas.containsKey(l.clave()))
+            throw new ReglaNegocioException(com.citacloud.springboot.contacloud.app.errors.ErrorCode.ACCOUNTING_MISSING_CONFIGURATION,
+                "Falta configurar la cuenta de «"+FuncionesContables.funcion(l.clave()).nombre()+"» requerida por esta operación.");
         var e=normalizar(new Entrada(fecha,Tipo.AUTOMATICO,moneda,concepto,fuente.numero(),null,
-            lineas.stream().map(l->new Movimiento(cuentas.get(l.clave()),l.descripcion(),l.debito(),l.credito(),l.centroCostoId())).toList()));
+            lineas.stream().map(l->new Movimiento(l.cuentaId()==null?cuentas.get(l.clave()):l.cuentaId(),l.descripcion(),l.debito(),l.credito(),l.centroCostoId())).toList()));
         periodo(p,e.fecha());
-        var base=validarMoneda(p,e.moneda());
+        var base=monedaBase(p);var monedaOrigen=e.moneda();var tasa=BigDecimal.ONE;
+        if(!base.id().equals(monedaOrigen)) {
+            if(!repo.monedaActiva(p,monedaOrigen))throw new ReglaNegocioException("La moneda de la operación no está activa en esta empresa.");
+            tasa=repo.tasaExacta(p,monedaOrigen,base.id(),e.fecha()).orElseThrow(()->new ReglaNegocioException("No existe una tasa de cambio disponible para la fecha y moneda de la operación."));
+            partidaDoble(e.lineas());
+            e=new Entrada(e.fecha(),e.tipo(),base.id(),e.concepto(),e.referencia(),e.observacion(),ConversionContable.convertir(e.lineas(),tasa));
+        }
         var renglones=validarLineas(p,e.lineas(),ValidacionLinea.CONTABILIZACION);
         partidaDoble(e.lineas());
         var clave=UUID.randomUUID();
         var id=insertar(p,e,base,renglones,fuente,null,null,clave);
+        repo.registrarEvento(p,id,version,traceId,datos);
+        repo.registrarConversion(p,id,monedaOrigen,tasa);
         repo.contabilizar(p,id,clave,emisor(p));
         auditar(p,"CONTABILIZAR_AUTOMATICO",detalle(p,id),null);
         return id;
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public UUID reversarAutomatico(Fuente fuente,LocalDate fecha,String motivo) {
+        var p=principal();catalogo.bloquearEmpresa(p);
+        var id=repo.porFuente(p,validarFuente(fuente));
+        if(id.isEmpty())return null;
+        var original=detalle(p,id.get());
+        if(original.fila().estado()==Estado.REVERSADO)return repo.reversa(p,id.get()).orElseThrow();
+        if(original.fila().tipo()!=Tipo.AUTOMATICO || original.fila().estado()!=Estado.CONTABILIZADO)
+            throw new ReglaNegocioException("El asiento de origen no admite esta anulación.");
+        if(fecha==null||fecha.isBefore(original.fila().fecha()))throw new ReglaNegocioException("La fecha de reversión no es válida.");
+        periodo(p,fecha);
+        var e=new Entrada(fecha,Tipo.REVERSION,original.moneda().id(),"Anulación de "+original.fila().numero(),
+            fuente.numero(),null,movimientos(original,true));
+        var lineas=validarLineas(p,e.lineas(),ValidacionLinea.REVERSION);partidaDoble(e.lineas());
+        var solicitud=UUID.randomUUID();
+        var reversa=insertar(p,e,original.moneda(),lineas,null,id.get(),requerido(motivo,1000,"Indica el motivo de anulación."),solicitud);
+        repo.origenSistema(p,reversa);repo.contabilizar(p,reversa,solicitud,emisor(p));repo.marcarReversado(p,id.get());
+        auditar(p,"REVERSAR_AUTOMATICO",detalle(p,reversa),id.get());return reversa;
     }
 
     @PreAuthorize(VER+" and hasAuthority('asientos.pdf')")
@@ -222,7 +278,37 @@ public class AsientoContableService {
         auditar(p,"CONTABILIZAR",detalle(p,d.fila().id()),null);
     }
 
-    private enum ValidacionLinea { BORRADOR, CONTABILIZACION, REVERSION }
+    private enum ValidacionLinea { BORRADOR, CONTABILIZACION, REVERSION, CIERRE_TECNICO }
+
+    // El proceso de cierre ya tomó el bloqueo de empresa y conserva la transacción.
+    UUID registrarCierre(TenantPrincipal p,LocalDate fecha,Moneda moneda,List<Movimiento> movimientos,UUID clave) {
+        periodo(p,fecha);
+        validarMoneda(p,moneda.id());
+        partidaDoble(movimientos);
+        var e=new Entrada(fecha,Tipo.CIERRE,moneda.id(),"Cierre del ejercicio",null,null,movimientos);
+        var id=insertar(p,e,moneda,validarLineas(p,movimientos,ValidacionLinea.CIERRE_TECNICO),null,null,null,clave);
+        repo.origenSistema(p,id);
+        repo.contabilizar(p,id,clave,emisor(p));
+        auditar(p,"CONTABILIZAR_CIERRE",detalle(p,id),null);
+        return id;
+    }
+
+    UUID revertirCierre(TenantPrincipal p,UUID id,LocalDate fecha,String motivo,UUID clave) {
+        var original=detalle(p,id);
+        if(original.fila().tipo()!=Tipo.CIERRE||original.fila().origen()!=Origen.SISTEMA
+                ||original.fila().estado()!=Estado.CONTABILIZADO||!original.fila().fecha().equals(fecha))
+            throw new ReglaNegocioException("El asiento de cierre no admite una reapertura.");
+        var movimientos=movimientos(original,true);
+        partidaDoble(movimientos);
+        var e=new Entrada(fecha,Tipo.REVERSION,original.moneda().id(),"Reapertura del ejercicio",
+            original.fila().numero(),null,movimientos);
+        var reversa=insertar(p,e,original.moneda(),validarLineas(p,movimientos,ValidacionLinea.CIERRE_TECNICO),null,id,motivo,clave);
+        repo.origenSistema(p,reversa);
+        repo.contabilizar(p,reversa,clave,emisor(p));
+        repo.marcarReversado(p,id);
+        auditar(p,"REVERSAR_CIERRE",detalle(p,reversa),id);
+        return reversa;
+    }
 
     private List<Linea> validarLineas(TenantPrincipal p,List<Movimiento> movimientos,ValidacionLinea validacion) {
         if(movimientos.stream().anyMatch(l->l.cuenta()==null)) throw new ReglaNegocioException("Selecciona una cuenta de movimiento válida en cada línea.");
@@ -231,12 +317,12 @@ public class AsientoContableService {
         var centros=ids.isEmpty()?Map.<UUID,CentroCostoDto.Referencia>of():repo.centros(p,ids);
         return movimientos.stream().map(l->{
             var c=cuentas.get(l.cuenta());
-            if(c==null||!c.activa()||!c.movimiento())
+            if(c==null||!c.movimiento()||!c.activa()&&validacion!=ValidacionLinea.CIERRE_TECNICO)
                 throw new ReglaNegocioException("Cada línea debe utilizar una cuenta de movimiento activa de la empresa.");
             var centro=l.centroCostoId()==null?null:centros.get(l.centroCostoId());
             if(l.centroCostoId()!=null&&centro==null)
                 throw new ReglaNegocioException("Selecciona un centro de costos de la empresa.");
-            if(validacion!=ValidacionLinea.REVERSION&&centro!=null
+            if(validacion!=ValidacionLinea.REVERSION&&validacion!=ValidacionLinea.CIERRE_TECNICO&&centro!=null
                     &&(!centro.activo()||c.usoCentroCosto()==CentroCostoDto.Uso.NO_PERMITIDO))
                 throw new ReglaNegocioException("La cuenta "+c.codigo()+" requiere una imputación de centro válida y activa, si la admite.");
             if(validacion==ValidacionLinea.CONTABILIZACION&&centro==null&&c.usoCentroCosto()==CentroCostoDto.Uso.OBLIGATORIO)
@@ -305,7 +391,7 @@ public class AsientoContableService {
     }
 
     private void periodo(TenantPrincipal p,LocalDate fecha) {
-        if(!repo.periodoAbierto(p,fecha)) throw new ReglaNegocioException("La fecha debe pertenecer a un período fiscal abierto.");
+        if(!repo.periodoAbierto(p,fecha)) throw new ReglaNegocioException(com.citacloud.springboot.contacloud.app.errors.ErrorCode.ACCOUNTING_PERIOD_CLOSED,"La fecha debe pertenecer a un período fiscal abierto.");
     }
 
     private Moneda validarMoneda(TenantPrincipal p,UUID id) {

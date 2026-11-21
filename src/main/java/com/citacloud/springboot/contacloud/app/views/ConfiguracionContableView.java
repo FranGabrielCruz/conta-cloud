@@ -1,451 +1,198 @@
 package com.citacloud.springboot.contacloud.app.views;
 
-import com.citacloud.springboot.contacloud.app.dto.*;
+import com.citacloud.springboot.contacloud.app.dto.ConfiguracionMotorDto.*;
 import com.citacloud.springboot.contacloud.app.security.TenantContext;
 import com.citacloud.springboot.contacloud.app.services.*;
 import com.citacloud.springboot.contacloud.app.views.components.*;
-import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
-import com.vaadin.flow.component.datepicker.DatePicker;
-import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.html.Paragraph;
-import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.tabs.Tab;
-import com.vaadin.flow.component.tabs.Tabs;
-import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.component.tabs.*;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.router.*;
 import jakarta.annotation.security.PermitAll;
-
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-@Route(value = "configuracion-contable", layout = MainLayout.class)
-@RouteAlias(value = "periodos-fiscales", layout = MainLayout.class)
+/** La vista presenta los estados que calcula el backend, incluida la evaluación de cambios pendientes. */
+@Route(value="configuracion-contable",layout=MainLayout.class)
 @PageTitle("Configuración contable | ContaCloud")
 @PermitAll
-public class ConfiguracionContableView extends VerticalLayout implements BeforeEnterObserver, BeforeLeaveObserver {
-    private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private final ConfiguracionContableService configuracionService;
-    private final AccountingPeriodService periodosService;
-    private final EmpresaModuloService modulos;
-    private final boolean verGeneral = hasAny("configuracion_contable.ver", "CONFIGURACION_CONTABLE_VER");
-    private final boolean verPeriodos = hasAny("periodos_fiscales.ver", "PERIODO_VER");
-    private final Tab generalTab = new Tab("Configuración general");
-    private final Tab periodosTab = new Tab("Períodos fiscales");
-    private final Tabs tabs = new Tabs();
-    private final Div contenido = new Div();
-    private final PanelGeneral general = new PanelGeneral();
-    private final PanelPeriodos periodos = new PanelPeriodos();
-    private boolean cambiandoTab;
+public class ConfiguracionContableView extends VerticalLayout implements BeforeEnterObserver,BeforeLeaveObserver {
+ private final ConfiguracionMotorService servicio;
+ private final EmpresaModuloService modulos;
+ private final Div cuentas=new Div(),automatizacion=new Div(),aviso=new Div(),resumen=new Div();
+ private final Checkbox maestro=new Checkbox("Contabilización automática");
+ private final Tab cuentasTab=new Tab("Cuentas contables"),autoTab=new Tab("Automatización");
+ private final Tabs tabs=new Tabs(cuentasTab,autoTab),modulosTabs=new Tabs();
+ private final Map<Modulo,Tab> pestanasModulo=new EnumMap<>(Modulo.class);
+ private final Map<String,UUID> valores=new HashMap<>();
+ private final Map<String,List<ComboBox<Cuenta>>> selectores=new HashMap<>();
+ private final Map<Modulo,Checkbox> switches=new EnumMap<>(Modulo.class);
+ private final Map<Modulo,Div> estadosModulo=new EnumMap<>(Modulo.class);
+ private final Map<Modulo,Div> indicadoresCuenta=new EnumMap<>(Modulo.class);
+ private final Map<Modulo,AppActionButton> configurar=new EnumMap<>(Modulo.class);
+ private Estado actual,evaluacion;
+ private boolean cargando,dirty,cambiandoTab;
+ private final boolean editar=permiso("configuracion_contable.editar","CONFIGURACION_CONTABLE_EDITAR");
+ private final boolean editarAuto=permiso("configuracion_contable.automatizacion");
 
-    public ConfiguracionContableView(ConfiguracionContableService configuracionService,
-                                     AccountingPeriodService periodosService,
-                                     EmpresaModuloService modulos) {
-        this.configuracionService = configuracionService;
-        this.periodosService = periodosService;
-        this.modulos = modulos;
-        addClassName("cc-page");
-        setPadding(false);
-        setSpacing(false);
-        setWidthFull();
-        add(new AppPageHeader("CONFIGURACIÓN CONTABLE",
-            "Administra los parámetros y períodos contables de la empresa."));
-        if (verGeneral) tabs.add(generalTab);
-        if (verPeriodos) tabs.add(periodosTab);
-        tabs.addClassName("cc-infrastructure-tabs");
-        contenido.addClassName("cc-tab-content");
-        add(tabs, contenido);
-        tabs.addSelectedChangeListener(event -> {
-            if (!event.isFromClient() || cambiandoTab) return;
-            Tab destino = event.getSelectedTab();
-            Tab anterior = event.getPreviousTab();
-            if (anterior == generalTab && general.dirty) {
-                cambiandoTab = true;
-                tabs.setSelectedTab(anterior);
-                cambiandoTab = false;
-                confirmarDescartar(() -> mostrar(destino, true));
-            } else mostrar(destino, true);
-        });
-    }
-
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        if (!modulos.habilitado("CONFIGURACION_CONTABLE") || (!verGeneral && !verPeriodos)) {
-            Notification.show("No tienes permiso para acceder a esta opción.");
-            event.rerouteTo(DashboardView.class);
-            return;
-        }
-        String path = event.getLocation().getPath();
-        String requested = "periodos-fiscales".equals(path) ? "periodos"
-            : event.getLocation().getQueryParameters().getParameters()
-                .getOrDefault("tab", List.of("general")).stream().findFirst().orElse("general");
-        Tab selected = "periodos".equalsIgnoreCase(requested) && verPeriodos ? periodosTab
-            : verGeneral ? generalTab : periodosTab;
-        mostrar(selected, !"configuracion-contable".equals(path));
-    }
-
-    @Override
-    public void beforeLeave(BeforeLeaveEvent event) {
-        if (!general.dirty) return;
-        BeforeLeaveEvent.ContinueNavigationAction action = event.postpone();
-        ConfirmDialog confirm = new ConfirmDialog();
-        confirm.setHeader("Cambios sin guardar");
-        confirm.setText("Hay cambios sin guardar. ¿Deseas descartarlos y salir?");
-        confirm.setCancelable(true);
-        confirm.setCancelText("Continuar editando");
-        confirm.setConfirmText("Descartar cambios");
-        confirm.setConfirmButtonTheme("error primary");
-        confirm.addConfirmListener(confirmEvent -> {
-            general.dirty = false;
-            action.proceed();
-        });
-        confirm.open();
-    }
-
-    private void mostrar(Tab tab, boolean canonicalizar) {
-        cambiandoTab = true;
-        tabs.setSelectedTab(tab);
-        cambiandoTab = false;
-        contenido.removeAll();
-        if (tab == generalTab) {
-            contenido.add(general);
-            general.cargar();
-        } else {
-            contenido.add(periodos);
-            periodos.cargar();
-        }
-        if (canonicalizar || UI.getCurrent() != null) {
-            UI.getCurrent().getPage().getHistory().replaceState(null,
-                "configuracion-contable?tab=" + (tab == generalTab ? "general" : "periodos"));
-        }
-    }
-
-    private void confirmarDescartar(Runnable continuar) {
-        ConfirmDialog confirm = new ConfirmDialog();
-        confirm.setHeader("Cambios sin guardar");
-        confirm.setText("Hay cambios sin guardar. ¿Deseas descartarlos y continuar?");
-        confirm.setCancelable(true);
-        confirm.setCancelText("Cancelar");
-        confirm.setConfirmText("Descartar cambios");
-        confirm.setConfirmButtonTheme("error primary");
-        confirm.addConfirmListener(event -> { general.dirty = false; continuar.run(); });
-        confirm.open();
-    }
-
-    private final class PanelGeneral extends VerticalLayout {
-        private final Select<String> metodo = new Select<>();
-        private final Checkbox automatica = new Checkbox("Contabilización automática");
-        private final Checkbox periodosCerrados = new Checkbox("Permitir contabilización en períodos cerrados");
-        private boolean cargado;
-        private boolean cargando;
-        private boolean dirty;
-
-        PanelGeneral() {
-            setPadding(false);
-            setSpacing(true);
-            setWidthFull();
-            metodo.setLabel("Método contable");
-            metodo.setItems("DEVENGADO");
-            metodo.setItemLabelGenerator(value -> "DEVENGADO".equals(value) ? "Devengado" : value);
-            metodo.setRequiredIndicatorVisible(true);
-            metodo.setHelperText("El método efectivo se habilitará cuando exista soporte en el motor contable.");
-            automatica.setHelperText("Prepara la generación automática para los módulos que se integren posteriormente.");
-            periodosCerrados.setValue(false);
-            periodosCerrados.setReadOnly(true);
-            periodosCerrados.setHelperText("Por seguridad, las contabilizaciones en períodos cerrados están bloqueadas.");
-
-            metodo.addValueChangeListener(event -> marcarDirty(event.isFromClient()));
-            automatica.addValueChangeListener(event -> marcarDirty(event.isFromClient()));
-            periodosCerrados.addValueChangeListener(event -> marcarDirty(event.isFromClient()));
-
-            Div parametros = seccion("PARÁMETROS GENERALES",
-                "Define el comportamiento contable básico de la empresa.", metodo, periodosCerrados);
-            Div asientos = seccion("CONFIGURACIÓN DE ASIENTOS",
-                "Estos parámetros serán consumidos por las futuras integraciones contables.", automatica);
-            Div cuentas = seccion("CUENTAS POR DEFECTO",
-                "Las integraciones contables utilizarán las cuentas configuradas en el catálogo.");
-            add(parametros, cuentas, asientos);
-            if (hasAny("configuracion_contable.editar", "CONFIGURACION_CONTABLE_EDITAR")) {
-                add(new HorizontalLayout(new AppActionButton(ActionType.SAVE, ButtonSize.MAIN, "Guardar", event -> guardar())));
-            } else {
-                metodo.setReadOnly(true);
-                automatica.setReadOnly(true);
-            }
-        }
-
-        void cargar() {
-            if (cargado) return;
-            cargado = true;
-            recargar();
-        }
-
-        void recargar() {
-            try {
-                cargando = true;
-                ConfiguracionContableDto dto = configuracionService.obtener();
-                metodo.setValue(dto.metodoContable());
-                automatica.setValue(dto.contabilizacionAutomatica());
-                periodosCerrados.setValue(dto.permitirPeriodosCerrados());
-                dirty = false;
-            } catch (RuntimeException ex) {
-                error(ex, "No fue posible cargar la configuración contable.");
-            } finally { cargando = false; }
-        }
-
-        void marcarDirty(boolean fromClient) { if (fromClient && !cargando) dirty = true; }
-
-        void guardar() {
-            try {
-                configuracionService.actualizar(new ConfiguracionContableInput(
-                    metodo.getValue(), automatica.getValue(), periodosCerrados.getValue()));
-                dirty = false;
-                Notification.show("Configuración contable actualizada correctamente.");
-            } catch (RuntimeException ex) {
-                error(ex, "No fue posible guardar la configuración contable.");
-            }
-        }
-    }
-
-    private final class PanelPeriodos extends VerticalLayout {
-        private final TextField buscar = new TextField();
-        private final ComboBox<Integer> anio = new ComboBox<>("Año");
-        private final ComboBox<String> estado = new ComboBox<>("Estado");
-        private final AppGrid<PeriodoFiscalDto> grid = new AppGrid<>(PeriodoFiscalDto.class);
-        private final AppPagination pagination;
-        private boolean cargado;
-
-        PanelPeriodos() {
-            setPadding(false);
-            setSpacing(true);
-            setWidthFull();
-            AppActionButton nuevo = hasAny("periodos_fiscales.crear", "PERIODO_CREAR")
-                ? new AppActionButton(ActionType.NEW, ButtonSize.MAIN, "Nuevo período fiscal", event -> editar(null)) : null;
-            add(new AppPageHeader("PERÍODOS FISCALES",
-                "Administra los períodos contables y controla su apertura y cierre.",
-                nuevo == null ? new Component[0] : new Component[]{nuevo}));
-            buscar.setPlaceholder("Buscar período...");
-            buscar.setClearButtonVisible(true);
-            buscar.setValueChangeMode(ValueChangeMode.LAZY);
-            anio.setPlaceholder("Todos");
-            anio.setClearButtonVisible(true);
-            estado.setItems("Todos", "Abiertos", "Cerrados");
-            estado.setValue("Todos");
-            HorizontalLayout filtros = new HorizontalLayout(buscar, anio, estado);
-            filtros.addClassName("cc-filter-bar");
-            filtros.setAlignItems(Alignment.END);
-
-            grid.addColumn(PeriodoFiscalDto::nombre).setHeader("Período").setAutoWidth(true).setFlexGrow(1);
-            grid.addColumn(item -> FECHA.format(item.fechaInicial())).setHeader("Fecha inicial").setAutoWidth(true);
-            grid.addColumn(item -> FECHA.format(item.fechaFinal())).setHeader("Fecha final").setAutoWidth(true);
-            grid.addComponentColumn(item -> badge(item.estado())).setHeader("Estado").setAutoWidth(true);
-            grid.addComponentColumn(this::acciones).setHeader("Acciones").setAutoWidth(true).setFlexGrow(0);
-            grid.setEmptyStateText("No hay períodos fiscales configurados.");
-            pagination = new AppPagination(request -> recargar());
-            buscar.addValueChangeListener(event -> { if (event.isFromClient()) reset(); });
-            anio.addValueChangeListener(event -> { if (event.isFromClient()) reset(); });
-            estado.addValueChangeListener(event -> { if (event.isFromClient()) reset(); });
-            add(filtros, grid, pagination);
-        }
-
-        Component acciones(PeriodoFiscalDto item) {
-            HorizontalLayout acciones = new HorizontalLayout();
-            acciones.addClassName("cc-grid-actions");
-            acciones.setPadding(false);
-            acciones.setSpacing(false);
-            acciones.add(new AppActionButton(ActionType.VIEW, ButtonSize.GRID_ACTION,
-                "Ver período fiscal", event -> detalle(item.id())));
-            if ("ABIERTO".equals(item.estado()) && hasAny("periodos_fiscales.editar", "PERIODO_EDITAR")) {
-                acciones.add(new AppActionButton(ActionType.EDIT, ButtonSize.GRID_ACTION,
-                    "Editar período fiscal", event -> editar(item)));
-            }
-            return acciones;
-        }
-
-        void cargar() { if (!cargado) { cargado = true; recargar(); } }
-
-        void recargar() {
-            try {
-                var request = pagination.currentRequest();
-                var page = periodosService.buscar(buscar.getValue(), anio.getValue(), estadoFiltro(),
-                    request.page(), request.size());
-                grid.setItems(page.getContent());
-                pagination.setTotal(page.getTotalElements());
-                List<Integer> disponibles = periodosService.listarAnios();
-                Integer seleccionado = anio.getValue();
-                anio.setItems(disponibles);
-                if (seleccionado != null && disponibles.contains(seleccionado)) anio.setValue(seleccionado);
-            } catch (RuntimeException ex) {
-                error(ex, "No fue posible cargar los períodos fiscales.");
-            }
-        }
-
-        void reset() { pagination.reset(); recargar(); }
-
-        String estadoFiltro() {
-            return switch (estado.getValue() == null ? "Todos" : estado.getValue()) {
-                case "Abiertos" -> "ABIERTO";
-                case "Cerrados" -> "CERRADO";
-                default -> null;
-            };
-        }
-
-        void editar(PeriodoFiscalDto item) {
-            boolean nuevo = item == null;
-            Dialog dialog = dialog(nuevo ? "Nuevo período fiscal" : "Editar período fiscal");
-            TextField nombre = new TextField("Nombre");
-            nombre.setRequired(true);
-            nombre.setMaxLength(120);
-            DatePicker inicio = fecha("Fecha inicial");
-            DatePicker fin = fecha("Fecha final");
-            Select<String> estadoInicial = new Select<>();
-            estadoInicial.setLabel("Estado inicial");
-            estadoInicial.setItems("ABIERTO");
-            estadoInicial.setItemLabelGenerator(value -> "Abierto");
-            estadoInicial.setValue("ABIERTO");
-            estadoInicial.setReadOnly(true);
-            if (!nuevo) {
-                nombre.setValue(item.nombre());
-                inicio.setValue(item.fechaInicial());
-                fin.setValue(item.fechaFinal());
-            }
-            dialog.add(form(nombre, estadoInicial, inicio, fin));
-            dialog.getFooter().add(new AppActionButton(ActionType.SAVE, ButtonSize.MAIN, "Guardar", event -> {
-                try {
-                    var input = new PeriodoFiscalInput(nombre.getValue(), inicio.getValue(), fin.getValue());
-                    if (nuevo) periodosService.crear(input); else periodosService.actualizar(item.id(), input);
-                    dialog.close();
-                    recargar();
-                    Notification.show(nuevo ? "Período fiscal creado correctamente."
-                        : "Período fiscal actualizado correctamente.");
-                } catch (RuntimeException ex) { error(ex, "No fue posible guardar el período fiscal."); }
-            }));
-            dialog.getFooter().add(new AppActionButton(ActionType.CANCEL, ButtonSize.MAIN,
-                "Cancelar", event -> dialog.close()));
-            dialog.open();
-        }
-
-        void detalle(UUID id) {
-            try {
-                PeriodoFiscalDto item = periodosService.obtener(id);
-                Dialog dialog = dialog("Detalle del período fiscal");
-                AppDetailSection detalle = new AppDetailSection("Información")
-                    .field("Nombre", item.nombre()).field("Estado", etiquetaEstado(item.estado()))
-                    .field("Fecha inicial", FECHA.format(item.fechaInicial()))
-                    .field("Fecha final", FECHA.format(item.fechaFinal()));
-                if (item.fechaCierre() != null) {
-                    detalle.field("Fecha de cierre", FECHA_HORA.format(item.fechaCierre()))
-                        .field("Cerrado por", referenciaUsuario(item.usuarioCierreId()));
-                }
-                dialog.add(detalle);
-                if ("ABIERTO".equals(item.estado()) && hasAny("periodos_fiscales.editar", "PERIODO_EDITAR")) {
-                    dialog.getFooter().add(new AppActionButton(ActionType.EDIT, ButtonSize.MAIN,
-                        "Editar período fiscal", event -> { dialog.close(); editar(item); }));
-                }
-                if ("ABIERTO".equals(item.estado()) && hasAny("periodos_fiscales.cerrar", "PERIODO_CERRAR")) {
-                    dialog.getFooter().add(new AppActionButton(ActionType.CLOSE_PERIOD, ButtonSize.MAIN,
-                        "Cerrar período", event -> confirmarCierre(item, dialog)));
-                }
-                if ("CERRADO".equals(item.estado()) && hasAny("periodos_fiscales.reabrir")) {
-                    dialog.getFooter().add(new AppActionButton(ActionType.REOPEN_PERIOD, ButtonSize.MAIN,
-                        "Reabrir período", event -> confirmarReapertura(item, dialog)));
-                }
-                dialog.getFooter().add(new AppActionButton(ActionType.CLOSE, ButtonSize.MAIN,
-                    "Cerrar", event -> dialog.close()));
-                dialog.open();
-            } catch (RuntimeException ex) { error(ex, "No fue posible consultar el período fiscal."); }
-        }
-
-        void confirmarCierre(PeriodoFiscalDto item, Dialog detail) {
-            confirmar("Cerrar período",
-                "El período dejará de aceptar nuevas contabilizaciones. ¿Deseas cerrar este período?",
-                "Confirmar cierre", () -> {
-                    periodosService.cerrar(item.id()); detail.close(); recargar();
-                    Notification.show("Período fiscal cerrado correctamente.");
-                }, "No fue posible cerrar el período fiscal.");
-        }
-
-        void confirmarReapertura(PeriodoFiscalDto item, Dialog detail) {
-            confirmar("Reabrir período",
-                "Este período volverá a permitir contabilizaciones. ¿Deseas reabrirlo?",
-                "Confirmar reapertura", () -> {
-                    periodosService.reabrir(item.id()); detail.close(); recargar();
-                    Notification.show("Período fiscal reabierto correctamente.");
-                }, "No fue posible reabrir el período fiscal.");
-        }
-    }
-
-    private static Div seccion(String titulo, String descripcion, Component... componentes) {
-        Div contenido = new Div(componentes);
-        contenido.addClassName("cc-accounting-section-grid");
-        Div section = new Div(new H3(titulo), new Paragraph(descripcion), contenido);
-        section.addClassName("cc-accounting-section");
-        return section;
-    }
-
-    private static Dialog dialog(String titulo) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle(titulo);
-        dialog.setWidth("min(760px, 96vw)");
-        return dialog;
-    }
-
-    private static Div form(Component... components) {
-        Div form = new Div(components);
-        form.addClassName("cc-dialog-form");
-        return form;
-    }
-
-    private static DatePicker fecha(String label) {
-        DatePicker field = new DatePicker(label);
-        field.setRequired(true);
-        field.setLocale(Locale.forLanguageTag("es-DO"));
-        return field;
-    }
-
-    private static Span badge(String estado) {
-        Span badge = new Span(etiquetaEstado(estado));
-        badge.getElement().getThemeList().add("badge " + ("ABIERTO".equals(estado) ? "success" : "contrast"));
-        return badge;
-    }
-
-    private static String etiquetaEstado(String estado) {
-        return "ABIERTO".equals(estado) ? "Abierto" : "CERRADO".equals(estado) ? "Cerrado" : "Bloqueado";
-    }
-
-    private static String referenciaUsuario(UUID id) { return id == null ? "No disponible" : "Usuario " + id; }
-
-    private static void confirmar(String titulo, String texto, String confirmar, Runnable accion, String fallback) {
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader(titulo);
-        dialog.setText(texto);
-        dialog.setCancelable(true);
-        dialog.setCancelText("Cancelar");
-        dialog.setConfirmText(confirmar);
-        dialog.setConfirmButtonTheme("error primary");
-        dialog.addConfirmListener(event -> {
-            try { accion.run(); }
-            catch (RuntimeException ex) { error(ex, fallback); }
-        });
-        dialog.open();
-    }
-
-    private static boolean hasAny(String... permisos) {
-        Set<String> actuales = TenantContext.principalActual().permisos();
-        return Arrays.stream(permisos).anyMatch(actuales::contains);
-    }
-
-    private static void error(RuntimeException ex, String fallback) {
-        com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex, fallback);
-    }
+ public ConfiguracionContableView(ConfiguracionMotorService servicio,EmpresaModuloService modulos) {
+  this.servicio=servicio;this.modulos=modulos;
+  setPadding(false);setSpacing(false);setWidthFull();addClassNames("cc-page","cc-motor-config");
+  add(new AppPageHeader("CONFIGURACIÓN CONTABLE","Define las cuentas y reglas utilizadas por el motor contable de la empresa."));
+  tabs.addClassName("cc-infrastructure-tabs");
+  cuentas.addClassName("cc-motor-panel");automatizacion.addClassName("cc-motor-panel");
+  crearCuentas();crearAutomatizacion();automatizacion.setVisible(false);
+  var contenido=new Div(cuentas,automatizacion);contenido.addClassName("cc-motor-content");
+  tabs.addSelectedChangeListener(e->{
+   if(cambiandoTab)return;
+   if(dirty&&e.isFromClient()) {
+    var destino=e.getSelectedTab();cambiandoTab=true;tabs.setSelectedTab(e.getPreviousTab());cambiandoTab=false;
+    confirmarDescartar(()->{cargar(actual);tabs.setSelectedTab(destino);});
+   } else {cuentas.setVisible(e.getSelectedTab()==cuentasTab);automatizacion.setVisible(e.getSelectedTab()==autoTab);}
+  });
+  add(tabs,contenido);
+ }
+ private Div encabezado(String titulo,String descripcion) {
+  var header=new Div(new H3(titulo),new Paragraph(descripcion));header.addClassName("cc-motor-tab-header");
+  if("AUTOMATIZACIÓN".equals(titulo)?editarAuto:editar)header.add(new AppActionButton(ActionType.SAVE,ButtonSize.MAIN,"Guardar",e->guardar()));
+  return header;
+ }
+ private void crearCuentas() {
+  cuentas.add(encabezado("CUENTAS CONTABLES","Define las cuentas utilizadas por el motor contable."));
+  modulosTabs.setWidthFull();Map<Tab,Div> panels=new LinkedHashMap<>();
+  for(var m:Modulo.values()) {
+   if(m==Modulo.FINANZAS)continue;
+   var tab=new Tab(m.etiqueta());modulosTabs.add(tab);pestanasModulo.put(m,tab);
+   var panel=new Div();panel.add(new H3(m.etiqueta()));var form=new Div();form.addClassName("cc-motor-fields");
+   for(var f:FuncionesContables.TODAS)if(f.modulos().contains(m)) {
+    var combo=new ComboBox<Cuenta>(f.nombre());combo.setWidthFull();combo.setClearButtonVisible(true);
+    combo.setItemLabelGenerator(Cuenta::etiqueta);combo.setRequiredIndicatorVisible(f.obligatoria().contains(m));combo.setReadOnly(!editar);
+    combo.setItems(q->servicio.buscar(f.clave(),q.getFilter().orElse(""),q.getOffset(),q.getLimit()).stream());
+    combo.setHelperText(f.obligatoria().contains(m)?"Obligatoria":"Opcional");
+    selectores.computeIfAbsent(f.clave(),k->new ArrayList<>()).add(combo);
+    combo.addValueChangeListener(e->{
+     if(cargando)return;
+     valores.put(f.clave(),e.getValue()==null?null:e.getValue().id());cargando=true;
+     selectores.get(f.clave()).stream().filter(c->c!=combo).forEach(c->c.setValue(e.getValue()));
+     cargando=false;dirty=true;refrescarEstados();
+    });form.add(combo);
+   }
+   if(m==Modulo.CIERRE)panel.add(new Paragraph("El resultado del ejercicio se requiere para el cierre anual. No condiciona el cierre mensual."));
+   var indicador=new Div();indicadoresCuenta.put(m,indicador);panel.add(form,indicador);
+   panel.setVisible(m==Modulo.VENTAS);panels.put(tab,panel);
+  }
+  modulosTabs.addSelectedChangeListener(e->panels.forEach((tab,panel)->panel.setVisible(tab==e.getSelectedTab())));
+  cuentas.add(modulosTabs);panels.values().forEach(cuentas::add);
+  cuentas.add(new Paragraph("Sin resultados: no existen cuentas de movimiento disponibles para esta función. Crea o activa cuentas compatibles en el Catálogo de cuentas."));
+ }
+ private void crearAutomatizacion() {
+  automatizacion.add(encabezado("AUTOMATIZACIÓN","Controla qué módulos generan asientos automáticamente."),resumen,maestro);
+  maestro.setReadOnly(!editarAuto);
+  maestro.addValueChangeListener(e->{if(!cargando){dirty=true;refrescarEstados();}});
+  automatizacion.add(new Paragraph("Activa la generación automática de asientos para los módulos que hayas habilitado."),aviso);
+  aviso.getElement().setAttribute("role","status");
+  var filas=new Div();filas.addClassName("cc-motor-module-list");
+  var titulos=new Div(new Span("Módulo"),new Span("Estado"),new Span("Automático"));titulos.addClassName("cc-motor-module-head");filas.add(titulos);
+  for(var m:Modulo.automatizables()) {
+   var status=new Div();estadosModulo.put(m,status);
+   var checkbox=new Checkbox();checkbox.setAriaLabel("Automatizar "+m.etiqueta());checkbox.setReadOnly(!editarAuto);switches.put(m,checkbox);
+   checkbox.addValueChangeListener(e->{if(!cargando){dirty=true;refrescarEstados();}});
+   var acciones=new Div(checkbox);acciones.addClassName("cc-motor-module-actions");
+   if(m!=Modulo.FINANZAS) {
+    var boton=new AppActionButton(ActionType.CONFIGURE,ButtonSize.GRID_ACTION,"Configurar cuentas",e->irACuentas(m));
+    configurar.put(m,boton);acciones.add(boton);
+   } else {
+    if(permiso("cajas.ver"))acciones.add(new AppActionButton(ActionType.CONFIGURE,ButtonSize.GRID_ACTION,"Configurar cajas",e->UI.getCurrent().navigate("cajas")));
+    if(permiso("cuentas_bancarias.ver"))acciones.add(new AppActionButton(ActionType.CONFIGURE,ButtonSize.GRID_ACTION,"Configurar cuentas bancarias",e->UI.getCurrent().navigate("cuentas-bancarias")));
+   }
+   var fila=new Div(new Span(m.etiqueta()),status,acciones);fila.addClassName("cc-motor-module-row");filas.add(fila);
+  }
+  automatizacion.add(filas,new Paragraph("Los cambios se aplican a nuevas operaciones. Apagar el interruptor general conserva las preferencias por módulo."));
+ }
+ private void irACuentas(Modulo m) {
+  Runnable navegar=()->{tabs.setSelectedTab(cuentasTab);if(m!=null)modulosTabs.setSelectedTab(pestanasModulo.get(m));};
+  if(dirty)confirmarDescartar(()->{cargar(actual);navegar.run();});else navegar.run();
+ }
+ @Override public void beforeEnter(BeforeEnterEvent e) {
+  if(e.getLocation()!=null&&e.getLocation().getQueryParameters().getParameters().getOrDefault("tab",List.of()).contains("periodos")) {
+   e.rerouteTo(PeriodosFiscalesView.class);return;
+  }
+  if(!modulos.habilitado("CONFIGURACION_CONTABLE")||!permiso("configuracion_contable.ver","CONFIGURACION_CONTABLE_VER")) {
+   e.rerouteTo(DashboardView.class);return;
+  }
+  try{cargar(servicio.obtener());}catch(RuntimeException ex){error(ex);}
+ }
+ private Entrada entrada() {
+  Map<String,UUID> cambios=new HashMap<>();
+  valores.forEach((clave,id)->{
+   var previa=actual.cuentas().get(clave);
+   if(!Objects.equals(previa==null?null:previa.id(),id))cambios.put(clave,id);
+  });
+  return new Entrada(actual.version(),"DEVENGADO",maestro.getValue(),cambios,flags());
+ }
+ private void cargar(Estado estado) {
+  actual=estado;evaluacion=estado;cargando=true;valores.clear();maestro.setValue(estado.automatico());
+  selectores.forEach((clave,cs)->{var c=estado.cuentas().get(clave);valores.put(clave,c==null?null:c.id());cs.forEach(s->s.setValue(c));});
+  estado.modulos().forEach(m->{if(switches.containsKey(m.modulo()))switches.get(m.modulo()).setValue(m.automatico());});
+  cargando=false;dirty=false;presentarEstados();
+ }
+ private void refrescarEstados() {
+  if(actual==null)return;
+  try{evaluacion=servicio.evaluar(entrada());presentarEstados();}catch(RuntimeException ex){error(ex);}
+ }
+ private void presentarEstados() {
+  if(evaluacion==null)return;
+  var estados=evaluacion.cuentasModulos();
+  selectores.forEach((k,cs)->cs.forEach(c->{
+   boolean invalida=c.getValue()!=null&&estados.stream().anyMatch(m->m.pendientes().contains(FuncionesContables.funcion(k).nombre()));
+   c.setInvalid(invalida);c.setErrorMessage("La cuenta configurada no está disponible o no es compatible.");
+   c.setEnabled(editar&&evaluacion.catalogo());
+  }));
+  long listos=evaluacion.modulosListos();
+  resumen.setText(listos+" de "+Modulo.automatizables().size()+" módulos con configuración disponible · "+evaluacion.modulosActivos()+" activos");
+  maestro.setEnabled(editarAuto&&(evaluacion.puedeActivarMaestro()||maestro.getValue()));
+  aviso.removeAll();
+  aviso.setClassName("cc-motor-notice-warning",listos==0);
+  if(!editarAuto)aviso.add(new Paragraph("Puedes consultar la configuración, pero necesitas permiso para modificar la automatización."));
+  else if(listos==0) {
+   aviso.add(new H3("⚠ CONTABILIZACIÓN AUTOMÁTICA NO DISPONIBLE"),
+    new Paragraph("Debes completar la configuración contable de al menos un módulo antes de activar la contabilización automática."),
+    new AppActionButton(ActionType.CONFIGURE,ButtonSize.GRID_ACTION,"Ir a Cuentas contables",e->irACuentas(null)));
+  } else if(!evaluacion.puedeActivarMaestro()&&!maestro.getValue())
+   aviso.add(new Paragraph("Selecciona al menos un módulo con configuración completa para habilitar el interruptor general."));
+  else aviso.add(new Paragraph(maestro.getValue()?(evaluacion.modulosActivos()>0?"✓ Contabilización automática activa.":
+   "Interruptor general encendido, sin módulos activos. Revisa la configuración o selecciona un módulo disponible."):
+   "Interruptor general apagado. Se conservan las preferencias individuales."));
+  for(var m:evaluacion.cuentasModulos()) {
+   var indicador=indicadoresCuenta.get(m.modulo());
+   if(indicador!=null){indicador.removeAll();indicador.add(new Paragraph(m.completo()?"✓ Configuración completa":
+    m.pendientes().isEmpty()?"✓ Cuentas configuradas. La integración operativa de automatización aún no está disponible.":
+    "⚠ Falta configurar: "+String.join(", ",m.pendientes())));}
+   var status=estadosModulo.get(m.modulo());if(status==null)continue;
+   status.removeAll();var badge=new Span(m.efectivo()?"✓ Activa":!m.completo()?"⚠ Configuración incompleta":!m.integrationAvailable()?"⚠ No disponible":"✓ Disponible");
+   badge.addClassName(m.completo()&&m.integrationAvailable()?"cc-motor-status-ready":"cc-motor-status-warning");status.add(badge);
+   if(!m.completo()||!m.integrationAvailable()) {
+    if(!m.pendientes().isEmpty())status.add(new Paragraph("Falta configurar: "+String.join(", ",m.pendientes())));
+    if(m.motivo()!=null&&!m.motivo().isBlank())status.add(new Paragraph(m.motivo()));
+   } else if(m.modulo()==Modulo.FINANZAS)status.add(new Paragraph("Disponible para transferencias en moneda base. Se validará la cuenta de cada recurso financiero utilizado."));
+   if(m.automatico()&&!m.efectivo())status.add(new Paragraph(
+    m.completo()&&m.integrationAvailable()?"Seleccionado · interruptor general apagado":"Preferencia conservada · contabilización bloqueada"));
+   switches.get(m.modulo()).setEnabled(editarAuto&&m.userCanManageAutomation()&&m.completo()&&m.integrationAvailable());
+   var configurarCuentas=configurar.get(m.modulo());if(configurarCuentas!=null)configurarCuentas.setVisible(!m.completo()&&!m.pendientes().isEmpty());
+  }
+ }
+ private Map<Modulo,Boolean> flags(){Map<Modulo,Boolean> r=new EnumMap<>(Modulo.class);switches.forEach((m,c)->r.put(m,c.getValue()));return r;}
+ private void guardar(){if(actual==null)return;try{cargar(servicio.guardar(entrada()));Notification.show(tabs.getSelectedTab()==autoTab?"Configuración de automatización guardada correctamente.":"Configuración contable guardada.");}catch(RuntimeException ex){error(ex);}}
+ private void confirmarDescartar(Runnable accion) {
+  var d=new ConfirmDialog();d.setHeader("Cambios sin guardar");d.setText("Hay cambios sin guardar. ¿Deseas salir sin guardarlos?");
+  d.setCancelable(true);d.setCancelText("Continuar editando");d.setConfirmText("Descartar cambios");d.setConfirmButtonTheme("error primary");
+  d.addConfirmListener(e->accion.run());d.open();
+ }
+ @Override public void beforeLeave(BeforeLeaveEvent e){if(dirty){var a=e.postpone();confirmarDescartar(()->{dirty=false;a.proceed();});}}
+ private static boolean permiso(String... ps){return Arrays.stream(ps).anyMatch(TenantContext.principalActual().permisos()::contains);}
+ private static void error(RuntimeException ex){com.citacloud.springboot.contacloud.app.errors.UiErrorHandler.show(ex,"No fue posible actualizar la configuración contable.");}
 }

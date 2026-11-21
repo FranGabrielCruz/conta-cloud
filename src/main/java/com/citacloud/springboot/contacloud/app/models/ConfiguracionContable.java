@@ -11,6 +11,8 @@ public class ConfiguracionContable {
 
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    @Version
+    private long version;
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
     @Column(name = "empresa_id", nullable = false)

@@ -1,6 +1,7 @@
 package com.citacloud.springboot.contacloud.app.views;
 
 import com.citacloud.springboot.contacloud.app.dto.CentroCostoDto;
+import com.vaadin.flow.component.checkbox.Checkbox;
 
 import com.citacloud.springboot.contacloud.app.dto.CuentaContableDto.*;
 import com.citacloud.springboot.contacloud.app.errors.UiErrorHandler;
@@ -165,6 +166,7 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
                     .field("Clasificación", c.clasificacion().etiqueta()).field("Naturaleza", c.naturaleza().etiqueta())
                     .field("Permite movimientos", c.permiteMovimientos() ? "Sí" : "No")
                     .field("Uso de Centro de Costos",c.usoCentroCosto().etiqueta())
+                    .field("Habilitada para resultado del ejercicio",c.permiteResultadoEjercicio()?"Sí":"No")
                     .field("Tiene movimientos", d.movimientos() ? "Sí" : "No")
                     .field("Saldo actual", "Disponible al integrar Asientos"));
             if (c.descripcion() != null) {
@@ -235,6 +237,13 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
         }
         usoCentro.setVisible(tipoCuenta.getValue()==Tipo.MOVIMIENTO);
         var estadoInicial = texto("Estado", 10);
+        var funcionResultado=new Checkbox("Habilitar para resultado del ejercicio");
+        funcionResultado.setValue(c!=null&&c.permiteResultadoEjercicio());
+        Runnable mostrarFuncion=()->funcionResultado.setVisible(tipoCuenta.getValue()==Tipo.MOVIMIENTO
+            &&Clasificacion.PATRIMONIO.etiqueta().equals(clase.getValue()));
+        tipoCuenta.addValueChangeListener(e->mostrarFuncion.run());
+        clase.addValueChangeListener(e->mostrarFuncion.run());
+        mostrarFuncion.run();
         estadoInicial.setValue(etiquetaEstado(c == null || c.activo()));
         estadoInicial.setReadOnly(true);
         padre.addValueChangeListener(e -> {
@@ -249,12 +258,13 @@ public class CatalogoCuentasView extends VerticalLayout implements BeforeEnterOb
         general.addClassName("cc-chart-form-general");
         modal.add(general,
             formulario("CLASIFICACIÓN CONTABLE", clase, naturaleza, tipoCuenta),
-            formulario("CONFIGURACIÓN", estadoInicial,usoCentro), descripcion);
+            formulario("CONFIGURACIÓN", estadoInicial,usoCentro,funcionResultado), descripcion);
         var solicitud = UUID.randomUUID();
         modal.getFooter().add(accion(ActionType.SAVE, "Guardar", () -> ejecutar("No fue posible guardar la cuenta.", () -> {
             if (nombre.isInvalid()) return;
             var entrada = new Entrada(padre.isEmpty() ? null : padre.getValue().id(), nombre.getValue(),
-                tipoCuenta.getValue(), naturaleza.getValue(), descripcion.getValue(),usoCentro.getValue());
+                tipoCuenta.getValue(), naturaleza.getValue(), descripcion.getValue(),usoCentro.getValue(),
+                funcionResultado.isVisible()&&funcionResultado.getValue());
             UUID id = c == null ? servicio.crear(entrada, solicitud) : c.id();
             if (c != null) servicio.editar(id, c.version(), entrada);
             modal.close();

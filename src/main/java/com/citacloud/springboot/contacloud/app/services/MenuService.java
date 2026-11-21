@@ -49,11 +49,12 @@ public class MenuService {
             configuracion.add(new OpcionMenu("Descuentos y recargos","configuracion/facturacion/descuentos-recargos","PERCENT"));
         boolean contabilidad = habilitados.contains("CONFIGURACION_CONTABLE")
             && (permisos.contains("configuracion_contable.ver")
-                || permisos.contains("CONFIGURACION_CONTABLE_VER")
-                || permisos.contains("periodos_fiscales.ver")
-                || permisos.contains("PERIODO_VER"));
+                || permisos.contains("CONFIGURACION_CONTABLE_VER"));
         if (contabilidad) configuracion.add(new OpcionMenu(
             "Configuración contable", "configuracion-contable", "BOOK_DOLLAR"));
+        if(habilitados.contains("CONFIGURACION_CONTABLE") &&
+            (permisos.contains("periodos_fiscales.ver") || permisos.contains("PERIODO_VER")))
+            configuracion.add(new OpcionMenu("Períodos fiscales","periodos-fiscales","CALENDAR"));
         if (habilitados.contains("CONFIGURACION") && permisos.contains("agentes_impresion.ver"))
             configuracion.add(new OpcionMenu("Agentes de impresión", "configuracion/impresion-pos/agentes", "PRINT"));
         if (!configuracion.isEmpty()) grupos.add(new GrupoMenu("CONFIGURACIÓN", List.copyOf(configuracion)));

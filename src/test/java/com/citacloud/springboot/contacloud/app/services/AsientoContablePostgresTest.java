@@ -147,6 +147,8 @@ class AsientoContablePostgresTest {
         });
         var reversado=new CountDownLatch(1);
         var liberar=new CountDownLatch(1);
+        var periodo=periodoCierre(jdbc,11);
+        var cierres=cierres(jdbc,new CierreContableRepository(new NamedParameterJdbcTemplate(jdbc)));
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
             var primero=executor.submit(()->{
                 autenticar(tenant,empresa);
@@ -155,6 +157,7 @@ class AsientoContablePostgresTest {
                         t.setRollbackOnly();
                         s.contabilizar(id,0,UUID.randomUUID());
                         s.reversar(id,1,fecha,"Prueba de concurrencia",UUID.randomUUID());
+                        cierres.cerrar(periodo,UUID.randomUUID(),null);
                         reversado.countDown();
                         esperar(liberar);
                     });
@@ -168,6 +171,10 @@ class AsientoContablePostgresTest {
                         assertThatThrownBy(()->tx.executeWithoutResult(t->{
                             jdbc.execute("SET LOCAL lock_timeout = '300ms'");
                             s.contabilizar(id,0,UUID.randomUUID());
+                        })).hasMessageContaining("FOR NO KEY UPDATE");
+                        assertThatThrownBy(()->tx.executeWithoutResult(t->{
+                            jdbc.execute("SET LOCAL lock_timeout = '300ms'");
+                            cierres.cerrar(periodo,UUID.randomUUID(),null);
                         })).hasMessageContaining("FOR NO KEY UPDATE");
                     } finally {SecurityContextHolder.clearContext();}
                 });
@@ -494,6 +501,155 @@ class AsientoContablePostgresTest {
         });
     }
 
+    @Test void cierreMensualBloqueaBorradoresYContabilizacionYConservaReaperturas() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            abrirPeriodo(jdbc);
+            autenticar(tenant,empresa);
+            var p=periodoCierre(jdbc,11);
+            var cierres=cierres(jdbc,new CierreContableRepository(new NamedParameterJdbcTemplate(jdbc)));
+            jdbc.update("UPDATE periodos_fiscales SET estado='CERRADO',fecha_cierre=current_timestamp,usuario_cierre_id=? WHERE id=?",
+                usuario,p);
+            assertThat(cierres.detalle(p).reabrible()).isTrue();
+            var legado=cierres.reabrir(p,null,UUID.randomUUID(),"Incorporar cierre anterior");
+            assertThat(legado.resumen().observacion()).contains("reconstruido");
+            assertThat(legado.reapertura().motivo()).isEqualTo("Incorporar cierre anterior");
+            assertThat(cierres.validacion(p).permiteCerrar()).isTrue();
+            var s=servicio(jdbc);
+            var caja=cuenta(jdbc,"CASH_DEFAULT");
+            var venta=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            var e=entrada(caja,venta,BigDecimal.TEN);
+            var borrador=s.crear(e,UUID.randomUUID());
+            assertThatThrownBy(()->cierres.cerrar(p,UUID.randomUUID(),null)).hasMessageContaining("borradores");
+            s.contabilizar(borrador,0,UUID.randomUUID());
+            var clave=UUID.randomUUID();
+            var cierre=cierres.cerrar(p,clave,"Validación mensual");
+            assertThat(cierre.asientoId()).isNull();
+            assertThat(cierre.resumen().evaluacion().resultado().neto()).isEqualByComparingTo("10");
+            assertThat(cierres.cerrar(p,clave,"Validación mensual").id()).isEqualTo(cierre.id());
+            assertThatThrownBy(()->cierres.cerrar(p,UUID.randomUUID(),null)).hasMessageContaining("abierto");
+            assertThatThrownBy(()->s.guardarYContabilizar(null,0,e,UUID.randomUUID())).hasMessageContaining("cerrado");
+            assertThatThrownBy(()->cierres.reabrir(p,cierre.id(),UUID.randomUUID()," ")).hasMessageContaining("motivo");
+            var claveReapertura=UUID.randomUUID();
+            var reabierto=cierres.reabrir(p,cierre.id(),claveReapertura,"Corrección mensual");
+            assertThat(reabierto.reapertura().motivo()).isEqualTo("Corrección mensual");
+            assertThat(cierres.reabrir(p,cierre.id(),claveReapertura,"Corrección mensual")).isEqualTo(reabierto);
+            assertThat(cierres.detalle(p).evaluacion().permiteCerrar()).isTrue();
+            var pdfService=new CierreContablePdfService(cierres,mock(LocalFileStorageService.class));
+            try(var pdf=Loader.loadPDF(pdfService.generar(p,cierre.id()).contenido())) {
+                assertThat(new PDFTextStripper().getText(pdf)).contains("CIERRE CONTABLE","Validación mensual",
+                    "Corrección mensual","10.00","30/11/2026").doesNotContain("ContaCloud");
+            } catch(java.io.IOException ex) {throw new AssertionError(ex);}
+            autenticar(tenant,UUID.randomUUID());
+            assertThatThrownBy(()->cierres.detalle(p)).isInstanceOf(RecursoNoEncontradoException.class);
+            autenticar(UUID.randomUUID(),empresa);
+            assertThatThrownBy(()->pdfService.generar(p,cierre.id())).isInstanceOf(RecursoNoEncontradoException.class);
+        });
+    }
+
+    @Test void cierreAnualRevierteYReintentaSinDuplicarElResultado() {
+        var jdbc=new JdbcTemplate(ds);
+        var gestor=new DataSourceTransactionManager(ds);
+        new TransactionTemplate(gestor).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            autenticar(tenant,empresa);
+            jdbc.update("""
+                INSERT INTO periodos_fiscales(tenant_id,empresa_id,anio,mes,nombre,fecha_inicial,fecha_final,estado)
+                SELECT ?,?,2026,n,'Mes '||n,make_date(2026,n,1),(make_date(2026,n,1)+interval '1 month - 1 day')::date,
+                       CASE WHEN n=12 OR n=11 THEN 'ABIERTO' ELSE 'CERRADO' END FROM generate_series(1,12) n
+                """,tenant,empresa);
+            var periodo=periodoCierre(jdbc,12);
+            var repo=new CierreContableRepository(new NamedParameterJdbcTemplate(jdbc));
+            var cierres=cierres(jdbc,repo);
+            assertThatThrownBy(()->cierres.cerrar(periodo,UUID.randomUUID(),null)).hasMessageContaining("anteriores");
+            assertThat(cierres.validacion(periodo).periodosAnteriores().existentes()).isEqualTo(11);
+            assertThat(cierres.validacion(periodo).periodosAnteriores().pendientes()).isEqualTo(1);
+            cierres.cerrar(periodoCierre(jdbc,11),UUID.randomUUID(),null);
+            assertThat(cierres.validacion(periodo).periodosAnteriores().pendientes()).isZero();
+            assertThatThrownBy(()->cierres.cerrar(periodo,UUID.randomUUID(),null)).hasMessageContaining("cuenta de resultado");
+            var resultado=jdbc.queryForObject("SELECT id FROM cuenta_contable WHERE empresa_id=? AND codigo='3.3'",UUID.class,empresa);
+            cierres.configurarResultado(resultado);
+            var s=servicio(jdbc);
+            var venta=cuenta(jdbc,"SALES_REVENUE_DEFAULT");
+            registrarBalanza(s,fecha.plusMonths(1),cuenta(jdbc,"CASH_DEFAULT"),venta,100);
+            var simulado=spy(repo);
+            doThrow(new ReglaNegocioException("Fallo de prueba")).when(simulado).registrar(any(),any(),any(),any(),any(),any());
+            var savepoint=new TransactionTemplate(gestor);
+            savepoint.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            assertThatThrownBy(()->savepoint.executeWithoutResult(t->cierres(jdbc,simulado).cerrar(periodo,UUID.randomUUID(),null)))
+                .hasMessageContaining("Fallo de prueba");
+            assertThat(cierres.detalle(periodo).historial()).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM asiento_contable WHERE empresa_id=? AND tipo='CIERRE'",Long.class,empresa)).isZero();
+            var anual=cierres.cerrar(periodo,UUID.randomUUID(),"Ejercicio");
+            assertThat(anual.resumen().evaluacion().resultado().neto()).isEqualByComparingTo("100");
+            assertThat(s.detalle(anual.asientoId()).fila().tipo()).isEqualTo(Tipo.CIERRE);
+            assertThat(s.detalle(anual.asientoId()).fila().origen()).isEqualTo(Origen.SISTEMA);
+            assertThat(s.detalle(anual.asientoId()).reversible()).isFalse();
+            var reapertura=cierres.reabrir(periodo,anual.id(),UUID.randomUUID(),"Ajuste posterior");
+            assertThat(reapertura.reapertura().reversaId()).isNotNull();
+            assertThat(s.detalle(anual.asientoId()).fila().estado()).isEqualTo(Estado.REVERSADO);
+            assertThat(s.detalle(reapertura.reapertura().reversaId()).reversaDe()).isEqualTo(anual.asientoId());
+            var segundo=cierres.cerrar(periodo,UUID.randomUUID(),null);
+            assertThat(segundo.resumen().evaluacion().resultado().neto()).isEqualByComparingTo("100");
+            assertThat(cierres.detalle(periodo).historial()).extracting(c->c.id()).containsExactly(segundo.id(),anual.id());
+        });
+    }
+
+    @Test void primerPeriodoDeEjercicioNoInventaMesesYRechazaCapitalComoResultado() {
+        var jdbc=new JdbcTemplate(ds);
+        new TransactionTemplate(new DataSourceTransactionManager(ds)).executeWithoutResult(tx->{
+            tx.setRollbackOnly();
+            preparar(jdbc);
+            autenticar(tenant,empresa);
+            jdbc.update("""
+                INSERT INTO periodos_fiscales(tenant_id,empresa_id,anio,mes,nombre,fecha_inicial,fecha_final,estado)
+                VALUES (?,?,2026,12,'Primer período',DATE '2026-09-28',DATE '2026-12-31','ABIERTO')
+                """,tenant,empresa);
+            var id=periodoCierre(jdbc,12);
+            var repo=new CierreContableRepository(new NamedParameterJdbcTemplate(jdbc));
+            var cierres=cierres(jdbc,repo);
+            var e=cierres.validacion(id);
+            assertThat(e.periodosAnteriores()).isEqualTo(new com.citacloud.springboot.contacloud.app.dto.CierreContableDto.PeriodosAnteriores(0,0));
+            assertThat(e.validaciones()).filteredOn(v->v.nombre().equals("Períodos anteriores")).singleElement()
+                .satisfies(v->assertThat(v.correcta()).isTrue());
+            var capital=jdbc.queryForObject("SELECT id FROM cuenta_contable WHERE empresa_id=? AND codigo='3.1'",UUID.class,empresa);
+            assertThatThrownBy(()->cierres.configurarResultado(capital)).hasMessageContaining("habilitada");
+            jdbc.update("""
+                INSERT INTO cuenta_contable_clave_empresa(tenant_id,empresa_id,clave,cuenta_id)
+                VALUES (?,?, 'FISCAL_RESULT_DEFAULT',?)
+                """,tenant,empresa,capital);
+            assertThat(cierres.validacion(id).permiteCerrar()).isFalse();
+            assertThatThrownBy(()->cierres.cerrar(id,UUID.randomUUID(),null)).hasMessageContaining("cuenta válida");
+            var destino=repo.buscarResultado(com.citacloud.springboot.contacloud.app.security.TenantContext.principalActual(),"",0,10);
+            assertThat(destino).singleElement().satisfies(c->assertThat(c.nombre()).isEqualTo("Resultado del ejercicio"));
+            cierres.configurarResultado(destino.getFirst().id());
+            jdbc.update("UPDATE cuenta_contable SET uso_centro_costo='OBLIGATORIO' WHERE id=?",destino.getFirst().id());
+            assertThat(cierres.validacion(id).permiteCerrar()).isFalse();
+            jdbc.update("UPDATE cuenta_contable SET uso_centro_costo='OPCIONAL' WHERE id=?",destino.getFirst().id());
+            assertThat(cierres.validacion(id).permiteCerrar()).isTrue();
+            assertThat(cierres.cerrar(id,UUID.randomUUID(),null).periodoId()).isEqualTo(id);
+        });
+    }
+
+    private UUID periodoCierre(JdbcTemplate jdbc,int mes) {
+        return jdbc.queryForObject("SELECT id FROM periodos_fiscales WHERE empresa_id=? AND anio=2026 AND mes=?",
+            UUID.class,empresa,mes);
+    }
+
+    private CierreContableService cierres(JdbcTemplate jdbc,CierreContableRepository repo) {
+        var named=new NamedParameterJdbcTemplate(jdbc);
+        var empresas=mock(EmpresaRepository.class);
+        var emisor=mock(Empresa.class);
+        when(emisor.getNombre()).thenReturn("Empresa de prueba");
+        when(emisor.getZonaHoraria()).thenReturn("America/Caracas");
+        when(empresas.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(emisor));
+        return new CierreContableService(repo,new CuentaContableRepository(named),new AsientoContableRepository(named),
+            servicio(jdbc),empresas,mock(DatosEmpresaRepository.class),new AuditoriaService(jdbc));
+    }
+
     private long ledger(JdbcTemplate j,UUID id) {
         return j.queryForObject("SELECT count(*) FROM asiento_movimiento_contable WHERE asiento_id=?",Long.class,id);
     }
@@ -534,8 +690,10 @@ class AsientoContablePostgresTest {
         when(e.getNombre()).thenReturn("Empresa de prueba");
         when(e.getZonaHoraria()).thenReturn("America/Caracas");
         when(empresas.findByIdAndTenantId(empresa,tenant)).thenReturn(Optional.of(e));
+        var configuracion=mock(ConfiguracionMotorService.class);
+        when(configuracion.efectivo(any())).thenReturn(true);
         return new AsientoContableService(new AsientoContableRepository(named),new CuentaContableRepository(named),empresas,
-            mock(DatosEmpresaRepository.class),auditoria);
+            mock(DatosEmpresaRepository.class),auditoria,configuracion);
     }
 
     private void autenticar(UUID t,UUID e) {
